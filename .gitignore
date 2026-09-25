@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual environment
+.venv/
+
+# Environment variables / secrets
+.env
+
+# Data
+data/raw/*
+data/processed/*
+
+# Models
+models/*
+
+# Jupyter
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
