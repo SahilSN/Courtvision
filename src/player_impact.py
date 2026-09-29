@@ -13,6 +13,8 @@ from feature_engineering import (
 )
 from model import WinProbabilityMLP
 
+from shared_attribution import apply_shared_credit
+
 
 # ============================================================
 # Paths
@@ -2301,6 +2303,21 @@ def analyze_player_impact(
         )
     )
 
+    # --------------------------------------------------------
+    # Shared-credit attribution
+    #
+    # The counterfactual WPA v3 event values above remain
+    # frozen. This layer only redistributes attribution among
+    # scorer/assister, turnover/stealer, and shooter/blocker.
+    # --------------------------------------------------------
+
+    events = apply_shared_credit(
+        events,
+        game_df,
+        home_team,
+        away_team,
+    )
+
     summary = (
         summarize_players(
             events
@@ -2397,8 +2414,8 @@ def analyze_player_impact(
     print(
         "Attribution:",
         (
-            "WPA v3 same-time "
-            "counterfactual"
+            "WPA v3 counterfactual "
+            "+ shared credit"
         ),
     )
 

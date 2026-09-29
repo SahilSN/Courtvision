@@ -268,19 +268,54 @@ def largest_event_wpa(
     if events.empty:
         return np.nan
 
-    return float(
-        events[
-            "playerWPA"
-        ]
+    if (
+        "sourcePlayerWPA"
+        in events.columns
+    ):
+        values = pd.to_numeric(
+            events[
+                "sourcePlayerWPA"
+            ],
+            errors="coerce",
+        )
+
+    else:
+        values = pd.to_numeric(
+            events[
+                "playerWPA"
+            ],
+            errors="coerce",
+        )
+
+    values = (
+        values
+        .dropna()
         .abs()
-        .max()
     )
+
+    if values.empty:
+        return np.nan
+
+    return float(
+        values.max()
+    )
+
 
 
 def scoring_share_of_top_events(
     events,
     n=10,
 ):
+    """
+    Measure the share of the largest underlying
+    WPA sequences that are scoring plays.
+
+    Shared-credit attribution can create multiple
+    player-allocation rows from one basketball
+    sequence, so validation must collapse back to
+    one row per sequence before ranking events.
+    """
+
     if events.empty:
         return np.nan
 
@@ -288,22 +323,66 @@ def scoring_share_of_top_events(
         events.copy()
     )
 
+    # sourcePlayerWPA preserves the original
+    # pre-split WPA value. Fall back to playerWPA
+    # for compatibility with primary-only WPA v3.
+    if (
+        "sourcePlayerWPA"
+        in df.columns
+    ):
+        df[
+            "validationEventWPA"
+        ] = pd.to_numeric(
+            df[
+                "sourcePlayerWPA"
+            ],
+            errors="coerce",
+        )
+
+    else:
+        df[
+            "validationEventWPA"
+        ] = pd.to_numeric(
+            df[
+                "playerWPA"
+            ],
+            errors="coerce",
+        )
+
     df[
-        "absoluteWPA"
+        "absoluteEventWPA"
     ] = (
         df[
-            "playerWPA"
+            "validationEventWPA"
         ]
         .abs()
     )
 
+    # Collapse scorer/assister, turnover/stealer,
+    # and shooter/blocker allocations back into
+    # their original sequence.
+    sequence_events = (
+        df.sort_values(
+            "absoluteEventWPA",
+            ascending=False,
+        )
+        .drop_duplicates(
+            subset=[
+                "sequenceId",
+            ],
+            keep="first",
+        )
+    )
+
     top = (
-        df.nlargest(
+        sequence_events.nlargest(
             min(
                 n,
-                len(df),
+                len(
+                    sequence_events
+                ),
             ),
-            "absoluteWPA",
+            "absoluteEventWPA",
         )
     )
 
@@ -319,6 +398,7 @@ def scoring_share_of_top_events(
         )
         .mean()
     )
+
 
 
 def same_clock_grouping_rate(
