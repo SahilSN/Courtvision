@@ -1064,6 +1064,16 @@ def build_run_explanation(
         "winProbabilitySwingPoints":
             wp_swing,
 
+        "startElapsed":
+            run[
+                "startElapsed"
+            ],
+
+        "endElapsed":
+            run[
+                "endElapsed"
+            ],
+
         "startPeriod":
             run[
                 "startPeriod"
@@ -1083,6 +1093,21 @@ def build_run_explanation(
             run[
                 "endClock"
             ],
+
+        "beneficiaryPoints":
+            beneficiary_points,
+
+        "opponentPoints":
+            opponent_points,
+
+        "beforeMargin":
+            before_margin,
+
+        "afterMargin":
+            after_margin,
+
+        "marginDescription":
+            margin_description,
 
         "contextScore":
             context_weight,

@@ -76,6 +76,7 @@ from analysis import (
 
 from momentum import detect_momentum_runs
 from contextual_explanations import build_contextual_explanations
+from game_story import build_game_story
 
 
 from box_score import (
@@ -86,7 +87,8 @@ from box_score import (
 
 from game_catalog import (
 
-    fetch_games_for_date,
+    fetch_season_games,
+    games_for_date_from_season_df,
 
 )
 
@@ -469,33 +471,35 @@ st.caption(
 
 
 @st.cache_data(
-
-    ttl=300
-
+    ttl=3600,
+    show_spinner=False,
 )
+def cached_season_game_log(
+    season,
+):
+    return (
+        fetch_season_games(
+            season=season,
+            timeout=60,
+        )
+    )
+
 
 def cached_games_for_date(
-
     season,
-
     selected_date,
-
 ):
+    season_df = (
+        cached_season_game_log(
+            season
+        )
+    )
 
     return (
-
-        fetch_games_for_date(
-
-            season=season,
-
-            game_date=(
-
-                selected_date
-
-            ),
-
+        games_for_date_from_season_df(
+            season_df=season_df,
+            game_date=selected_date,
         )
-
     )
 
 
@@ -551,6 +555,50 @@ def get_full_player_name(row):
     show_spinner=False,
 
 )
+
+
+@st.cache_data(
+    ttl=86400,
+    show_spinner=False,
+)
+def cached_existing_player_summary(
+    game_id,
+):
+    """
+    Load an already-computed WPA v3 summary without rerunning
+    the counterfactual player-impact pipeline.
+    """
+
+    result_path = (
+        ROOT_DIR
+        / "results"
+        / f"player_wpa_v3_{game_id}_summary.csv"
+    )
+
+    if not result_path.exists():
+        return None
+
+    try:
+        summary = pd.read_csv(
+            result_path
+        )
+
+    except Exception:
+        return None
+
+    required = {
+        "player",
+        "team",
+        "net_wpa_pp",
+    }
+
+    if not required.issubset(
+        summary.columns
+    ):
+        return None
+
+    return summary
+
 
 def cached_player_impact(
 
@@ -4716,6 +4764,278 @@ def render_team_box_score(
 
 
 
+
+def render_game_story(
+    game_df,
+    game_id,
+    season,
+    home_team_metadata,
+    away_team_metadata,
+    live=False,
+):
+    st.subheader(
+        "Game Story"
+    )
+
+    st.caption(
+        "Courtvision's whole-game read, combining game flow, "
+        "momentum, win probability, and player impact."
+    )
+
+    home_team = (
+        home_team_metadata[
+            "tricode"
+        ]
+    )
+
+    away_team = (
+        away_team_metadata[
+            "tricode"
+        ]
+    )
+
+    momentum = (
+        detect_momentum_runs(
+            game_df,
+            home_team=home_team,
+            away_team=away_team,
+            top_k=3,
+        )
+    )
+
+    player_summary = None
+
+    if not live:
+        player_summary = (
+            cached_existing_player_summary(
+                str(game_id)
+            )
+        )
+
+    explanations = (
+        build_contextual_explanations(
+            game_df=game_df,
+            momentum_result=momentum,
+            home_team=home_team,
+            away_team=away_team,
+            player_summary=player_summary,
+            top_k=4,
+        )
+    )
+
+    story = (
+        build_game_story(
+            game_df=game_df,
+            explanations=explanations,
+            home_team=home_team,
+            away_team=away_team,
+            player_summary=player_summary,
+        )
+    )
+
+    if story is None:
+        st.caption(
+            "Game Story is unavailable for this game."
+        )
+        return
+
+    metadata_by_team = {
+        home_team:
+            home_team_metadata,
+
+        away_team:
+            away_team_metadata,
+    }
+
+    winner = (
+        story.get(
+            "winner"
+        )
+    )
+
+    winner_metadata = (
+        metadata_by_team.get(
+            winner,
+            {},
+        )
+    )
+
+    color = (
+        winner_metadata.get(
+            "chart_color",
+            "#9CA3AF",
+        )
+    )
+
+    lead = (
+        story.get(
+            "lead",
+            "",
+        )
+    )
+
+    subtitle = (
+        story.get(
+            "subtitle",
+            "",
+        )
+    )
+
+    header_html = (
+        f'<div style="'
+        f'border-left:5px solid {color};'
+        f'background:rgba(128,128,128,0.055);'
+        f'border-radius:10px;'
+        f'padding:1.05rem 1.2rem;'
+        f'margin-bottom:0.9rem;'
+        f'">'
+
+        f'<div style="'
+        f'font-size:1.08rem;'
+        f'font-weight:800;'
+        f'line-height:1.35;'
+        f'">'
+        f'{lead}'
+        f'</div>'
+
+        f'<div style="'
+        f'margin-top:0.3rem;'
+        f'color:rgba(230,230,230,0.72);'
+        f'font-size:0.93rem;'
+        f'">'
+        f'{subtitle}'
+        f'</div>'
+
+        f'</div>'
+    )
+
+    st.markdown(
+        header_html,
+        unsafe_allow_html=True,
+    )
+
+    metrics = (
+        story.get(
+            "metrics",
+            [],
+        )
+    )
+
+    if metrics:
+        columns = (
+            st.columns(
+                len(metrics)
+            )
+        )
+
+        for column, metric in zip(
+            columns,
+            metrics,
+        ):
+            with column:
+                metric_html = (
+                    f'<div style="'
+                    f'background:rgba(128,128,128,0.035);'
+                    f'border:1px solid rgba(160,160,160,0.16);'
+                    f'border-radius:8px;'
+                    f'padding:0.75rem 0.9rem;'
+                    f'min-height:76px;'
+                    f'">'
+
+                    f'<div style="'
+                    f'color:rgba(220,220,220,0.58);'
+                    f'font-size:0.73rem;'
+                    f'font-weight:700;'
+                    f'text-transform:uppercase;'
+                    f'letter-spacing:0.05em;'
+                    f'">'
+                    f'{metric["label"]}'
+                    f'</div>'
+
+                    f'<div style="'
+                    f'margin-top:0.25rem;'
+                    f'font-size:1.02rem;'
+                    f'font-weight:800;'
+                    f'color:{color};'
+                    f'">'
+                    f'{metric["value"]}'
+                    f'</div>'
+
+                    f'</div>'
+                )
+
+                st.markdown(
+                    metric_html,
+                    unsafe_allow_html=True,
+                )
+
+    sections = (
+        story.get(
+            "sections",
+            [],
+        )
+    )
+
+    if sections:
+        story_html = (
+            '<div style="'
+            'background:rgba(128,128,128,0.035);'
+            'border:1px solid rgba(160,160,160,0.16);'
+            'border-radius:10px;'
+            'padding:0.35rem 1.15rem;'
+            'margin-top:1rem;'
+            '">'
+        )
+
+        for index, section in enumerate(
+            sections
+        ):
+            if index > 0:
+                story_html += (
+                    '<div style="'
+                    'border-top:1px solid '
+                    'rgba(160,160,160,0.12);'
+                    '"></div>'
+                )
+
+            story_html += (
+                '<div style="'
+                'padding:0.9rem 0;'
+                '">'
+
+                '<div style="'
+                'font-size:0.75rem;'
+                'font-weight:800;'
+                'text-transform:uppercase;'
+                'letter-spacing:0.055em;'
+                f'color:{color};'
+                'margin-bottom:0.32rem;'
+                '">'
+                f'{section["label"]}'
+                '</div>'
+
+                '<div style="'
+                'font-size:0.97rem;'
+                'line-height:1.55;'
+                'color:rgba(240,240,240,0.90);'
+                '">'
+                f'{section["text"]}'
+                '</div>'
+
+                '</div>'
+            )
+
+        story_html += (
+            '</div>'
+        )
+
+        st.markdown(
+            story_html,
+            unsafe_allow_html=True,
+        )
+
+
+
 def render_contextual_game_explanations(
     game_df,
     game_id,
@@ -6037,6 +6357,17 @@ def render_game(
     st.divider()
 
 
+
+    render_game_story(
+        game_df=game_df,
+        game_id=game_id,
+        season=season,
+        home_team_metadata=home_team,
+        away_team_metadata=away_team,
+        live=live,
+    )
+
+    st.divider()
 
     render_momentum_runs(
         game_df,
