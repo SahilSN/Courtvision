@@ -38,3 +38,11 @@ __pycache__/
 
 # Generated training datasets
 data/training/*.csv
+
+# Generated WPA analysis outputs
+results/player_wpa_*.csv
+results/player_wpa_v2_*.csv
+results/player_wpa_v3_*.csv
+
+# Local dashboard backups
+dashboard/*.before_*
