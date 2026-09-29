@@ -1,5 +1,5 @@
 import html
-
+import pandas as pd
 import sys
 
 from datetime import date
@@ -11,6 +11,7 @@ from pathlib import Path
 import plotly.graph_objects as go
 
 import streamlit as st
+from nba_api.stats.endpoints import commonteamroster, commonplayerinfo
 
 
 
@@ -3723,13 +3724,340 @@ def format_advanced_percent(
         return "—"
 
 
-def prepare_box_score_rows(
+def normalize_box_position(
+    value,
+):
+    if value is None:
+        return "—"
+
+    try:
+        if value != value:
+            return "—"
+    except Exception:
+        pass
+
+    position = str(
+        value
+    ).strip()
+
+    if not position:
+        return "—"
+
+    aliases = {
+        "Guard": "G",
+        "Forward": "F",
+        "Center": "C",
+        "Guard-Forward": "G-F",
+        "Forward-Guard": "F-G",
+        "Forward-Center": "F-C",
+        "Center-Forward": "C-F",
+    }
+
+    return aliases.get(
+        position,
+        position,
+    )
+
+
+@st.cache_data(
+    ttl=86400,
+    show_spinner=False,
+)
+def cached_team_position_map(
+    team_id,
+    season,
+):
+    """
+    Return personId -> roster position.
+
+    Historical box-score starter rows usually contain a
+    position directly, while bench rows may not. The team
+    roster fills those missing bench positions.
+    """
+
+    try:
+        endpoint = (
+            commonteamroster
+            .CommonTeamRoster(
+                team_id=int(team_id),
+                season=season,
+                timeout=60,
+            )
+        )
+
+        frames = (
+            endpoint.get_data_frames()
+        )
+
+        if not frames:
+            return {}
+
+        roster_df = (
+            frames[0]
+            .copy()
+        )
+
+        positions = {}
+
+        for _, row in (
+            roster_df.iterrows()
+        ):
+            player_id = (
+                row.get(
+                    "PLAYER_ID"
+                )
+            )
+
+            if (
+                player_id is None
+                or player_id != player_id
+            ):
+                continue
+
+            positions[
+                int(player_id)
+            ] = (
+                normalize_box_position(
+                    row.get(
+                        "POSITION"
+                    )
+                )
+            )
+
+        return positions
+
+    except Exception:
+        # Position information is supplemental.
+        # Never make the box score fail because this
+        # secondary endpoint is unavailable.
+        return {}
+
+
+
+@st.cache_data(
+    ttl=86400,
+    show_spinner=False,
+)
+def cached_player_position(
+    person_id,
+):
+    """
+    Last-resort position lookup for players missing from
+    the season roster response.
+    """
+
+    try:
+        endpoint = (
+            commonplayerinfo
+            .CommonPlayerInfo(
+                player_id=int(
+                    person_id
+                ),
+                timeout=60,
+            )
+        )
+
+        frames = (
+            endpoint.get_data_frames()
+        )
+
+        if not frames:
+            return "—"
+
+        player_df = (
+            frames[0]
+            .copy()
+        )
+
+        if player_df.empty:
+            return "—"
+
+        row = (
+            player_df.iloc[
+                0
+            ]
+        )
+
+        # nba_api versions have used both upper- and
+        # title-style column naming in endpoint wrappers,
+        # so support either defensively.
+        position = None
+
+        for column in [
+            "POSITION",
+            "Position",
+            "position",
+        ]:
+            if column in player_df.columns:
+                position = (
+                    row.get(
+                        column
+                    )
+                )
+
+                break
+
+        return (
+            normalize_box_position(
+                position
+            )
+        )
+
+    except Exception:
+        return "—"
+
+
+def identify_box_score_starters(
     team_df,
 ):
+    """
+    Identify the starting five.
+
+    Priority:
+      1. explicit starter field, when available
+      2. historical V3 position field
+      3. first five rows as a fallback
+    """
+
+    starters = pd.Series(
+        False,
+        index=team_df.index,
+        dtype=bool,
+    )
+
+    if "starter" in team_df.columns:
+        values = (
+            team_df[
+                "starter"
+            ]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .str.lower()
+        )
+
+        explicit = (
+            values.isin(
+                [
+                    "true",
+                    "1",
+                    "yes",
+                    "y",
+                ]
+            )
+        )
+
+        if explicit.sum() == 5:
+            return explicit
+
+    if "position" in team_df.columns:
+        positioned = (
+            team_df[
+                "position"
+            ]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .ne("")
+        )
+
+        # Traditional V3 normally populates this for
+        # the five starters.
+        if positioned.sum() == 5:
+            return positioned
+
+    starters.iloc[
+        :min(
+            5,
+            len(team_df),
+        )
+    ] = True
+
+    return starters
+
+
+def prepare_box_score_rows(
+    team_df,
+    season,
+):
+    """
+    Build the traditional table.
+
+    Important:
+    numeric statistics remain numeric rather than being
+    converted to strings. This fixes Streamlit sorting.
+    """
+
+    working = (
+        team_df.copy()
+        .reset_index(
+            drop=True
+        )
+    )
+
+    working[
+        "_apiOrder"
+    ] = range(
+        len(working)
+    )
+
+    working[
+        "_starter"
+    ] = (
+        identify_box_score_starters(
+            working
+        )
+        .to_numpy()
+    )
+
+    # Default ordering:
+    # five starters first, then bench.
+    working = (
+        working
+        .sort_values(
+            [
+                "_starter",
+                "_apiOrder",
+            ],
+            ascending=[
+                False,
+                True,
+            ],
+            kind="mergesort",
+        )
+        .reset_index(
+            drop=True
+        )
+    )
+
+    position_map = {}
+
+    if (
+        not working.empty
+        and "teamId"
+        in working.columns
+    ):
+        ids = (
+            working[
+                "teamId"
+            ]
+            .dropna()
+        )
+
+        if not ids.empty:
+            position_map = (
+                cached_team_position_map(
+                    int(
+                        ids.iloc[0]
+                    ),
+                    season,
+                )
+            )
+
     rows = []
 
     for _, row in (
-        team_df.iterrows()
+        working.iterrows()
     ):
         minutes = str(
             row.get(
@@ -3747,36 +4075,123 @@ def prepare_box_score_rows(
             or ""
         ).strip()
 
-        if not minutes:
-            rows.append(
-                {
-                    "Player":
-                        row.get(
-                            "fullName",
-                            "",
-                        ),
+        played = bool(
+            minutes
+        )
 
-                    "MIN":
-                        (
-                            comment
-                            if comment
-                            else "DNP"
-                        ),
-
-                    "PTS": "—",
-                    "REB": "—",
-                    "AST": "—",
-                    "STL": "—",
-                    "BLK": "—",
-                    "TO": "—",
-                    "FG": "—",
-                    "3PT": "—",
-                    "FT": "—",
-                    "+/-": "—",
-                }
+        person_id = (
+            row.get(
+                "personId"
             )
+        )
 
-            continue
+        roster_position = None
+
+        try:
+            if (
+                person_id is not None
+                and person_id == person_id
+            ):
+                roster_position = (
+                    position_map.get(
+                        int(person_id)
+                    )
+                )
+        except (
+            TypeError,
+            ValueError,
+        ):
+            pass
+
+        direct_position = (
+            normalize_box_position(
+                row.get(
+                    "position",
+                    "",
+                )
+            )
+        )
+
+        position = (
+            roster_position
+            if (
+                roster_position
+                and roster_position != "—"
+            )
+            else direct_position
+        )
+
+        # If both the box-score row and the team roster
+        # are missing a position, query the player's
+        # canonical NBA profile as a final fallback.
+        if (
+            position == "—"
+            and person_id is not None
+        ):
+            try:
+                if person_id == person_id:
+                    position = (
+                        cached_player_position(
+                            int(
+                                person_id
+                            )
+                        )
+                    )
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+                pass
+
+        # If both the box-score row and the team roster
+        # are missing a position, query the player's
+        # canonical NBA profile as a final fallback.
+        if (
+            position == "—"
+            and person_id is not None
+        ):
+            try:
+                if person_id == person_id:
+                    position = (
+                        cached_player_position(
+                            int(
+                                person_id
+                            )
+                        )
+                    )
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+                pass
+
+        def numeric_stat(
+            column,
+        ):
+            if not played:
+                return pd.NA
+
+            value = pd.to_numeric(
+                pd.Series(
+                    [
+                        row.get(
+                            column
+                        )
+                    ]
+                ),
+                errors="coerce",
+            ).iloc[0]
+
+            if pd.isna(value):
+                return pd.NA
+
+            return int(
+                round(
+                    float(value)
+                )
+            )
 
         rows.append(
             {
@@ -3786,91 +4201,138 @@ def prepare_box_score_rows(
                         "",
                     ),
 
+                "POS":
+                    position,
+
                 "MIN":
-                    minutes,
+                    (
+                        minutes
+                        if played
+                        else (
+                            comment
+                            if comment
+                            else "DNP"
+                        )
+                    ),
 
                 "PTS":
-                    format_box_stat(
-                        row.get(
-                            "points"
-                        )
+                    numeric_stat(
+                        "points"
                     ),
 
                 "REB":
-                    format_box_stat(
-                        row.get(
-                            "reboundsTotal"
-                        )
+                    numeric_stat(
+                        "reboundsTotal"
                     ),
 
                 "AST":
-                    format_box_stat(
-                        row.get(
-                            "assists"
-                        )
+                    numeric_stat(
+                        "assists"
                     ),
 
                 "STL":
-                    format_box_stat(
-                        row.get(
-                            "steals"
-                        )
+                    numeric_stat(
+                        "steals"
                     ),
 
                 "BLK":
-                    format_box_stat(
-                        row.get(
-                            "blocks"
-                        )
+                    numeric_stat(
+                        "blocks"
                     ),
 
                 "TO":
-                    format_box_stat(
-                        row.get(
-                            "turnovers"
-                        )
+                    numeric_stat(
+                        "turnovers"
                     ),
 
                 "FG":
-                    format_shooting_line(
-                        row.get(
-                            "fieldGoalsMade"
-                        ),
-                        row.get(
-                            "fieldGoalsAttempted"
-                        ),
+                    (
+                        format_shooting_line(
+                            row.get(
+                                "fieldGoalsMade"
+                            ),
+                            row.get(
+                                "fieldGoalsAttempted"
+                            ),
+                        )
+                        if played
+                        else "—"
                     ),
 
                 "3PT":
-                    format_shooting_line(
-                        row.get(
-                            "threePointersMade"
-                        ),
-                        row.get(
-                            "threePointersAttempted"
-                        ),
+                    (
+                        format_shooting_line(
+                            row.get(
+                                "threePointersMade"
+                            ),
+                            row.get(
+                                "threePointersAttempted"
+                            ),
+                        )
+                        if played
+                        else "—"
                     ),
 
                 "FT":
-                    format_shooting_line(
-                        row.get(
-                            "freeThrowsMade"
-                        ),
-                        row.get(
-                            "freeThrowsAttempted"
-                        ),
+                    (
+                        format_shooting_line(
+                            row.get(
+                                "freeThrowsMade"
+                            ),
+                            row.get(
+                                "freeThrowsAttempted"
+                            ),
+                        )
+                        if played
+                        else "—"
                     ),
 
                 "+/-":
-                    format_plus_minus(
-                        row.get(
-                            "plusMinusPoints"
-                        )
+                    numeric_stat(
+                        "plusMinusPoints"
+                    ),
+
+                "_starter":
+                    bool(
+                        row[
+                            "_starter"
+                        ]
                     ),
             }
         )
 
-    return rows
+    result = pd.DataFrame(
+        rows
+    )
+
+    # Force nullable numeric dtype so Streamlit knows that
+    # these are numbers instead of text.
+    for column in [
+        "PTS",
+        "REB",
+        "AST",
+        "STL",
+        "BLK",
+        "TO",
+        "+/-",
+    ]:
+        if column in result.columns:
+            result[
+                column
+            ] = (
+                pd.to_numeric(
+                    result[
+                        column
+                    ],
+                    errors="coerce",
+                )
+                .astype(
+                    "Int64"
+                )
+            )
+
+    return result
+
 
 
 def prepare_advanced_box_score_rows(
@@ -3982,9 +4444,74 @@ def prepare_advanced_box_score_rows(
     return rows
 
 
+def render_box_team_header(
+    team,
+):
+    tricode = (
+        team[
+            "tricode"
+        ]
+    )
+
+    name = (
+        team.get(
+            "name",
+            tricode,
+        )
+    )
+
+    color = (
+        team.get(
+            "chart_color",
+            "#9CA3AF",
+        )
+    )
+
+    html = (
+        f'<div style="'
+        f'border-left:5px solid {color};'
+        f'background:rgba(128,128,128,0.055);'
+        f'border-radius:8px;'
+        f'padding:0.70rem 0.95rem;'
+        f'margin:0.25rem 0 0.65rem 0;'
+        f'">'
+
+        f'<div style="'
+        f'display:flex;'
+        f'align-items:baseline;'
+        f'gap:0.65rem;'
+        f'">'
+
+        f'<span style="'
+        f'font-size:1.45rem;'
+        f'font-weight:800;'
+        f'">'
+        f'{tricode}'
+        f'</span>'
+
+        f'<span style="'
+        f'color:{color};'
+        f'font-size:0.92rem;'
+        f'font-weight:650;'
+        f'">'
+        f'{name}'
+        f'</span>'
+
+        f'</div>'
+        f'</div>'
+    )
+
+    st.markdown(
+        html,
+        unsafe_allow_html=True,
+    )
+
+
 def render_team_box_score(
     box_score,
     team,
+    season,
+    game_id,
 ):
     team_df = (
         get_team_players(
@@ -3995,8 +4522,8 @@ def render_team_box_score(
         )
     )
 
-    st.markdown(
-        f"### {team['tricode']}"
+    render_box_team_header(
+        team
     )
 
     if team_df.empty:
@@ -4005,13 +4532,151 @@ def render_team_box_score(
         )
         return
 
-    st.dataframe(
+    prepared_df = (
         prepare_box_score_rows(
-            team_df
-        ),
-        use_container_width=True,
-        hide_index=True,
+            team_df,
+            season,
+        )
     )
+
+    # --------------------------------------------------------
+    # Player filtering
+    # --------------------------------------------------------
+
+    view = st.segmented_control(
+        "Players",
+        options=[
+            "All",
+            "Starters",
+            "Bench",
+        ],
+        default="All",
+        key=(
+            f"box_score_view_"
+            f"{game_id}_"
+            f"{team['tricode']}"
+        ),
+        label_visibility="collapsed",
+    )
+
+    if view == "Starters":
+        table_df = (
+            prepared_df[
+                prepared_df[
+                    "_starter"
+                ]
+            ]
+            .copy()
+        )
+
+    elif view == "Bench":
+        table_df = (
+            prepared_df[
+                ~prepared_df[
+                    "_starter"
+                ]
+            ]
+            .copy()
+        )
+
+    else:
+        table_df = (
+            prepared_df.copy()
+        )
+
+    table_df = (
+        table_df
+        .drop(
+            columns=[
+                "_starter",
+            ]
+        )
+        .reset_index(
+            drop=True
+        )
+    )
+
+    st.dataframe(
+        table_df,
+        width="stretch",
+        hide_index=True,
+        height=min(
+            560,
+            42
+            + (
+                max(
+                    1,
+                    len(table_df),
+                )
+                * 35
+            ),
+        ),
+        column_config={
+            "Player":
+                st.column_config.TextColumn(
+                    "Player",
+                    width="large",
+                ),
+
+            "POS":
+                st.column_config.TextColumn(
+                    "POS",
+                    width="small",
+                ),
+
+            "MIN":
+                st.column_config.TextColumn(
+                    "MIN",
+                    width="small",
+                ),
+
+            "PTS":
+                st.column_config.NumberColumn(
+                    "PTS",
+                    format="%d",
+                ),
+
+            "REB":
+                st.column_config.NumberColumn(
+                    "REB",
+                    format="%d",
+                ),
+
+            "AST":
+                st.column_config.NumberColumn(
+                    "AST",
+                    format="%d",
+                ),
+
+            "STL":
+                st.column_config.NumberColumn(
+                    "STL",
+                    format="%d",
+                ),
+
+            "BLK":
+                st.column_config.NumberColumn(
+                    "BLK",
+                    format="%d",
+                ),
+
+            "TO":
+                st.column_config.NumberColumn(
+                    "TO",
+                    format="%d",
+                ),
+
+            "+/-":
+                st.column_config.NumberColumn(
+                    "+/-",
+                    format="%+d",
+                ),
+        },
+    )
+
+    # --------------------------------------------------------
+    # Preserve existing advanced-stat behavior
+    # --------------------------------------------------------
 
     advanced_columns = [
         "offensiveRating",
@@ -4044,13 +4709,14 @@ def render_team_box_score(
                 prepare_advanced_box_score_rows(
                     team_df
                 ),
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 
 
 def render_box_score(
     game_id,
+    season,
     away_team,
     home_team,
     live=False,
@@ -4060,10 +4726,9 @@ def render_box_score(
     )
 
     st.caption(
-        "Traditional player statistics "
-        "with plus/minus. Expand each team "
-        "for advanced efficiency and "
-        "possession-based metrics."
+        "Starting five are listed first, followed by the "
+        "bench. Use the player filter or click any numeric "
+        "column header to sort."
     )
 
     try:
@@ -4099,16 +4764,20 @@ def render_box_score(
     render_team_box_score(
         box_score,
         away_team,
+        season,
+        str(game_id),
     )
 
     st.markdown(
-        "<div style='height:0.75rem'></div>",
+        "<div style='height:1rem'></div>",
         unsafe_allow_html=True,
     )
 
     render_team_box_score(
         box_score,
         home_team,
+        season,
+        str(game_id),
     )
 
     if not box_score.get(
@@ -4119,9 +4788,6 @@ def render_box_score(
             "Advanced statistics are "
             "currently unavailable."
         )
-
-
-
 
 
 # ============================================================
@@ -5064,7 +5730,7 @@ def render_game(
 
         figure,
 
-        use_container_width=True,
+        width="stretch",
 
         config={
 
@@ -5182,6 +5848,7 @@ def render_game(
 
     render_box_score(
         game_id=game_id,
+        season=season,
         away_team=away_team,
         home_team=home_team,
         live=live,
@@ -5217,7 +5884,7 @@ def render_game(
 
             game_df,
 
-            use_container_width=True,
+            width="stretch",
 
         )
 
