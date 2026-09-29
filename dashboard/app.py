@@ -73,6 +73,9 @@ from analysis import (
 
 
 
+from momentum import detect_momentum_runs
+
+
 from box_score import (
     fetch_box_score,
     get_team_players,
@@ -665,7 +668,7 @@ if mode == "Historical":
 
         HISTORICAL_SEASONS,
 
-        index=1,
+        index=0,
 
         key="courtvision_historical_season",
 
@@ -4120,6 +4123,317 @@ def render_box_score(
 
 
 
+
+# ============================================================
+# Momentum runs
+# ============================================================
+
+def format_momentum_duration(
+    seconds,
+):
+    seconds = max(
+        0,
+        int(
+            round(
+                float(
+                    seconds
+                )
+            )
+        ),
+    )
+
+    minutes = (
+        seconds // 60
+    )
+
+    remaining = (
+        seconds % 60
+    )
+
+    return (
+        f"{minutes}:{remaining:02d}"
+    )
+
+
+def format_momentum_location(
+    period,
+    clock,
+):
+    return (
+        f"{format_period_label(period)} "
+        f"{normalize_clock_display(clock)}"
+    )
+
+
+def render_momentum_card(
+    run,
+    team_metadata,
+):
+    team = (
+        run[
+            "beneficiaryTeam"
+        ]
+    )
+
+    opponent = (
+        run[
+            "opponentTeam"
+        ]
+    )
+
+    color = (
+        team_metadata.get(
+            "chart_color",
+            "#9CA3AF",
+        )
+    )
+
+    swing = float(
+        run[
+            "winProbabilitySwingPoints"
+        ]
+    )
+
+    before = (
+        float(
+            run[
+                "winProbabilityBefore"
+            ]
+        )
+        * 100.0
+    )
+
+    after = (
+        float(
+            run[
+                "winProbabilityAfter"
+            ]
+        )
+        * 100.0
+    )
+
+    start_location = (
+        format_momentum_location(
+            run[
+                "startPeriod"
+            ],
+            run[
+                "startClock"
+            ],
+        )
+    )
+
+    end_location = (
+        format_momentum_location(
+            run[
+                "endPeriod"
+            ],
+            run[
+                "endClock"
+            ],
+        )
+    )
+
+    duration = (
+        format_momentum_duration(
+            run[
+                "durationSeconds"
+            ]
+        )
+    )
+
+    team_points = int(
+        run[
+            "beneficiaryPoints"
+        ]
+    )
+
+    opponent_points = int(
+        run[
+            "opponentPoints"
+        ]
+    )
+
+    transitions = int(
+        run[
+            "transitions"
+        ]
+    )
+
+    # Construct HTML without leading indentation.
+    # Indented HTML inside a Markdown string can be
+    # interpreted by Streamlit as a code block.
+    html_block = (
+        f'<div style="'
+        f'border-left:4px solid {color};'
+        f'border-radius:8px;'
+        f'padding:0.85rem 1rem;'
+        f'margin-bottom:0.75rem;'
+        f'background:rgba(128,128,128,0.06);'
+        f'">'
+
+        f'<div style="'
+        f'display:flex;'
+        f'justify-content:space-between;'
+        f'align-items:baseline;'
+        f'gap:1rem;'
+        f'">'
+
+        f'<span style="'
+        f'font-weight:750;'
+        f'font-size:1.02rem;'
+        f'">'
+        f'{team} momentum run'
+        f'</span>'
+
+        f'<span style="'
+        f'color:{color};'
+        f'font-weight:800;'
+        f'font-variant-numeric:tabular-nums;'
+        f'white-space:nowrap;'
+        f'">'
+        f'+{swing:.1f} pp'
+        f'</span>'
+
+        f'</div>'
+
+        f'<div style="'
+        f'margin-top:0.35rem;'
+        f'color:rgba(230,230,230,0.82);'
+        f'">'
+        f'{start_location} → {end_location}'
+        f' · {duration}'
+        f'</div>'
+
+        f'<div style="'
+        f'margin-top:0.45rem;'
+        f'font-weight:600;'
+        f'">'
+        f'{team} win probability: '
+        f'{before:.1f}% → {after:.1f}%'
+        f'</div>'
+
+        f'<div style="'
+        f'margin-top:0.25rem;'
+        f'color:rgba(230,230,230,0.78);'
+        f'">'
+        f'Scoring stretch: '
+        f'{team} {team_points}–{opponent_points} {opponent}'
+        f' · {transitions} state transitions'
+        f'</div>'
+
+        f'</div>'
+    )
+
+    st.markdown(
+        html_block,
+        unsafe_allow_html=True,
+    )
+
+
+
+def render_momentum_runs(
+    game_df,
+    home_team_metadata,
+    away_team_metadata,
+):
+    st.subheader(
+        "Momentum Runs"
+    )
+
+    st.caption(
+        "Multi-play stretches where one team's modeled "
+        "chance of winning rose substantially over a short "
+        "sequence. These values show net observed win-"
+        "probability movement across the stretch; they are "
+        "not sums of player WPA."
+    )
+
+    result = (
+        detect_momentum_runs(
+            game_df,
+            home_team=(
+                home_team_metadata[
+                    "tricode"
+                ]
+            ),
+            away_team=(
+                away_team_metadata[
+                    "tricode"
+                ]
+            ),
+            top_k=3,
+        )
+    )
+
+    home_runs = (
+        result[
+            "home_runs"
+        ]
+    )
+
+    away_runs = (
+        result[
+            "away_runs"
+        ]
+    )
+
+    if (
+        not home_runs
+        and not away_runs
+    ):
+        st.caption(
+            "No momentum runs cleared the current "
+            "detection thresholds in this game."
+        )
+
+        return
+
+    home_col, away_col = (
+        st.columns(
+            2
+        )
+    )
+
+    with home_col:
+        st.markdown(
+            f"### "
+            f"{home_team_metadata['tricode']}"
+        )
+
+        if home_runs:
+            for run in home_runs:
+                render_momentum_card(
+                    run,
+                    home_team_metadata,
+                )
+
+        else:
+            st.caption(
+                "No qualifying run."
+            )
+
+    with away_col:
+        st.markdown(
+            f"### "
+            f"{away_team_metadata['tricode']}"
+        )
+
+        if away_runs:
+            for run in away_runs:
+                render_momentum_card(
+                    run,
+                    away_team_metadata,
+                )
+
+        else:
+            st.caption(
+                "No qualifying run."
+            )
+
+
+
+
 def render_game(
 
     result,
@@ -4857,6 +5171,14 @@ def render_game(
     st.divider()
 
 
+
+    render_momentum_runs(
+        game_df,
+        home_team,
+        away_team,
+    )
+
+    st.divider()
 
     render_box_score(
         game_id=game_id,
