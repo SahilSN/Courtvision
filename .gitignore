@@ -22,3 +22,19 @@ models/*
 
 # macOS
 .DS_Store
+# Courtvision generated datasets / caches
+data/raw/
+data/processed/
+data/training/*_training_v4_base.csv
+data/training/*_training_v4_base_pilot.csv
+data/training/*_fetch_failures.csv
+
+# Large model evaluation outputs
+results/*_predictions.csv
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Generated training datasets
+data/training/*.csv
