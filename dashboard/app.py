@@ -1403,1225 +1403,1620 @@ def normalize_clock_display(
 
 
 
-def build_win_probability_plot(
 
-    game_df,
-
-    home_swings,
-
-    away_swings,
-
-    home_team,
-
-    away_team,
-
+def hex_to_rgb(
+    color,
 ):
+    """
+    Convert #RRGGBB to an RGB tuple.
+    """
 
-    home_color = (
+    if not isinstance(
+        color,
+        str,
+    ):
+        return None
 
-        home_team.get(
+    color = (
+        color.strip()
+        .lstrip("#")
+    )
 
-            "chart_color",
+    if len(color) != 6:
+        return None
 
-            "#58A6FF",
-
+    try:
+        return tuple(
+            int(
+                color[index:index + 2],
+                16,
+            )
+            for index
+            in (
+                0,
+                2,
+                4,
+            )
         )
 
-    )
+    except ValueError:
+        return None
 
 
+def chart_color_distance(
+    color_a,
+    color_b,
+):
+    """
+    Simple RGB distance used only to determine
+    whether two matchup colors are visually
+    difficult to distinguish.
+    """
 
-    away_color = (
-
-        away_team.get(
-
-            "chart_color",
-
-            "#FF5C77",
-
+    rgb_a = (
+        hex_to_rgb(
+            color_a
         )
-
     )
 
-
-
-    background_color = (
-
-        "#0E1117"
-
+    rgb_b = (
+        hex_to_rgb(
+            color_b
+        )
     )
-
-
-
-    text_color = (
-
-        "#F3F4F6"
-
-    )
-
-
-
-    muted_text = (
-
-        "#9CA3AF"
-
-    )
-
-
-
-    reference_color = (
-
-        "rgba(255,255,255,0.30)"
-
-    )
-
-
-
-    grid_color = (
-
-        "rgba(255,255,255,0.08)"
-
-    )
-
-
-
-
 
     if (
-
-        "isTerminalState"
-
-        in game_df.columns
-
+        rgb_a is None
+        or rgb_b is None
     ):
+        return 999.0
 
-        model_game_df = (
+    return (
+        sum(
+            (
+                component_a
+                - component_b
+            ) ** 2
 
-            game_df[
-
-                game_df[
-
-                    "isTerminalState"
-
-                ]
-
-                == False
-
-            ]
-
-            .copy()
-
+            for (
+                component_a,
+                component_b,
+            )
+            in zip(
+                rgb_a,
+                rgb_b,
+            )
         )
-
-
-
-        terminal_df = (
-
-            game_df[
-
-                game_df[
-
-                    "isTerminalState"
-
-                ]
-
-                == True
-
-            ]
-
-            .copy()
-
-        )
-
-
-
-    else:
-
-        model_game_df = (
-
-            game_df.copy()
-
-        )
-
-
-
-        terminal_df = (
-
-            game_df.iloc[
-
-                0:0
-
-            ].copy()
-
-        )
-
-
-
-
-
-    fig = (
-
-        go.Figure()
-
+        ** 0.5
     )
 
 
 
 
+def relative_luminance(
+    color,
+):
+    """
+    WCAG-style relative luminance for a hex color.
+    """
+
+    rgb = (
+        hex_to_rgb(
+            color
+        )
+    )
+
+    if rgb is None:
+        return 1.0
+
+    channels = []
+
+    for value in rgb:
+        channel = (
+            value / 255.0
+        )
+
+        if channel <= 0.04045:
+            channel = (
+                channel / 12.92
+            )
+
+        else:
+            channel = (
+                (
+                    channel + 0.055
+                )
+                / 1.055
+            ) ** 2.4
+
+        channels.append(
+            channel
+        )
+
+    return (
+        0.2126
+        * channels[0]
+        + 0.7152
+        * channels[1]
+        + 0.0722
+        * channels[2]
+    )
+
+
+def contrast_ratio(
+    color_a,
+    color_b,
+):
+    luminance_a = (
+        relative_luminance(
+            color_a
+        )
+    )
+
+    luminance_b = (
+        relative_luminance(
+            color_b
+        )
+    )
+
+    lighter = max(
+        luminance_a,
+        luminance_b,
+    )
+
+    darker = min(
+        luminance_a,
+        luminance_b,
+    )
+
+    return (
+        (
+            lighter + 0.05
+        )
+        / (
+            darker + 0.05
+        )
+    )
+
+
+def resolve_matchup_chart_styles(
+    home_team,
+    away_team,
+):
+    """
+    Pick team-authentic colors that satisfy two goals:
+
+    1. distinguish the two teams from each other;
+    2. remain readable against Courtvision's dark background.
+
+    Candidate order:
+        chart color
+        primary team color
+        secondary team color
+        optional chart alternate color
+
+    If a team's normal secondary color is black, for example,
+    it will be rejected on the dark dashboard.
+    """
+
+    background = (
+        "#0E1117"
+    )
+
+    minimum_background_contrast = (
+        2.2
+    )
+
+    minimum_team_distance = (
+        95.0
+    )
+
+    def candidate_colors(
+        team,
+    ):
+        values = [
+            team.get(
+                "chart_color"
+            ),
+            team.get(
+                "primary_color"
+            ),
+            team.get(
+                "secondary_color"
+            ),
+            team.get(
+                "alternate_chart_color"
+            ),
+        ]
+
+        result = []
+
+        for value in values:
+            if (
+                value
+                and value not in result
+            ):
+                result.append(
+                    value
+                )
+
+        return result
+
+
+    home_candidates = (
+        candidate_colors(
+            home_team
+        )
+    )
+
+    away_candidates = (
+        candidate_colors(
+            away_team
+        )
+    )
+
+
+    # --------------------------------------------------------
+    # Only keep colors that are visible on the dashboard.
+    # --------------------------------------------------------
+
+    readable_home = [
+        color
+        for color
+        in home_candidates
+        if (
+            contrast_ratio(
+                color,
+                background,
+            )
+            >= minimum_background_contrast
+        )
+    ]
+
+    readable_away = [
+        color
+        for color
+        in away_candidates
+        if (
+            contrast_ratio(
+                color,
+                background,
+            )
+            >= minimum_background_contrast
+        )
+    ]
+
+
+    # Always retain at least the chart color as a fallback.
+    if not readable_home:
+        readable_home = [
+            home_team.get(
+                "chart_color",
+                "#58A6FF",
+            )
+        ]
+
+    if not readable_away:
+        readable_away = [
+            away_team.get(
+                "chart_color",
+                "#FF5C77",
+            )
+        ]
+
+
+    # --------------------------------------------------------
+    # Score every possible color pairing.
+    #
+    # The dominant criterion is team-to-team separation.
+    # Background contrast provides a secondary preference.
+    # --------------------------------------------------------
+
+    best_pair = None
+    best_score = None
+
+    for home_color in (
+        readable_home
+    ):
+        for away_color in (
+            readable_away
+        ):
+            team_distance = (
+                chart_color_distance(
+                    home_color,
+                    away_color,
+                )
+            )
+
+            home_contrast = (
+                contrast_ratio(
+                    home_color,
+                    background,
+                )
+            )
+
+            away_contrast = (
+                contrast_ratio(
+                    away_color,
+                    background,
+                )
+            )
+
+            # Prefer pairs that clear our team-separation
+            # threshold, but still rank all candidates.
+            separation_bonus = (
+                1000.0
+                if (
+                    team_distance
+                    >= minimum_team_distance
+                )
+                else 0.0
+            )
+
+            score = (
+                separation_bonus
+                + team_distance
+                + 10.0
+                * min(
+                    home_contrast,
+                    away_contrast,
+                )
+            )
+
+            if (
+                best_score is None
+                or score > best_score
+            ):
+                best_score = score
+
+                best_pair = (
+                    home_color,
+                    away_color,
+                )
+
+
+    home_color, away_color = (
+        best_pair
+    )
+
+
+    return {
+        "home_color":
+            home_color,
+
+        "away_color":
+            away_color,
+
+        "home_dash":
+            "solid",
+
+        "away_dash":
+            "solid",
+
+        "home_marker":
+            "circle",
+
+        "away_marker":
+            "circle",
+    }
+
+
+
+
+def format_period_label(
+    period,
+):
+    """
+    Convert NBA period numbers into basketball-friendly labels.
+
+    1 -> Q1
+    2 -> Q2
+    3 -> Q3
+    4 -> Q4
+    5 -> OT
+    6 -> 2OT
+    7 -> 3OT
+    ...
+    """
+
+    try:
+        period = int(
+            period
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        return str(
+            period
+        )
+
+    if period <= 4:
+        return (
+            f"Q{period}"
+        )
+
+    overtime_number = (
+        period - 4
+    )
+
+    if overtime_number == 1:
+        return "OT"
+
+    return (
+        f"{overtime_number}OT"
+    )
+
+
+
+def build_game_time_ticks(
+    max_period,
+):
+    """
+    Build basketball-aware x-axis ticks from the
+    actual number of periods played.
+
+    Regulation:
+        Start, Q2, Q3, Q4, End
+
+    1 OT:
+        Start, Q2, Q3, Q4, OT, End
+
+    2 OT:
+        Start, Q2, Q3, Q4, OT, 2OT, End
+
+    Period number, rather than elapsed floating-point
+    time, determines how many overtime periods occurred.
+    """
+
+    try:
+        max_period = int(
+            max_period
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ):
+        max_period = 4
+
+    max_period = max(
+        4,
+        max_period,
+    )
+
+    tickvals = [
+        0,
+        720,
+        1440,
+        2160,
+    ]
+
+    ticktext = [
+        "Start",
+        "Q2",
+        "Q3",
+        "Q4",
+    ]
+
+    # Regulation
+    if max_period == 4:
+        tickvals.append(
+            2880
+        )
+
+        ticktext.append(
+            "End"
+        )
+
+        return (
+            tickvals,
+            ticktext,
+        )
+
+    # Overtime
+    overtime_count = (
+        max_period - 4
+    )
+
+    for overtime_number in range(
+        1,
+        overtime_count + 1,
+    ):
+        overtime_start = (
+            2880
+            + (
+                overtime_number - 1
+            )
+            * 300
+        )
+
+        tickvals.append(
+            overtime_start
+        )
+
+        if overtime_number == 1:
+            ticktext.append(
+                "OT"
+            )
+        else:
+            ticktext.append(
+                f"{overtime_number}OT"
+            )
+
+    # End of the final OT period.
+    game_end = (
+        2880
+        + overtime_count
+        * 300
+    )
+
+    tickvals.append(
+        game_end
+    )
+
+    ticktext.append(
+        "End"
+    )
+
+    return (
+        tickvals,
+        ticktext,
+    )
+
+
+def build_win_probability_plot(
+    game_df,
+    home_swings,
+    away_swings,
+    home_team,
+    away_team,
+):
+    """
+    Display both teams' modeled win probabilities.
+
+    V7 still predicts home-team win probability.
+    Away-team probability is derived as:
+
+        P(away win) = 1 - P(home win)
+
+    No model behavior is changed here.
+    """
+
+    matchup_styles = (
+        resolve_matchup_chart_styles(
+            home_team,
+            away_team,
+        )
+    )
+
+    home_color = (
+        matchup_styles[
+            "home_color"
+        ]
+    )
+
+    away_color = (
+        matchup_styles[
+            "away_color"
+        ]
+    )
+
+    background_color = (
+        "#0E1117"
+    )
+
+    text_color = (
+        "#F3F4F6"
+    )
+
+    muted_text = (
+        "#9CA3AF"
+    )
+
+    reference_color = (
+        "rgba(255,255,255,0.30)"
+    )
+
+    grid_color = (
+        "rgba(255,255,255,0.08)"
+    )
+
+    if (
+        "isTerminalState"
+        in game_df.columns
+    ):
+        model_game_df = (
+            game_df[
+                game_df[
+                    "isTerminalState"
+                ]
+                == False
+            ]
+            .copy()
+        )
+
+        terminal_df = (
+            game_df[
+                game_df[
+                    "isTerminalState"
+                ]
+                == True
+            ]
+            .copy()
+        )
+
+    else:
+        model_game_df = (
+            game_df.copy()
+        )
+
+        terminal_df = (
+            game_df.iloc[
+                0:0
+            ].copy()
+        )
+
+    model_game_df = (
+        model_game_df
+        .dropna(
+            subset=[
+                "elapsedGameTime",
+                "winProbability",
+            ]
+        )
+        .copy()
+    )
+
+    if model_game_df.empty:
+        return go.Figure()
+
+    model_game_df[
+        "homeWinProbabilityPct"
+    ] = (
+        model_game_df[
+            "winProbability"
+        ]
+        * 100.0
+    )
+
+    model_game_df[
+        "awayWinProbabilityPct"
+    ] = (
+        100.0
+        - model_game_df[
+            "homeWinProbabilityPct"
+        ]
+    )
+
+    # --------------------------------------------------------
+    # Hover data
+    # --------------------------------------------------------
+
+    def clean_score_value(
+        value,
+    ):
+        try:
+            if value != value:
+                return ""
+
+            return str(
+                int(
+                    float(value)
+                )
+            )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+            return str(
+                value
+            )
+
+    if (
+        "scoreHome"
+        in model_game_df.columns
+    ):
+        home_scores = (
+            model_game_df[
+                "scoreHome"
+            ]
+            .apply(
+                clean_score_value
+            )
+            .tolist()
+        )
+
+    else:
+        home_scores = (
+            [""]
+            * len(
+                model_game_df
+            )
+        )
+
+    if (
+        "scoreAway"
+        in model_game_df.columns
+    ):
+        away_scores = (
+            model_game_df[
+                "scoreAway"
+            ]
+            .apply(
+                clean_score_value
+            )
+            .tolist()
+        )
+
+    else:
+        away_scores = (
+            [""]
+            * len(
+                model_game_df
+            )
+        )
+
+    home_customdata = list(
+        zip(
+            model_game_df[
+                "awayWinProbabilityPct"
+            ].tolist(),
+            home_scores,
+            away_scores,
+        )
+    )
+
+    away_customdata = list(
+        zip(
+            model_game_df[
+                "homeWinProbabilityPct"
+            ].tolist(),
+            home_scores,
+            away_scores,
+        )
+    )
+
+    fig = (
+        go.Figure()
+    )
+
+    # --------------------------------------------------------
+    # Home team
+    # --------------------------------------------------------
 
     fig.add_trace(
-
         go.Scatter(
-
             x=(
-
                 model_game_df[
-
                     "elapsedGameTime"
-
                 ]
-
             ),
-
-
 
             y=(
-
                 model_game_df[
-
-                    "winProbability"
-
+                    "homeWinProbabilityPct"
                 ]
-
-                * 100
-
             ),
-
-
 
             mode="lines",
 
-
-
             line={
-
                 "color":
-
                     home_color,
 
-
-
                 "width":
-
                     4,
 
+                "dash":
+                    matchup_styles[
+                        "home_dash"
+                    ],
             },
 
-
-
             name=(
-
-                f"{home_team['tricode']} "
-
-                "win probability"
-
+                home_team[
+                    "tricode"
+                ]
             ),
 
-
+            customdata=(
+                home_customdata
+            ),
 
             hovertemplate=(
-
                 "<b>"
-
-                f"{home_team['tricode']}"
-
+                f"{home_team['tricode']} "
+                "%{y:.1f}%"
                 "</b><br>"
 
-                "Win probability: "
+                f"{away_team['tricode']} "
+                "%{customdata[0]:.1f}%"
+                "<br>"
 
-                "%{y:.1f}%"
+                "Score: "
+                f"{away_team['tricode']} "
+                "%{customdata[2]}"
+                " – "
+                "%{customdata[1]} "
+                f"{home_team['tricode']}"
 
                 "<extra></extra>"
-
             ),
-
         )
-
     )
 
+    # --------------------------------------------------------
+    # Away team
+    # --------------------------------------------------------
 
+    fig.add_trace(
+        go.Scatter(
+            x=(
+                model_game_df[
+                    "elapsedGameTime"
+                ]
+            ),
 
+            y=(
+                model_game_df[
+                    "awayWinProbabilityPct"
+                ]
+            ),
 
+            mode="lines",
+
+            line={
+                "color":
+                    away_color,
+
+                "width":
+                    4,
+
+                "dash":
+                    matchup_styles[
+                        "away_dash"
+                    ],
+            },
+
+            name=(
+                away_team[
+                    "tricode"
+                ]
+            ),
+
+            customdata=(
+                away_customdata
+            ),
+
+            hovertemplate=(
+                "<b>"
+                f"{away_team['tricode']} "
+                "%{y:.1f}%"
+                "</b><br>"
+
+                f"{home_team['tricode']} "
+                "%{customdata[0]:.1f}%"
+                "<br>"
+
+                "Score: "
+                f"{away_team['tricode']} "
+                "%{customdata[2]}"
+                " – "
+                "%{customdata[1]} "
+                f"{home_team['tricode']}"
+
+                "<extra></extra>"
+            ),
+        )
+    )
+
+    # --------------------------------------------------------
+    # 50% reference
+    # --------------------------------------------------------
 
     fig.add_hline(
-
         y=50,
-
         line_dash="dash",
-
         line_width=1.5,
-
         line_color=(
-
             reference_color
-
         ),
-
     )
-
-
-
-
 
     fig.add_annotation(
-
         x=0,
-
         y=50,
-
-        text="Toss-up",
-
+        text="50% · Toss-up",
         showarrow=False,
-
         xanchor="left",
-
         xshift=4,
-
         yshift=12,
-
         font={
-
             "color":
-
                 muted_text,
 
-
-
             "size":
-
                 11,
-
         },
-
     )
 
-
-
-
-
+    # Quarter boundaries. Overtime boundaries are
+    # added later once the final elapsed time is known.
     for boundary in [
-
         720,
-
         1440,
-
         2160,
-
     ]:
-
         fig.add_vline(
-
             x=boundary,
-
             line_dash="dot",
-
             line_width=1,
-
             line_color=(
-
                 reference_color
-
             ),
-
         )
 
-
-
-
+    # --------------------------------------------------------
+    # Largest home-benefiting turning point
+    # --------------------------------------------------------
 
     if not home_swings.empty:
-
         row = (
-
             home_swings.iloc[0]
-
         )
 
-
-
-        change = (
-
-            row[
-
-                "probabilityChange"
-
-            ]
-
-            * 100
-
+        magnitude = (
+            abs(
+                float(
+                    row[
+                        "probabilityChange"
+                    ]
+                )
+            )
+            * 100.0
         )
-
-
 
         clock = (
-
             normalize_clock_display(
-
                 row.get(
-
                     "clock"
-
                 )
-
             )
-
         )
 
-
+        period_label = (
+            format_period_label(
+                row.get(
+                    "period"
+                )
+            )
+        )
 
         fig.add_trace(
-
             go.Scatter(
-
                 x=[
-
                     row[
-
                         "elapsedGameTime"
-
                     ]
-
                 ],
-
-
 
                 y=[
-
-                    row[
-
-                        "winProbability"
-
-                    ]
-
-                    * 100
-
+                    float(
+                        row[
+                            "winProbability"
+                        ]
+                    )
+                    * 100.0
                 ],
-
-
 
                 mode="markers",
 
-
-
                 marker={
-
                     "size":
-
                         13,
 
-
-
                     "color":
-
                         home_color,
 
-
+                    "symbol":
+                        matchup_styles[
+                            "home_marker"
+                        ],
 
                     "line": {
-
                         "color":
-
                             "#FFFFFF",
 
-
-
                         "width":
-
                             2,
-
                     },
-
                 },
 
-
-
-                name=(
-
-                    f"{home_team['tricode']} "
-
-                    "biggest swing"
-
-                ),
-
-
+                showlegend=False,
 
                 hovertemplate=(
-
                     "<b>"
-
                     f"{home_team['tricode']} "
-
-                    f"{change:+.1f} pp"
-
+                    f"+{magnitude:.1f} pp"
                     "</b><br>"
 
-                    f"Q{int(row['period'])} "
-
+                    f"{period_label} "
                     f"{clock}<br>"
 
                     f"{row.get('description', '')}"
 
                     "<extra></extra>"
-
                 ),
-
             )
-
         )
 
-
-
-
+    # --------------------------------------------------------
+    # Largest away-benefiting turning point
+    # --------------------------------------------------------
 
     if not away_swings.empty:
-
         row = (
-
             away_swings.iloc[0]
-
         )
 
-
-
-        change = (
-
-            row[
-
-                "probabilityChange"
-
-            ]
-
-            * 100
-
+        magnitude = (
+            abs(
+                float(
+                    row[
+                        "probabilityChange"
+                    ]
+                )
+            )
+            * 100.0
         )
 
-
+        away_probability = (
+            100.0
+            - (
+                float(
+                    row[
+                        "winProbability"
+                    ]
+                )
+                * 100.0
+            )
+        )
 
         clock = (
-
             normalize_clock_display(
-
                 row.get(
-
                     "clock"
-
                 )
-
             )
-
         )
 
-
+        period_label = (
+            format_period_label(
+                row.get(
+                    "period"
+                )
+            )
+        )
 
         fig.add_trace(
-
             go.Scatter(
-
                 x=[
-
                     row[
-
                         "elapsedGameTime"
-
                     ]
-
                 ],
-
-
 
                 y=[
-
-                    row[
-
-                        "winProbability"
-
-                    ]
-
-                    * 100
-
+                    away_probability
                 ],
-
-
 
                 mode="markers",
 
-
-
                 marker={
-
                     "size":
-
                         13,
 
-
-
                     "color":
-
                         away_color,
 
-
+                    "symbol":
+                        matchup_styles[
+                            "away_marker"
+                        ],
 
                     "line": {
-
                         "color":
-
                             "#FFFFFF",
 
-
-
                         "width":
-
                             2,
-
                     },
-
                 },
 
-
-
-                name=(
-
-                    f"{away_team['tricode']} "
-
-                    "biggest swing"
-
-                ),
-
-
+                showlegend=False,
 
                 hovertemplate=(
-
                     "<b>"
-
                     f"{away_team['tricode']} "
-
-                    f"{change:+.1f} pp"
-
+                    f"+{magnitude:.1f} pp"
                     "</b><br>"
 
-                    f"Q{int(row['period'])} "
-
+                    f"{period_label} "
                     f"{clock}<br>"
 
                     f"{row.get('description', '')}"
 
                     "<extra></extra>"
-
                 ),
-
             )
-
         )
 
+    # --------------------------------------------------------
+    # Terminal state
+    # --------------------------------------------------------
 
-
-
+    final_time = float(
+        model_game_df[
+            "elapsedGameTime"
+        ].max()
+    )
 
     if not terminal_df.empty:
-
-        last_model_row = (
-
-            model_game_df
-
-            .iloc[-1]
-
-        )
-
-
-
         terminal_row = (
-
-            terminal_df
-
-            .iloc[-1]
-
+            terminal_df.iloc[-1]
         )
-
-
-
-        last_model_time = float(
-
-            last_model_row[
-
-                "elapsedGameTime"
-
-            ]
-
-        )
-
-
-
-        last_probability = (
-
-            float(
-
-                last_model_row[
-
-                    "winProbability"
-
-                ]
-
-            )
-
-            * 100
-
-        )
-
-
 
         final_time = float(
-
             terminal_row[
-
                 "elapsedGameTime"
-
             ]
-
         )
 
-
-
-        final_probability = (
-
+        terminal_home = (
             float(
-
                 terminal_row[
-
                     "winProbability"
-
                 ]
-
             )
-
-            * 100
-
+            * 100.0
         )
 
+        terminal_away = (
+            100.0
+            - terminal_home
+        )
 
+        previous_row = (
+            model_game_df.iloc[-1]
+        )
+
+        previous_time = (
+            float(
+                previous_row[
+                    "elapsedGameTime"
+                ]
+            )
+        )
+
+        previous_home = (
+            float(
+                previous_row[
+                    "winProbability"
+                ]
+            )
+            * 100.0
+        )
+
+        previous_away = (
+            100.0
+            - previous_home
+        )
 
         fig.add_trace(
-
             go.Scatter(
-
                 x=[
-
-                    last_model_time,
-
+                    previous_time,
                     final_time,
-
                 ],
-
-
 
                 y=[
-
-                    last_probability,
-
-                    final_probability,
-
+                    previous_home,
+                    terminal_home,
                 ],
-
-
 
                 mode="lines",
 
-
-
                 line={
-
                     "color":
-
                         home_color,
 
-
-
                     "width":
-
                         2,
 
-
-
                     "dash":
-
                         "dot",
-
                 },
 
+                hoverinfo="skip",
+                showlegend=False,
+            )
+        )
 
+        fig.add_trace(
+            go.Scatter(
+                x=[
+                    previous_time,
+                    final_time,
+                ],
 
-                name=(
+                y=[
+                    previous_away,
+                    terminal_away,
+                ],
 
-                    "Final result"
+                mode="lines",
 
-                ),
+                line={
+                    "color":
+                        away_color,
 
+                    "width":
+                        2,
 
+                    "dash":
+                        "dot",
+                },
 
                 hoverinfo="skip",
-
+                showlegend=False,
             )
-
         )
-
-
-
-    else:
-
-        final_time = float(
-
-            model_game_df[
-
-                "elapsedGameTime"
-
-            ].max()
-
-        )
-
-
-
-
 
     max_elapsed = max(
-
         2880.0,
-
         final_time,
-
     )
 
+    # Use actual NBA period numbers to determine
+    # regulation vs overtime. Do not infer overtime
+    # count from floating-point elapsed time.
+    period_values = []
 
+    if (
+        "period"
+        in model_game_df.columns
+    ):
+        period_values.extend(
+            model_game_df[
+                "period"
+            ]
+            .dropna()
+            .tolist()
+        )
 
+    if (
+        not terminal_df.empty
+        and "period"
+        in terminal_df.columns
+    ):
+        period_values.extend(
+            terminal_df[
+                "period"
+            ]
+            .dropna()
+            .tolist()
+        )
 
+    max_period = (
+        int(
+            max(
+                period_values
+            )
+        )
+        if period_values
+        else 4
+    )
+
+    (
+        time_tickvals,
+        time_ticktext,
+    ) = build_game_time_ticks(
+        max_period
+    )
+
+    # Add only the overtime boundaries that actually
+    # correspond to periods played.
+    overtime_count = max(
+        0,
+        max_period - 4,
+    )
+
+    for overtime_index in range(
+        overtime_count
+    ):
+        overtime_boundary = (
+            2880.0
+            + overtime_index
+            * 300.0
+        )
+
+        fig.add_vline(
+            x=(
+                overtime_boundary
+            ),
+            line_dash="dot",
+            line_width=1,
+            line_color=(
+                reference_color
+            ),
+        )
+
+    # --------------------------------------------------------
+    # Layout
+    # --------------------------------------------------------
 
     fig.update_layout(
-
         title={
-
             "text": (
-
-                "<b>"
-
-                f"{home_team['tricode']} "
-
-                "Win Probability"
-
-                "</b><br>"
-
-                "<span "
-
-                "style='font-size:13px'>"
-
-                f"vs "
-
-                f"{away_team['tricode']}"
-
+                "<b>Win Probability</b><br>"
+                "<span style='font-size:13px'>"
+                f"{away_team['tricode']} "
+                "vs "
+                f"{home_team['tricode']}"
                 "</span>"
-
             ),
 
-            "x": 0.01,
+            "x":
+                0.01,
 
-            "xanchor": "left",
+            "xanchor":
+                "left",
 
-            "y": 0.98,
+            "y":
+                0.98,
 
-            "yanchor": "top",
-
+            "yanchor":
+                "top",
         },
-
-
 
         height=560,
 
-
-
         paper_bgcolor=(
-
             background_color
-
         ),
-
-
 
         plot_bgcolor=(
-
             background_color
-
         ),
-
-
 
         font={
+            "color":
+                text_color,
 
-            "color": text_color,
-
-            "size": 13,
-
+            "size":
+                13,
         },
-
-
-
-        # More room above the actual plot for
-
-        # title + legend, and more right padding.
 
         margin={
+            "l":
+                75,
 
-            "l": 75,
+            "r":
+                65,
 
-            "r": 65,
+            "t":
+                150,
 
-            "t": 150,
-
-            "b": 65,
-
+            "b":
+                65,
         },
 
-
-
-        hovermode="closest",
-
-
-
-        legend={
-
-            "orientation": "h",
-
-
-
-            # Put legend in its own row above
-
-            # the plotting region.
-
-            "x": 0.0,
-
-            "xanchor": "left",
-
-
-
-            "y": 1.10,
-
-            "yanchor": "bottom",
-
-
-
-            "bgcolor": (
-
-                "rgba(0,0,0,0)"
-
-            ),
-
-        },
-
-    )
-
-
-
-
-
-    fig.update_xaxes(
-
-        # Add a small amount of horizontal
-
-        # breathing room beyond both ends.
-
-        range=[
-
-            -40,
-
-            max_elapsed + 40,
-
-        ],
-
-
-
-        tickvals=[
-
-            0,
-
-            720,
-
-            1440,
-
-            2160,
-
-            2880,
-
-        ],
-
-
-
-        ticktext=[
-
-            "Start",
-
-            "Q2",
-
-            "Q3",
-
-            "Q4",
-
-            "End",
-
-        ],
-
-
-
-        showgrid=False,
-
-        zeroline=False,
-
-        fixedrange=True,
-
-
-
-        # Stops edge labels from being clipped.
-
-        automargin=True,
-
-    )
-
-
-
-
-
-    fig.update_yaxes(
-
-        title={
-
-            "text": (
-
-                f"{home_team['tricode']} "
-
-                "Win Probability"
-
-            )
-
-        },
-
-
-
-        range=[
-
-            0,
-
-            103,
-
-        ],
-
-
-
-        tickvals=[
-
-            0,
-
-            25,
-
-            50,
-
-            75,
-
-            100,
-
-        ],
-
-
-
-        ticktext=[
-
-            "0%",
-
-            "25%",
-
-            "50%",
-
-            "75%",
-
-            "100%",
-
-        ],
-
-
-
-        gridcolor=(
-
-            grid_color
-
+        hovermode=(
+            "closest"
         ),
 
+        legend={
+            "orientation":
+                "h",
 
+            "x":
+                0.0,
 
-        zeroline=False,
+            "xanchor":
+                "left",
 
-        fixedrange=True,
+            "y":
+                1.10,
 
-        automargin=True,
+            "yanchor":
+                "bottom",
 
+            "bgcolor":
+                "rgba(0,0,0,0)",
+        },
     )
 
+    fig.update_xaxes(
+        range=[
+            -40,
+            max_elapsed + 40,
+        ],
 
+        tickvals=(
+            time_tickvals
+        ),
 
+        ticktext=(
+            time_ticktext
+        ),
 
+        showgrid=False,
+        zeroline=False,
+        fixedrange=True,
+        automargin=True,
+    )
+
+    fig.update_yaxes(
+        title={
+            "text":
+                "Win Probability"
+        },
+
+        range=[
+            0,
+            103,
+        ],
+
+        tickvals=[
+            0,
+            25,
+            50,
+            75,
+            100,
+        ],
+
+        ticktext=[
+            "0%",
+            "25%",
+            "50%",
+            "75%",
+            "100%",
+        ],
+
+        showgrid=True,
+
+        gridcolor=(
+            grid_color
+        ),
+
+        zeroline=False,
+        fixedrange=True,
+        automargin=True,
+    )
 
     return fig
 
 
-
-
-
-# ============================================================
-
-# Turning point cards
-
-# ============================================================
-
-
-
 def render_swing_card(
-
     row,
-
     team,
-
     direction,
-
 ):
+    """
+    Always express a turning point from
+    the benefiting team's perspective.
+    """
 
     clock = (
-
         normalize_clock_display(
-
             row.get(
-
                 "clock"
-
             )
+        )
+    )
 
+    home_change = float(
+        row[
+            "probabilityChange"
+        ]
+    )
+
+    home_before = float(
+        row[
+            "previousWinProbability"
+        ]
+    )
+
+    home_after = float(
+        row[
+            "winProbability"
+        ]
+    )
+
+    if direction == "home":
+        before = (
+            home_before
+            * 100.0
         )
 
+        after = (
+            home_after
+            * 100.0
+        )
+
+    else:
+        before = (
+            1.0
+            - home_before
+        ) * 100.0
+
+        after = (
+            1.0
+            - home_after
+        ) * 100.0
+
+    magnitude = (
+        abs(
+            home_change
+        )
+        * 100.0
     )
-
-
-
-    change = (
-
-        row[
-
-            "probabilityChange"
-
-        ]
-
-        * 100
-
-    )
-
-
-
-    before = (
-
-        row[
-
-            "previousWinProbability"
-
-        ]
-
-        * 100
-
-    )
-
-
-
-    after = (
-
-        row[
-
-            "winProbability"
-
-        ]
-
-        * 100
-
-    )
-
-
 
     color = (
-
         team.get(
-
             "chart_color",
-
             "#9CA3AF",
-
         )
-
     )
-
-
-
-    icon = (
-
-        "▲"
-
-        if direction
-
-        == "home"
-
-        else "▼"
-
-    )
-
-
 
     description = (
-
         html.escape(
-
             str(
-
                 row.get(
-
                     "description",
-
                     "",
-
                 )
-
             )
-
         )
-
     )
 
+    team_tricode = (
+        html.escape(
+            str(
+                team[
+                    "tricode"
+                ]
+            )
+        )
+    )
 
+    period_label = (
+        format_period_label(
+            row.get(
+                "period"
+            )
+        )
+    )
 
     card_html = (
-
         f'<div class="turning-point-card" '
-
         f'style="border-left-color:{color};">'
 
         f'<div class="turning-point-change" '
-
         f'style="color:{color};">'
 
-        f'{icon} {change:+.1f} pp'
+        f'▲ {team_tricode} '
+        f'+{magnitude:.1f} pp'
 
         f'</div>'
 
         f'<div class="turning-point-clock">'
 
-        f'Q{int(row["period"])} {clock}'
+        f'{period_label} '
+        f'{clock}'
 
         f'</div>'
 
@@ -2633,24 +3028,18 @@ def render_swing_card(
 
         f'<div class="turning-point-probability">'
 
+        f'{team_tricode} win probability: '
         f'{before:.1f}% → {after:.1f}%'
 
         f'</div>'
 
         f'</div>'
-
     )
-
-
 
     st.markdown(
-
         card_html,
-
         unsafe_allow_html=True,
-
     )
-
 
 
 def get_team_wpa_leaders(
@@ -3813,6 +4202,41 @@ def render_game(
 
 
 
+    # Matchup-wide display palette
+    #
+    # Resolve visually distinct, team-authentic
+    # colors once for the entire page. Every
+    # downstream component then reads the same
+    # local chart_color values.
+    matchup_styles = (
+        resolve_matchup_chart_styles(
+            home_team,
+            away_team,
+        )
+    )
+
+    # Work with local copies so this matchup does
+    # not modify the global TEAM_METADATA registry.
+    home_team = dict(
+        home_team
+    )
+
+    away_team = dict(
+        away_team
+    )
+
+    home_team[
+        "chart_color"
+    ] = matchup_styles[
+        "home_color"
+    ]
+
+    away_team[
+        "chart_color"
+    ] = matchup_styles[
+        "away_color"
+    ]
+
     if live:
 
         home_score = (
@@ -4178,115 +4602,122 @@ def render_game(
 
 
     st.subheader(
-
         "Game Summary"
-
     )
 
+    current_home_wp = float(
+        result[
+            "current_home_win_probability"
+        ]
+    )
 
+    current_away_wp = (
+        1.0
+        - current_home_wp
+    )
 
-    left, right = (
-
+    home_metric, away_metric, state_metric = (
         st.columns(
-
-            2
-
+            3
         )
-
     )
-
-
-
-
 
     if live:
-
-        with left:
-
-            st.metric(
-
-                (
-
-                    f"{home_team['tricode']} "
-
-                    "Win Probability"
-
-                ),
-
-                (
-
-                    f"{result['current_home_win_probability']:.1%}"
-
-                ),
-
-            )
-
-
-
-        with right:
-
-            st.metric(
-
-                "Game State",
-
-                center_status,
-
-            )
-
-
-
-    else:
-
-        winner = (
-
-            home_team[
-
-                "tricode"
-
-            ]
-
-            if home_score
-
-            > away_score
-
-            else away_team[
-
-                "tricode"
-
-            ]
-
+        home_label = (
+            f"Current "
+            f"{home_team['tricode']} "
+            "Win Probability"
         )
 
+        away_label = (
+            f"Current "
+            f"{away_team['tricode']} "
+            "Win Probability"
+        )
 
+    else:
+        home_label = (
+            f"Last Live "
+            f"{home_team['tricode']} "
+            "Win Probability"
+        )
 
-        with left:
+        away_label = (
+            f"Last Live "
+            f"{away_team['tricode']} "
+            "Win Probability"
+        )
+
+    with home_metric:
+        st.metric(
+            home_label,
+            f"{current_home_wp:.1%}",
+        )
+
+    with away_metric:
+        st.metric(
+            away_label,
+            f"{current_away_wp:.1%}",
+        )
+
+    with state_metric:
+        if live:
+            st.metric(
+                "Game State",
+                center_status,
+            )
+
+        else:
+            winner = (
+                home_team["tricode"]
+                if home_score > away_score
+                else away_team["tricode"]
+            )
+
+            loser = (
+                away_team["tricode"]
+                if winner
+                == home_team["tricode"]
+                else home_team["tricode"]
+            )
+
+            winner_score = (
+                home_score
+                if winner
+                == home_team["tricode"]
+                else away_score
+            )
+
+            loser_score = (
+                away_score
+                if winner
+                == home_team["tricode"]
+                else home_score
+            )
 
             st.metric(
-
-                "Last Live Win Probability",
-
+                "Final Result",
                 (
-
-                    f"{result['current_home_win_probability']:.1%}"
-
+                    f"{winner} "
+                    f"{winner_score}–"
+                    f"{loser_score} "
+                    f"{loser}"
                 ),
-
             )
 
+    if live:
+        st.caption(
+            "Current Win Probability is Courtvision's "
+            "model estimate for each team's chance of "
+            "winning at the latest available game state."
+        )
 
-
-        with right:
-
-            st.metric(
-
-                "Winner",
-
-                winner,
-
-            )
-
-
-
+    else:
+        st.caption(
+            "Last Live Win Probability is Courtvision's "
+            "model estimate at the final game state before "
+            "the known final result is applied."
+        )
 
 
     figure = (
@@ -4306,6 +4737,12 @@ def render_game(
         )
 
     )
+    st.caption(
+        "Both lines show each team's modeled chance "
+        "of winning. Turning-point values are always "
+        "expressed from the benefiting team's perspective."
+    )
+
 
 
 
@@ -4359,7 +4796,7 @@ def render_game(
 
             f"{home_team['tricode']} "
 
-            "Swings"
+            "Turning Points"
 
         )
 
@@ -4393,7 +4830,7 @@ def render_game(
 
             f"{away_team['tricode']} "
 
-            "Swings"
+            "Turning Points"
 
         )
 

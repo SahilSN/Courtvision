@@ -58,6 +58,7 @@ TEAM_METADATA = {
     1610612741: {
         "name": "Chicago Bulls",
         "tricode": "CHI",
+        "alternate_chart_color": "#F3F4F6",
         "primary_color": "#CE1141",
         "secondary_color": "#000000",
         "chart_color": "#FF3B5C",
