@@ -75,6 +75,7 @@ from analysis import (
 
 
 from momentum import detect_momentum_runs
+from contextual_explanations import build_contextual_explanations
 
 
 from box_score import (
@@ -4714,6 +4715,205 @@ def render_team_box_score(
             )
 
 
+
+def render_contextual_game_explanations(
+    game_df,
+    game_id,
+    season,
+    home_team_metadata,
+    away_team_metadata,
+    live=False,
+):
+    """
+    Explain the most important multi-play swings using
+    deterministic Courtvision signals.
+
+    This is intentionally not an LLM-generated recap.
+    Every statement is derived from the game timeline,
+    momentum detector, and validated player WPA layer.
+    """
+
+    st.subheader(
+        "Why the Game Changed"
+    )
+
+    st.caption(
+        "Contextual explanations combine momentum runs, "
+        "score state, play-level win-probability movement, "
+        "and player impact."
+    )
+
+    home_team = (
+        home_team_metadata[
+            "tricode"
+        ]
+    )
+
+    away_team = (
+        away_team_metadata[
+            "tricode"
+        ]
+    )
+
+    momentum = (
+        detect_momentum_runs(
+            game_df,
+            home_team=home_team,
+            away_team=away_team,
+            top_k=3,
+        )
+    )
+
+    player_summary = None
+
+    # Historical player WPA is validated. Live player WPA
+    # remains intentionally disabled.
+    if not live:
+        try:
+            impact = (
+                cached_player_impact(
+                    str(game_id),
+                    season,
+                    "v3",
+                )
+            )
+
+            player_summary = (
+                impact.get(
+                    "player_summary"
+                )
+            )
+
+        except Exception:
+            player_summary = None
+
+    explanations = (
+        build_contextual_explanations(
+            game_df=game_df,
+            momentum_result=momentum,
+            home_team=home_team,
+            away_team=away_team,
+            player_summary=player_summary,
+            top_k=4,
+        )
+    )
+
+    if not explanations:
+        st.caption(
+            "No contextual swing explanations cleared "
+            "the current momentum thresholds."
+        )
+
+        return
+
+    team_metadata = {
+        home_team:
+            home_team_metadata,
+
+        away_team:
+            away_team_metadata,
+    }
+
+    for index, explanation in enumerate(
+        explanations,
+        start=1,
+    ):
+        team = (
+            explanation[
+                "team"
+            ]
+        )
+
+        metadata = (
+            team_metadata.get(
+                team,
+                {},
+            )
+        )
+
+        color = (
+            metadata.get(
+                "chart_color",
+                "#9CA3AF",
+            )
+        )
+
+        swing = (
+            explanation[
+                "winProbabilitySwingPoints"
+            ]
+        )
+
+        html = (
+            f'<div style="'
+            f'border-left:4px solid {color};'
+            f'background:rgba(128,128,128,0.055);'
+            f'border-radius:9px;'
+            f'padding:0.95rem 1.05rem;'
+            f'margin-bottom:0.75rem;'
+            f'">'
+
+            f'<div style="'
+            f'display:flex;'
+            f'justify-content:space-between;'
+            f'align-items:baseline;'
+            f'gap:1rem;'
+            f'">'
+
+            f'<span style="'
+            f'font-size:1.02rem;'
+            f'font-weight:800;'
+            f'">'
+            f'{index}. '
+            f'{explanation["headline"]}'
+            f'</span>'
+
+            f'<span style="'
+            f'color:{color};'
+            f'font-weight:800;'
+            f'white-space:nowrap;'
+            f'">'
+            f'+{swing:.1f} pp'
+            f'</span>'
+
+            f'</div>'
+
+            f'<div style="'
+            f'margin-top:0.45rem;'
+            f'line-height:1.5;'
+            f'color:rgba(235,235,235,0.90);'
+            f'">'
+            f'{explanation["summary"]}'
+            f'</div>'
+
+            f'</div>'
+        )
+
+        st.markdown(
+            html,
+            unsafe_allow_html=True,
+        )
+
+        details = (
+            explanation.get(
+                "details",
+                [],
+            )
+        )
+
+        if details:
+            with st.expander(
+                "Supporting context",
+                expanded=False,
+            ):
+                for detail in details:
+                    st.markdown(
+                        f"- {detail}"
+                    )
+
+
+
+
 def render_box_score(
     game_id,
     season,
@@ -5842,6 +6042,17 @@ def render_game(
         game_df,
         home_team,
         away_team,
+    )
+
+    st.divider()
+
+    render_contextual_game_explanations(
+        game_df=game_df,
+        game_id=game_id,
+        season=season,
+        home_team_metadata=home_team,
+        away_team_metadata=away_team,
+        live=live,
     )
 
     st.divider()

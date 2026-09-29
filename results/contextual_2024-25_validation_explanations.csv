@@ -1,0 +1,65 @@
+gameId,rank,team,opponent,headline,winProbabilitySwingPoints,contextScore,beforeMargin,afterMargin,marginType,detailCount,hasPlayerContext,scoreIdentityPass,teamMatchPass,opponentMatchPass,swingMatchPass,summaryMarginPass,headlinePass,structuralPass,missingSourceRun
+0022400061,1,BOS,NYK,BOS pulled away with a 11–2 run,12.415343523025513,12.415343523025513,12,21,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022400061,2,BOS,NYK,BOS pulled away with a 9–2 run,12.090682983398438,12.090682983398438,15,22,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022400061,3,BOS,NYK,BOS pulled away with a 5–0 run,10.648101568222046,10.648101568222046,1,6,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022400190,1,DAL,PHX,DAL flipped the game with a 6–0 run,38.20754587650299,50.70754587650299,-4,2,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400190,2,PHX,DAL,PHX flipped the game with a 7–0 run,37.60323226451874,50.10323226451874,-6,1,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400190,3,PHX,DAL,PHX flipped the game with a 4–0 run,31.144049763679504,43.644049763679504,-2,2,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400190,4,DAL,PHX,DAL flipped the game with a 5–0 run,30.742448568344116,43.242448568344116,-1,4,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400235,1,IND,MIA,IND broke the tie with a 6–0 run,29.00301218032837,38.00301218032837,0,6,tie_broken,2,True,True,True,True,True,True,True,True,False
+0022400235,2,MIA,IND,MIA surged back with a 5–0 run,25.46837329864502,30.46837329864502,-5,0,tie_created,2,True,True,True,True,True,True,True,True,False
+0022400235,3,MIA,IND,MIA surged back with a 9–2 run,16.577821969985962,21.577821969985962,-12,-5,deficit_cut,2,True,True,True,True,True,True,True,True,False
+0022400235,4,IND,MIA,IND broke the tie with a 8–0 run,16.47028923034668,20.47028923034668,0,8,tie_broken,2,True,True,True,True,True,True,True,True,False
+0022400285,1,OKC,SAC,OKC flipped the game with a 5–0 run,15.128833055496216,22.628833055496216,-2,3,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400285,2,OKC,SAC,OKC pulled away with a 6–0 run,14.525915682315826,14.525915682315826,1,7,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022400285,3,OKC,SAC,OKC pulled away with a 7–0 run,11.136635392904282,11.136635392904282,5,12,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022400324,1,LAC,MIN,LAC flipped the game with a 8–0 run,18.205830454826355,25.705830454826355,-7,1,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400324,2,MIN,LAC,MIN flipped the game with a 7–0 run,16.820120811462402,24.320120811462402,-1,6,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400324,3,MIN,LAC,MIN broke the tie with a 9–2 run,16.793087124824524,20.793087124824524,0,7,tie_broken,2,True,True,True,True,True,True,True,True,False
+0022400324,4,MIN,LAC,MIN pulled away with a 6–0 run,13.477931916713715,13.477931916713715,13,19,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022400423,1,MEM,NOP,MEM pulled away with a 8–0 run,18.003283068537712,18.003283068537712,3,11,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022400423,2,NOP,MEM,NOP surged back with a 3–0 run,12.228815257549286,12.228815257549286,-6,-3,deficit_cut,2,True,True,True,True,True,True,True,True,False
+0022400423,3,MEM,NOP,MEM pulled away with a 12–4 run,11.821745708584785,11.821745708584785,8,16,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022400423,4,NOP,MEM,NOP surged back with a 7–0 run,10.380593687295914,10.380593687295914,-11,-4,deficit_cut,2,True,True,True,True,True,True,True,True,False
+0022400557,1,NOP,CHI,NOP broke the tie with a 10–2 run,38.5123685002327,47.5123685002327,0,8,tie_broken,2,True,True,True,True,True,True,True,True,False
+0022400557,2,NOP,CHI,NOP flipped the game with a 5–0 run,23.872902989387512,31.372902989387512,-1,4,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400557,3,CHI,NOP,CHI flipped the game with a 5–0 run,22.44856059551239,29.94856059551239,-2,3,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400557,4,CHI,NOP,CHI flipped the game with a 5–1 run,16.614776849746704,24.114776849746704,-2,2,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400622,1,POR,ORL,POR pulled away with a 6–0 run,23.785653710365295,23.785653710365295,6,12,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022400622,2,POR,ORL,POR flipped the game with a 7–2 run,14.136183261871338,21.636183261871338,-1,4,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400622,3,ORL,POR,ORL flipped the game with a 6–0 run,10.117548704147339,17.61754870414734,-1,5,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400622,4,POR,ORL,POR pulled away with a 7–2 run,13.840115070343018,13.840115070343018,2,7,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022400686,1,IND,ATL,IND flipped the game with a 9–0 run,53.16612124443054,65.66612124443054,-3,6,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400686,2,ATL,IND,ATL flipped the game with a 6–2 run,31.03962540626526,43.53962540626526,-1,3,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400686,3,ATL,IND,ATL flipped the game with a 4–0 run,26.539987325668335,39.039987325668335,-3,1,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400686,4,IND,ATL,IND flipped the game with a 2–0 run,22.706949710845947,35.20694971084595,-1,1,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400751,1,UTA,LAC,UTA flipped the game with a 10–0 run,26.851266622543335,34.351266622543335,-1,9,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400751,2,LAC,UTA,LAC pulled away with a 8–0 run,28.10835838317871,33.10835838317871,2,10,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022400751,3,LAC,UTA,LAC pulled away with a 8–0 run,28.413528203964233,28.413528203964233,2,10,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022400751,4,UTA,LAC,UTA surged back with a 6–0 run,22.930890321731567,27.930890321731567,-8,-2,deficit_cut,2,True,True,True,True,True,True,True,True,False
+0022400813,1,IND,LAC,IND pulled away with a 9–2 run,15.473783016204834,15.473783016204834,5,12,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022400813,2,IND,LAC,IND pulled away with a 5–0 run,12.908768653869629,12.908768653869629,11,16,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022400813,3,IND,LAC,IND pulled away with a 12–5 run,12.423741817474365,12.423741817474365,1,8,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022400813,4,LAC,IND,LAC surged back with a 6–0 run,11.241650581359863,11.241650581359863,-11,-5,deficit_cut,2,True,True,True,True,True,True,True,True,False
+0022400878,1,ATL,MEM,ATL surged back with a 5–0 run,32.00858235359192,37.00858235359192,-5,0,tie_created,2,True,True,True,True,True,True,True,True,False
+0022400878,2,MEM,ATL,MEM flipped the game with a 8–0 run,19.259822368621826,26.759822368621826,-1,7,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400878,3,ATL,MEM,ATL flipped the game with a 9–0 run,18.721961975097656,26.221961975097656,-1,8,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400878,4,MEM,ATL,MEM pulled away with a 11–2 run,18.602031469345093,23.602031469345093,4,13,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022400942,1,MIL,IND,MIL flipped the game with a 5–0 run,47.16576337814331,59.66576337814331,-3,2,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400942,2,IND,MIL,IND flipped the game with a 7–0 run,27.89773941040039,40.39773941040039,-4,3,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022400942,3,IND,MIL,IND broke the tie with a 8–0 run,29.85329031944275,38.85329031944275,0,8,tie_broken,2,True,True,True,True,True,True,True,True,False
+0022400942,4,IND,MIL,IND broke the tie with a 5–0 run,28.915470838546753,37.91547083854675,0,5,tie_broken,2,True,True,True,True,True,True,True,True,False
+0022401007,1,PHX,CHI,PHX flipped the game with a 8–0 run,16.453099250793457,23.953099250793457,-4,4,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022401007,2,CHI,PHX,CHI flipped the game with a 6–0 run,13.677465915679932,21.17746591567993,-2,4,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022401007,3,CHI,PHX,CHI surged back with a 8–0 run,12.395620346069336,17.395620346069336,-12,-4,deficit_cut,2,True,True,True,True,True,True,True,True,False
+0022401007,4,PHX,CHI,PHX pulled away with a 10–2 run,15.365815162658691,15.365815162658691,3,11,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022401071,1,MIN,PHX,MIN flipped the game with a 8–0 run,14.006364345550537,21.506364345550537,-2,6,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022401071,2,PHX,MIN,PHX surged back with a 11–3 run,11.880534887313843,11.880534887313843,-14,-6,deficit_cut,2,True,True,True,True,True,True,True,True,False
+0022401134,1,TOR,BKN,TOR broke the tie with a 8–0 run,15.8721923828125,19.8721923828125,0,8,tie_broken,2,True,True,True,True,True,True,True,True,False
+0022401134,2,TOR,BKN,TOR flipped the game with a 7–2 run,11.176174879074097,18.676174879074097,-3,2,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022401134,3,BKN,TOR,BKN surged back with a 7–0 run,12.766465544700623,12.766465544700623,-7,0,tie_created,2,True,True,True,True,True,True,True,True,False
+0022401134,4,TOR,BKN,TOR pulled away with a 5–0 run,11.837460845708847,11.837460845708847,14,19,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022401200,1,SAC,PHX,SAC flipped the game with a 8–0 run,16.119438409805298,23.619438409805298,-3,5,lead_flip,2,True,True,True,True,True,True,True,True,False
+0022401200,2,SAC,PHX,SAC pulled away with a 8–0 run,23.58100414276123,23.58100414276123,3,11,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022401200,3,SAC,PHX,SAC pulled away with a 6–0 run,21.454626321792603,21.454626321792603,5,11,lead_extended,2,True,True,True,True,True,True,True,True,False
+0022401200,4,PHX,SAC,PHX surged back with a 6–0 run,16.844773292541504,16.844773292541504,-11,-5,deficit_cut,2,True,True,True,True,True,True,True,True,False
