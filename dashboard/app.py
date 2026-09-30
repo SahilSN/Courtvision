@@ -5776,6 +5776,24 @@ def render_game_story(
         )
     )
 
+    # Keep Game Story concise and non-redundant.
+    # Detailed momentum windows are already presented
+    # in "Why the Game Changed".
+    sections = [
+        section
+        for section in sections
+        if str(
+            section.get(
+                "label",
+                "",
+            )
+        ).strip().upper()
+        in {
+            "GAME FLOW",
+            "KEY CONTRIBUTORS",
+        }
+    ]
+
     if sections:
         story_html = (
             '<div style="'
@@ -5858,9 +5876,9 @@ def render_contextual_game_explanations(
     )
 
     st.caption(
-        "Contextual explanations combine momentum runs, "
-        "score state, play-level win-probability movement, "
-        "and player impact."
+        "Courtvision highlights the most distinct "
+        "game-changing stretches, prioritizing meaningful "
+        "score-state and win-probability shifts."
     )
 
     home_team = (
@@ -5914,6 +5932,289 @@ def render_contextual_game_explanations(
         )
 
         return
+
+    # Display the selected explanation windows in
+    # actual game chronology.
+    #
+    # This does NOT change which explanations qualify or
+    # their validated context scores. It only changes the
+    # presentation order.
+    def explanation_chronology_key(
+        explanation,
+    ):
+        period = int(
+            explanation.get(
+                "startPeriod",
+                999,
+            )
+        )
+
+        clock = str(
+            explanation.get(
+                "startClock",
+                "",
+            )
+        )
+
+        remaining_seconds = -1.0
+
+        try:
+            if (
+                clock.startswith(
+                    "PT"
+                )
+                and clock.endswith(
+                    "S"
+                )
+            ):
+                clock_body = (
+                    clock[
+                        2:-1
+                    ]
+                )
+
+                if "M" in clock_body:
+                    minutes_text, seconds_text = (
+                        clock_body.split(
+                            "M",
+                            1,
+                        )
+                    )
+
+                    remaining_seconds = (
+                        60.0
+                        * float(
+                            minutes_text
+                            or 0
+                        )
+                        + float(
+                            seconds_text
+                            or 0
+                        )
+                    )
+
+                else:
+                    remaining_seconds = float(
+                        clock_body
+                        or 0
+                    )
+
+        except (
+            TypeError,
+            ValueError,
+        ):
+            remaining_seconds = -1.0
+
+        # Earlier periods come first.
+        #
+        # Inside an NBA period, a larger remaining clock
+        # occurs earlier, so negate remaining_seconds.
+        return (
+            period,
+            -remaining_seconds,
+        )
+
+    explanations = sorted(
+        explanations,
+        key=(
+            explanation_chronology_key
+        ),
+    )
+
+    # --------------------------------------------------------
+    # Display-only narrative diversity
+    # --------------------------------------------------------
+    #
+    # Contextual Intelligence may identify several valid
+    # momentum windows that tell essentially the same story
+    # (for example, three separate comeback runs by one team).
+    #
+    # Keep the underlying validated explanations untouched,
+    # but avoid repeating the same narrative on the page.
+    #
+    # For repeated team + narrative combinations, prefer the
+    # moment with the strongest game-state consequence:
+    # tie / lead change > separation > raw WP swing.
+    # --------------------------------------------------------
+
+    def explanation_narrative_type(
+        explanation,
+    ):
+        headline = str(
+            explanation.get(
+                "headline",
+                "",
+            )
+        ).lower()
+
+        if "broke the tie" in headline:
+            return "broke_tie"
+
+        if "flipped the game" in headline:
+            return "flipped_game"
+
+        if "pulled away" in headline:
+            return "pulled_away"
+
+        if "surged back" in headline:
+            return "surged_back"
+
+        return headline
+
+    def explanation_display_score(
+        explanation,
+    ):
+        headline = str(
+            explanation.get(
+                "headline",
+                "",
+            )
+        ).lower()
+
+        summary = str(
+            explanation.get(
+                "summary",
+                "",
+            )
+        ).lower()
+
+        score = float(
+            explanation.get(
+                "winProbabilitySwingPoints",
+                0.0,
+            )
+        )
+
+        # Most meaningful state changes.
+        if (
+            "tie the game" in summary
+            or "tied the game" in summary
+            or "broke the tie" in headline
+        ):
+            score += 100.0
+
+        if (
+            "turning a" in summary
+            and "deficit into a" in summary
+            and "lead" in summary
+        ):
+            score += 90.0
+
+        if "flipped the game" in headline:
+            score += 80.0
+
+        if "pulled away" in headline:
+            score += 60.0
+
+        if (
+            "extending the lead" in summary
+            or "building a" in summary
+            and "lead" in summary
+        ):
+            score += 40.0
+
+        return score
+
+    best_by_narrative = {}
+
+    for explanation in explanations:
+        key = (
+            str(
+                explanation.get(
+                    "team",
+                    "",
+                )
+            ),
+            explanation_narrative_type(
+                explanation
+            ),
+        )
+
+        current = (
+            best_by_narrative.get(
+                key
+            )
+        )
+
+        if (
+            current is None
+            or explanation_display_score(
+                explanation
+            )
+            > explanation_display_score(
+                current
+            )
+        ):
+            best_by_narrative[
+                key
+            ] = explanation
+
+    explanations = list(
+        best_by_narrative.values()
+    )
+
+    # Rank the remaining distinct narratives by how much
+    # they changed the actual game state.
+    ranked_explanations = sorted(
+        explanations,
+        key=(
+            explanation_display_score
+        ),
+        reverse=True,
+    )
+
+    # Keep the section narratively balanced:
+    #
+    # - at most four explanations overall;
+    # - at most two explanations for either team;
+    # - allow fewer than four when additional cards would
+    #   mostly repeat the same team's story.
+    diverse_explanations = []
+    team_counts = {}
+
+    for explanation in ranked_explanations:
+        team = str(
+            explanation.get(
+                "team",
+                "",
+            )
+        )
+
+        current_count = (
+            team_counts.get(
+                team,
+                0,
+            )
+        )
+
+        if current_count >= 2:
+            continue
+
+        diverse_explanations.append(
+            explanation
+        )
+
+        team_counts[
+            team
+        ] = (
+            current_count + 1
+        )
+
+        if len(
+            diverse_explanations
+        ) >= 4:
+            break
+
+    explanations = diverse_explanations
+
+    # Always present the final selected narratives in
+    # actual game chronology rather than importance order.
+    explanations = sorted(
+        explanations,
+        key=(
+            explanation_chronology_key
+        ),
+    )
 
     team_metadata = {
         home_team:
@@ -6645,9 +6946,6 @@ def render_game(
     )
 
 
-
-
-
     # Matchup-wide display palette
     #
     # Resolve visually distinct, team-authentic
@@ -7062,6 +7360,14 @@ def render_game(
         - current_home_wp
     )
 
+    display_home_wp = (
+        current_home_wp
+    )
+
+    display_away_wp = (
+        current_away_wp
+    )
+
     home_metric, away_metric, state_metric = (
         st.columns(
             3
@@ -7083,27 +7389,126 @@ def render_game(
 
     else:
         home_label = (
-            f"Last Live "
             f"{home_team['tricode']} "
-            "Win Probability"
+            "Pregame Win Expectation"
         )
 
         away_label = (
-            f"Last Live "
             f"{away_team['tricode']} "
-            "Win Probability"
+            "Pregame Win Expectation"
         )
+
+        try:
+            _, rating_history = (
+                cached_team_season_intelligence(
+                    season
+                )
+            )
+
+            normalized_game_id = (
+                str(
+                    game_id
+                )
+                .zfill(
+                    10
+                )
+            )
+
+            normalized_history_ids = (
+                rating_history[
+                    "gameId"
+                ]
+                .astype(
+                    str
+                )
+                .str.zfill(
+                    10
+                )
+            )
+
+            rating_game_rows = (
+                rating_history.loc[
+                    normalized_history_ids
+                    == normalized_game_id
+                ]
+            )
+
+            home_rating_row = (
+                rating_game_rows.loc[
+                    rating_game_rows[
+                        "team"
+                    ]
+                    == home_team[
+                        "tricode"
+                    ]
+                ]
+            )
+
+            away_rating_row = (
+                rating_game_rows.loc[
+                    rating_game_rows[
+                        "team"
+                    ]
+                    == away_team[
+                        "tricode"
+                    ]
+                ]
+            )
+
+            if (
+                len(
+                    home_rating_row
+                )
+                == 1
+                and len(
+                    away_rating_row
+                )
+                == 1
+            ):
+                display_home_wp = float(
+                    home_rating_row.iloc[
+                        0
+                    ][
+                        "pregameWinProbability"
+                    ]
+                )
+
+                display_away_wp = float(
+                    away_rating_row.iloc[
+                        0
+                    ][
+                        "pregameWinProbability"
+                    ]
+                )
+
+            else:
+                display_home_wp = None
+                display_away_wp = None
+
+        except Exception:
+            display_home_wp = None
+            display_away_wp = None
 
     with home_metric:
         st.metric(
             home_label,
-            f"{current_home_wp:.1%}",
+            (
+                f"{display_home_wp:.1%}"
+                if display_home_wp
+                is not None
+                else "N/A"
+            ),
         )
 
     with away_metric:
         st.metric(
             away_label,
-            f"{current_away_wp:.1%}",
+            (
+                f"{display_away_wp:.1%}"
+                if display_away_wp
+                is not None
+                else "N/A"
+            ),
         )
 
     with state_metric:
@@ -7160,9 +7565,9 @@ def render_game(
 
     else:
         st.caption(
-            "Last Live Win Probability is Courtvision's "
-            "model estimate at the final game state before "
-            "the known final result is applied."
+            "Pregame Win Expectation is the frozen "
+            "Team Courtvision Rating model's estimate "
+            "of each team's chance of winning before tipoff."
         )
 
 
@@ -7212,133 +7617,12 @@ def render_game(
 
 
 
-    st.subheader(
-
-        "Biggest Turning Points"
-
-    )
-
-
-
-    home_column, away_column = (
-
-        st.columns(
-
-            2
-
-        )
-
-    )
-
-
-
-
-
-    with home_column:
-
-        st.markdown(
-
-            f"## "
-
-            f"{home_team['tricode']} "
-
-            "Turning Points"
-
-        )
-
-
-
-        for _, row in (
-
-            home_swings.iterrows()
-
-        ):
-
-            render_swing_card(
-
-                row,
-
-                home_team,
-
-                "home",
-
-            )
-
-
-
-
-
-    with away_column:
-
-        st.markdown(
-
-            f"## "
-
-            f"{away_team['tricode']} "
-
-            "Turning Points"
-
-        )
-
-
-
-        for _, row in (
-
-            away_swings.iterrows()
-
-        ):
-
-            render_swing_card(
-
-                row,
-
-                away_team,
-
-                "away",
-
-            )
-
-
-
-    st.divider()
-
-
-
     render_game_story(
         game_df=game_df,
         game_id=game_id,
         season=season,
         home_team_metadata=home_team,
         away_team_metadata=away_team,
-        live=live,
-    )
-
-    st.divider()
-
-    render_momentum_runs(
-        game_df,
-        home_team,
-        away_team,
-    )
-
-    st.divider()
-
-    render_contextual_game_explanations(
-        game_df=game_df,
-        game_id=game_id,
-        season=season,
-        home_team_metadata=home_team,
-        away_team_metadata=away_team,
-        live=live,
-    )
-
-    st.divider()
-
-    render_box_score(
-        game_id=game_id,
-        season=season,
-        away_team=away_team,
-        home_team=home_team,
         live=live,
     )
 
@@ -7361,6 +7645,85 @@ def render_game(
 
 
 
+
+    st.divider()
+
+    render_contextual_game_explanations(
+        game_df=game_df,
+        game_id=game_id,
+        season=season,
+        home_team_metadata=home_team,
+        away_team_metadata=away_team,
+        live=live,
+    )
+
+    with st.expander(
+        "View all detected momentum runs",
+        expanded=False,
+    ):
+        render_momentum_runs(
+            game_df,
+            home_team,
+            away_team,
+        )
+
+    st.divider()
+
+    st.subheader(
+        "Biggest Turning Points"
+    )
+
+    home_column, away_column = (
+        st.columns(
+            2
+        )
+    )
+
+    with home_column:
+        st.markdown(
+            f"## {home_team['tricode']} Turning Points"
+        )
+
+        for _, row in home_swings.iterrows():
+            render_swing_card(
+                row,
+                home_team,
+                "home",
+            )
+
+    with away_column:
+        st.markdown(
+            f"## {away_team['tricode']} Turning Points"
+        )
+
+        for _, row in away_swings.iterrows():
+            render_swing_card(
+                row,
+                away_team,
+                "away",
+            )
+
+    if not live:
+        st.divider()
+
+        render_historical_team_rating(
+            game_id=game_id,
+            season=season,
+            home_team_metadata=home_team,
+            away_team_metadata=away_team,
+        )
+
+    st.divider()
+
+    render_box_score(
+        game_id=game_id,
+        season=season,
+        away_team=away_team,
+        home_team=home_team,
+        live=live,
+    )
+
+    st.divider()
 
     with st.expander(
 
@@ -7389,6 +7752,7 @@ def render_game(
 
 
 HISTORICAL_ANALYSIS_CACHE_VERSION = "v1_v7"
+
 
 
 def historical_analysis_cache_dir():
@@ -8141,6 +8505,441 @@ def add_historical_league_ranks(
     )
 
     return ranked
+
+
+
+
+
+def render_historical_team_rating(
+    game_id,
+    season,
+    home_team_metadata,
+    away_team_metadata,
+):
+    """
+    Render frozen Team Courtvision Rating context for one
+    historical game.
+
+    This is display-only. It reads the already-generated
+    Season Intelligence artifacts and does not recompute
+    rating updates.
+    """
+
+    try:
+        _, history = (
+            cached_team_season_intelligence(
+                season
+            )
+        )
+
+    except FileNotFoundError:
+        # Some historical seasons may not have Courtvision
+        # Rating artifacts. Historical game analysis should
+        # still render normally.
+        return
+
+    except Exception as error:
+        st.warning(
+            "Team Courtvision Rating context could not be "
+            f"loaded: {error}"
+        )
+        return
+
+    history = (
+        add_historical_league_ranks(
+            history
+        )
+    )
+
+    normalized_game_id = (
+        str(
+            game_id
+        )
+        .zfill(
+            10
+        )
+    )
+
+    normalized_history_ids = (
+        history[
+            "gameId"
+        ]
+        .astype(
+            str
+        )
+        .str.zfill(
+            10
+        )
+    )
+
+    game_rows = (
+        history.loc[
+            normalized_history_ids
+            == normalized_game_id
+        ]
+        .copy()
+    )
+
+    if len(
+        game_rows
+    ) != 2:
+        return
+
+    game_rows = (
+        game_rows
+        .sort_values(
+            "isHome",
+            ascending=False,
+        )
+        .reset_index(
+            drop=True
+        )
+    )
+
+    home_row = (
+        game_rows.loc[
+            game_rows[
+                "isHome"
+            ]
+            == 1
+        ]
+        .iloc[
+            0
+        ]
+    )
+
+    away_row = (
+        game_rows.loc[
+            game_rows[
+                "isHome"
+            ]
+            == 0
+        ]
+        .iloc[
+            0
+        ]
+    )
+
+    winner_row = (
+        game_rows.loc[
+            game_rows[
+                "teamWin"
+            ]
+            == 1
+        ]
+        .iloc[
+            0
+        ]
+    )
+
+    st.subheader(
+        "Team Courtvision Rating"
+    )
+
+    st.caption(
+        (
+            f"{season} · Frozen Team Courtvision Rating v1 · "
+            "ratings shown immediately before and after this game"
+        )
+    )
+
+    def render_team_rating_card(
+        row,
+        location_label,
+    ):
+        team = str(
+            row[
+                "team"
+            ]
+        )
+
+        if (
+            team
+            == home_team_metadata.get(
+                "tricode"
+            )
+        ):
+            metadata = (
+                home_team_metadata
+            )
+
+        elif (
+            team
+            == away_team_metadata.get(
+                "tricode"
+            )
+        ):
+            metadata = (
+                away_team_metadata
+            )
+
+        else:
+            metadata = (
+                get_team_metadata_by_tricode(
+                    team
+                )
+            )
+
+        team_name = metadata.get(
+            "name",
+            team,
+        )
+
+        team_color = metadata.get(
+            "chart_color",
+            "#58A6FF",
+        )
+
+        logo = metadata.get(
+            "logo"
+        )
+
+        rating_before = float(
+            row[
+                "ratingBefore"
+            ]
+        )
+
+        rating_after = float(
+            row[
+                "ratingAfter"
+            ]
+        )
+
+        rating_change = float(
+            row[
+                "ratingChange"
+            ]
+        )
+
+        pregame_probability = float(
+            row[
+                "pregameWinProbability"
+            ]
+        )
+
+        league_rank = int(
+            row[
+                "leagueRankAfterGame"
+            ]
+        )
+
+        result_label = (
+            "W"
+            if int(
+                row[
+                    "teamWin"
+                ]
+            )
+            == 1
+            else "L"
+        )
+
+        change_color = (
+            "#2ECC71"
+            if rating_change >= 0
+            else "#FF5C77"
+        )
+
+        card = st.container(
+            border=True,
+        )
+
+        with card:
+            st.markdown(
+                (
+                    "<div style='"
+                    f"height:4px; background:{team_color}; "
+                    "border-radius:999px; margin-bottom:12px;"
+                    "'></div>"
+                ),
+                unsafe_allow_html=True,
+            )
+
+            identity_logo_col, identity_text_col = (
+                st.columns(
+                    [
+                        1,
+                        5,
+                    ],
+                    vertical_alignment="center",
+                )
+            )
+
+            with identity_logo_col:
+                if (
+                    logo
+                    and Path(
+                        logo
+                    ).exists()
+                ):
+                    st.image(
+                        logo,
+                        width=52,
+                    )
+
+            with identity_text_col:
+                st.markdown(
+                    (
+                        f"### {html.escape(team_name)}"
+                        "  \n"
+                        f"{location_label} · {result_label}"
+                    )
+                )
+
+            metric_1, metric_2, metric_3 = (
+                st.columns(
+                    3
+                )
+            )
+
+            with metric_1:
+                st.metric(
+                    "Pregame",
+                    f"{rating_before:.1f}",
+                )
+
+            with metric_2:
+                st.markdown(
+                    (
+                        "<div style='"
+                        "font-size:0.82rem; opacity:0.68; "
+                        "margin-bottom:0.25rem;"
+                        "'>"
+                        "Rating Change"
+                        "</div>"
+                        "<div style='"
+                        "font-size:1.75rem; "
+                        "font-weight:700; "
+                        f"color:{change_color};"
+                        "'>"
+                        f"{rating_change:+.1f}"
+                        "</div>"
+                    ),
+                    unsafe_allow_html=True,
+                )
+
+            with metric_3:
+                st.metric(
+                    "Postgame",
+                    f"{rating_after:.1f}",
+                )
+
+            st.caption(
+                (
+                    f"Pregame win expectation: "
+                    f"{pregame_probability * 100.0:.1f}% "
+                    f"· Postgame league rank: #{league_rank}"
+                )
+            )
+
+    away_col, home_col = (
+        st.columns(
+            2
+        )
+    )
+
+    with away_col:
+        render_team_rating_card(
+            away_row,
+            "Away",
+        )
+
+    with home_col:
+        render_team_rating_card(
+            home_row,
+            "Home",
+        )
+
+    margin_dominance = float(
+        winner_row[
+            "marginDominance"
+        ]
+    )
+
+    dominance_multiplier = float(
+        winner_row[
+            "dominanceMultiplier"
+        ]
+    )
+
+    winner_margin = abs(
+        float(
+            winner_row[
+                "signedMargin"
+            ]
+        )
+    )
+
+    detail_1, detail_2, detail_3 = (
+        st.columns(
+            3
+        )
+    )
+
+    with detail_1:
+        st.metric(
+            "Final Margin",
+            f"{winner_margin:.0f}",
+        )
+
+    with detail_2:
+        st.metric(
+            "Margin Dominance",
+            f"{margin_dominance:.3f}",
+        )
+
+    with detail_3:
+        st.metric(
+            "Dominance Multiplier",
+            f"{dominance_multiplier:.3f}×",
+        )
+
+    st.markdown(
+        "#### Why Did the Ratings Move?"
+    )
+
+    winner_metadata = (
+        get_team_metadata_by_tricode(
+            winner_row[
+                "team"
+            ]
+        )
+    )
+
+    winner_color = (
+        winner_metadata.get(
+            "chart_color",
+            "#58A6FF",
+        )
+    )
+
+    explanation = (
+        build_rating_change_explanation(
+            winner_row
+        )
+    )
+
+    st.markdown(
+        (
+            "<div style='"
+            "padding:14px 16px; "
+            "border-radius:10px; "
+            "background:rgba(148,163,184,0.06); "
+            f"border-left:4px solid {winner_color};"
+            "'>"
+            f"{html.escape(explanation)}"
+            "</div>"
+        ),
+        unsafe_allow_html=True,
+    )
+
+    st.caption(
+        (
+            "Courtvision Rating updates are zero-sum, so the "
+            "opponent receives the equal and opposite rating change."
+        )
+    )
 
 
 
