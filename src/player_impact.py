@@ -739,6 +739,14 @@ def build_sequence_table(
     scaler,
     device,
 ):
+    """
+    Build the frozen WPA v3 same-time counterfactual table.
+
+    Semantics are unchanged from the original implementation,
+    but all counterfactual V7 states are predicted in one batch
+    rather than one model call per sequence.
+    """
+
     grouped = list(
         game_df.groupby(
             "sequenceId",
@@ -746,7 +754,17 @@ def build_sequence_table(
         )
     )
 
-    rows = []
+    if not grouped:
+        return pd.DataFrame()
+
+    sequence_metadata = []
+    counterfactual_features = []
+
+    # --------------------------------------------------------
+    # First pass:
+    # collect sequence metadata and construct only the eight
+    # V7 features needed for each same-time counterfactual.
+    # --------------------------------------------------------
 
     for index, (
         sequence_id,
@@ -754,18 +772,8 @@ def build_sequence_table(
     ) in enumerate(
         grouped
     ):
-        sequence = (
-            sequence
-            .copy()
-            .reset_index(
-                drop=True
-            )
-        )
-
         actual_post_state = (
-            sequence
-            .iloc[-1]
-            .copy()
+            sequence.iloc[-1]
         )
 
         actual_probability = float(
@@ -774,33 +782,247 @@ def build_sequence_table(
             ]
         )
 
+        metadata = {
+            "sequenceId":
+                sequence_id,
+
+            "period":
+                int(
+                    sequence[
+                        "period"
+                    ].iloc[0]
+                ),
+
+            "clock":
+                sequence[
+                    "clock"
+                ].iloc[0],
+
+            "elapsedGameTime":
+                float(
+                    actual_post_state[
+                        "elapsedGameTime"
+                    ]
+                ),
+
+            "rowsInSequence":
+                len(sequence),
+
+            "actualWinProbability":
+                actual_probability,
+
+            "scoreHome":
+                int(
+                    actual_post_state[
+                        "scoreHome"
+                    ]
+                ),
+
+            "scoreAway":
+                int(
+                    actual_post_state[
+                        "scoreAway"
+                    ]
+                ),
+
+            "homePossession":
+                int(
+                    actual_post_state[
+                        "homePossession"
+                    ]
+                ),
+        }
+
+        if index == 0:
+            metadata[
+                "previousObservedWinProbability"
+            ] = np.nan
+
+            sequence_metadata.append(
+                metadata
+            )
+
+            continue
+
+        previous_state = (
+            grouped[
+                index - 1
+            ][1]
+            .iloc[-1]
+        )
+
+        previous_observed_probability = float(
+            previous_state[
+                "winProbability"
+            ]
+        )
+
+        metadata[
+            "previousObservedWinProbability"
+        ] = (
+            previous_observed_probability
+        )
+
+        sequence_metadata.append(
+            metadata
+        )
+
+        # Same WPA v3 counterfactual as before:
+        #
+        # CURRENT time/pregame context
+        # PREVIOUS score/possession.
+        elapsed = float(
+            actual_post_state[
+                "elapsedGameTime"
+            ]
+        )
+
+        score_home = int(
+            previous_state[
+                "scoreHome"
+            ]
+        )
+
+        score_away = int(
+            previous_state[
+                "scoreAway"
+            ]
+        )
+
+        home_score_diff = (
+            score_home
+            - score_away
+        )
+
+        total_score = (
+            score_home
+            + score_away
+        )
+
+        regulation_progress = min(
+            1.0,
+            max(
+                0.0,
+                elapsed / 2880.0,
+            ),
+        )
+
+        counterfactual_features.append(
+            {
+                "elapsedGameTime":
+                    elapsed,
+
+                "homeScoreDiff":
+                    home_score_diff,
+
+                "homePossession":
+                    int(
+                        previous_state[
+                            "homePossession"
+                        ]
+                    ),
+
+                "totalScore":
+                    total_score,
+
+                "homePreGameWinPct":
+                    float(
+                        actual_post_state[
+                            "homePreGameWinPct"
+                        ]
+                    ),
+
+                "awayPreGameWinPct":
+                    float(
+                        actual_post_state[
+                            "awayPreGameWinPct"
+                        ]
+                    ),
+
+                "strengthDifference":
+                    float(
+                        actual_post_state[
+                            "strengthDifference"
+                        ]
+                    ),
+
+                "scoreDiffLateWeight":
+                    (
+                        home_score_diff
+                        * regulation_progress
+                    ),
+            }
+        )
+
+    # --------------------------------------------------------
+    # One scaler transform + one V7 forward pass for all
+    # counterfactual sequence states.
+    # --------------------------------------------------------
+
+    if counterfactual_features:
+        counterfactual_df = pd.DataFrame(
+            counterfactual_features,
+            columns=MODEL_FEATURES,
+        )
+
+        counterfactual_probabilities = (
+            predict_states(
+                counterfactual_df,
+                model,
+                scaler,
+                device,
+            )
+        )
+
+    else:
+        counterfactual_probabilities = (
+            np.array([])
+        )
+
+    # --------------------------------------------------------
+    # Second pass:
+    # reconstruct the exact frozen WPA v3 output schema.
+    # --------------------------------------------------------
+
+    rows = []
+    counterfactual_index = 0
+
+    for index, metadata in enumerate(
+        sequence_metadata
+    ):
+        actual_probability = float(
+            metadata[
+                "actualWinProbability"
+            ]
+        )
+
         if index == 0:
             rows.append(
                 {
                     "sequenceId":
-                        sequence_id,
+                        metadata[
+                            "sequenceId"
+                        ],
 
                     "period":
-                        int(
-                            sequence[
-                                "period"
-                            ].iloc[0]
-                        ),
+                        metadata[
+                            "period"
+                        ],
 
                     "clock":
-                        sequence[
+                        metadata[
                             "clock"
-                        ].iloc[0],
+                        ],
 
                     "elapsedGameTime":
-                        float(
-                            actual_post_state[
-                                "elapsedGameTime"
-                            ]
-                        ),
+                        metadata[
+                            "elapsedGameTime"
+                        ],
 
                     "rowsInSequence":
-                        len(sequence),
+                        metadata[
+                            "rowsInSequence"
+                        ],
 
                     "counterfactualWinProbability":
                         np.nan,
@@ -821,97 +1043,48 @@ def build_sequence_table(
                         np.nan,
 
                     "scoreHome":
-                        int(
-                            actual_post_state[
-                                "scoreHome"
-                            ]
-                        ),
+                        metadata[
+                            "scoreHome"
+                        ],
 
                     "scoreAway":
-                        int(
-                            actual_post_state[
-                                "scoreAway"
-                            ]
-                        ),
+                        metadata[
+                            "scoreAway"
+                        ],
 
                     "homePossession":
-                        int(
-                            actual_post_state[
-                                "homePossession"
-                            ]
-                        ),
+                        metadata[
+                            "homePossession"
+                        ],
                 }
             )
 
             continue
 
-        previous_sequence = (
-            grouped[
-                index - 1
-            ][1]
+        counterfactual_probability = float(
+            counterfactual_probabilities[
+                counterfactual_index
+            ]
         )
 
-        previous_state = (
-            previous_sequence
-            .iloc[-1]
-            .copy()
-        )
+        counterfactual_index += 1
 
-        previous_observed_probability = (
-            float(
-                previous_state[
-                    "winProbability"
-                ]
-            )
+        previous_observed_probability = float(
+            metadata[
+                "previousObservedWinProbability"
+            ]
         )
-
-        counterfactual_state = (
-            build_counterfactual_state(
-                previous_state,
-                actual_post_state,
-            )
-        )
-
-        counterfactual_probability = (
-            float(
-                predict_states(
-                    counterfactual_state,
-                    model,
-                    scaler,
-                    device,
-                )[0]
-            )
-        )
-
-        # -------------------------
-        # Core WPA v3 quantity
-        # -------------------------
-        #
-        # Event effect:
-        #
-        # actual state at current time
-        # minus
-        # pre-event score/possession at
-        # current time.
-        #
-        # Time is therefore held fixed.
 
         event_delta = (
             actual_probability
             - counterfactual_probability
         )
 
-        # Old adjacent-state change.
         observed_delta = (
             actual_probability
             - previous_observed_probability
         )
 
-        # Difference attributable to moving
-        # the clock from the previous
-        # sequence to the current sequence,
-        # while leaving score/possession
-        # unchanged.
         time_effect = (
             counterfactual_probability
             - previous_observed_probability
@@ -920,29 +1093,29 @@ def build_sequence_table(
         rows.append(
             {
                 "sequenceId":
-                    sequence_id,
+                    metadata[
+                        "sequenceId"
+                    ],
 
                 "period":
-                    int(
-                        sequence[
-                            "period"
-                        ].iloc[0]
-                    ),
+                    metadata[
+                        "period"
+                    ],
 
                 "clock":
-                    sequence[
+                    metadata[
                         "clock"
-                    ].iloc[0],
+                    ],
 
                 "elapsedGameTime":
-                    float(
-                        actual_post_state[
-                            "elapsedGameTime"
-                        ]
-                    ),
+                    metadata[
+                        "elapsedGameTime"
+                    ],
 
                 "rowsInSequence":
-                    len(sequence),
+                    metadata[
+                        "rowsInSequence"
+                    ],
 
                 "counterfactualWinProbability":
                     counterfactual_probability,
@@ -963,25 +1136,19 @@ def build_sequence_table(
                     time_effect,
 
                 "scoreHome":
-                    int(
-                        actual_post_state[
-                            "scoreHome"
-                        ]
-                    ),
+                    metadata[
+                        "scoreHome"
+                    ],
 
                 "scoreAway":
-                    int(
-                        actual_post_state[
-                            "scoreAway"
-                        ]
-                    ),
+                    metadata[
+                        "scoreAway"
+                    ],
 
                 "homePossession":
-                    int(
-                        actual_post_state[
-                            "homePossession"
-                        ]
-                    ),
+                    metadata[
+                        "homePossession"
+                    ],
             }
         )
 
@@ -1146,16 +1313,19 @@ def team_relative_delta(
 # ============================================================
 
 def allocate_scoring_sequence(
-    sequence,
+    candidates,
     event_delta,
     home_team,
     away_team,
 ):
-    candidates = (
-        scoring_candidates(
-            sequence
-        )
-    )
+    """
+    Allocate an already-classified same-clock scoring
+    sequence.
+
+    Candidate discovery is intentionally performed once
+    in choose_sequence_attribution() rather than repeated
+    here.
+    """
 
     if candidates.empty:
         return []
@@ -1291,37 +1461,108 @@ def choose_sequence_attribution(
     home_team,
     away_team,
 ):
-    # -------------------------
-    # 1. Scoring
-    # -------------------------
+    """
+    Choose the frozen WPA v3 attribution target.
 
-    scoring = (
-        scoring_candidates(
-            sequence
+    Priority is unchanged:
+      1. scoring
+      2. turnover
+      3. last valid rebound
+      4. first valid missed shot
+
+    Player validity is computed once for the sequence rather
+    than repeatedly through DataFrame.apply(axis=1).
+    """
+
+    if sequence.empty:
+        return []
+
+    # Equivalent to valid_player_row():
+    #
+    # clean_text(playerName)
+    # AND
+    # clean_text(teamTricode)
+    #
+    # Both fields must be non-null and non-blank.
+    valid_mask = (
+        sequence[
+            "playerName"
+        ]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .ne("")
+        &
+        sequence[
+            "teamTricode"
+        ]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .ne("")
+    )
+
+    event_types = (
+        sequence[
+            "eventType"
+        ]
+    )
+
+    # --------------------------------------------------------
+    # 1. Scoring
+    # --------------------------------------------------------
+
+    scoring_mask = (
+        valid_mask
+        & event_types.isin(
+            [
+                "Made Shot",
+                "Free Throw",
+            ]
+        )
+        & (
+            sequence[
+                "pointsAdded"
+            ]
+            > 0
         )
     )
 
-    if not scoring.empty:
+    if scoring_mask.any():
+        scoring = (
+            sequence.loc[
+                scoring_mask
+            ]
+        )
+
         return (
             allocate_scoring_sequence(
-                sequence,
+                scoring,
                 event_delta,
                 home_team,
                 away_team,
             )
         )
 
-    # -------------------------
+    # --------------------------------------------------------
     # 2. Turnover
-    # -------------------------
+    # --------------------------------------------------------
 
-    turnovers = (
-        turnover_candidates(
-            sequence
+    turnover_mask = (
+        valid_mask
+        & (
+            event_types
+            == "Turnover"
         )
     )
 
-    if not turnovers.empty:
+    if turnover_mask.any():
+        turnovers = (
+            sequence.loc[
+                turnover_mask
+            ]
+        )
+
         return (
             allocate_equal_candidates(
                 turnovers,
@@ -1333,19 +1574,24 @@ def choose_sequence_attribution(
             )
         )
 
-    # -------------------------
+    # --------------------------------------------------------
     # 3. Rebound
-    # -------------------------
+    # --------------------------------------------------------
 
-    rebounds = (
-        rebound_candidates(
-            sequence
+    rebound_mask = (
+        valid_mask
+        & (
+            event_types
+            == "Rebound"
         )
     )
 
-    if not rebounds.empty:
+    if rebound_mask.any():
         rebound = (
-            rebounds.tail(1)
+            sequence.loc[
+                rebound_mask
+            ]
+            .tail(1)
         )
 
         return (
@@ -1362,19 +1608,24 @@ def choose_sequence_attribution(
             )
         )
 
-    # -------------------------
+    # --------------------------------------------------------
     # 4. Missed shot
-    # -------------------------
+    # --------------------------------------------------------
 
-    misses = (
-        missed_shot_candidates(
-            sequence
+    miss_mask = (
+        valid_mask
+        & (
+            event_types
+            == "Missed Shot"
         )
     )
 
-    if not misses.empty:
+    if miss_mask.any():
         miss = (
-            misses.head(1)
+            sequence.loc[
+                miss_mask
+            ]
+            .head(1)
         )
 
         return (
@@ -2247,12 +2498,32 @@ def analyze_player_impact(
     game_id,
     season,
     top_k=10,
+    season_df=None,
+    model=None,
+    scaler=None,
+    device=None,
 ):
-    season_df = (
-        load_season_data(
-            season
+    if season_df is None:
+        season_df = (
+            load_season_data(
+                season
+            )
         )
-    )
+
+    provided_model_artifacts = [
+        model is not None,
+        scaler is not None,
+        device is not None,
+    ]
+
+    if (
+        any(provided_model_artifacts)
+        and not all(provided_model_artifacts)
+    ):
+        raise ValueError(
+            "model, scaler, and device must either "
+            "all be supplied or all be omitted."
+        )
 
     processed_df = (
         load_processed_game(
@@ -2267,11 +2538,12 @@ def analyze_player_impact(
         )
     )
 
-    (
-        model,
-        scaler,
-        device,
-    ) = load_model()
+    if model is None:
+        (
+            model,
+            scaler,
+            device,
+        ) = load_model()
 
     game_df = (
         add_predictions(

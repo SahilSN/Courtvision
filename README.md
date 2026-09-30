@@ -7,12 +7,20 @@ The current frozen model is **V7**, a PyTorch MLP developed on the 2024-25 NBA s
 ## Current Features
 
 - historical game replay across multiple NBA seasons
-- possession-level win probability prediction
+- possession-level win probability prediction with frozen V7
 - leakage-safe pregame team-strength features
 - turning-point detection
+- counterfactual Player Win Probability Added (WPA v3)
+- shared player credit for assists, steals, and blocks
+- multi-play momentum-run detection
+- contextual "Why the Game Changed" explanations
+- automated Game Story generation
+- traditional and advanced box-score views
 - calibration and temporal-generalization evaluation
 - Streamlit dashboard visualization
 - season/date/game calendar navigation
+- asynchronous background analysis for expensive features
+- persistent warm Player Impact inference service
 - current-game polling infrastructure for future live use
 
 ## Model
@@ -163,7 +171,9 @@ Date
 Game
 ```
 
-Historical analysis uses locally generated season data when available and NBA API data otherwise.
+Historical analysis prefers locally generated processed play-by-play and season data when available, falling back to NBA API data only when necessary.
+
+Season game catalogs and completed-game analysis artifacts are cached locally to avoid repeated network requests and recomputation.
 
 Pregame records are reconstructed using only games completed before the selected game, preventing future leakage.
 
@@ -217,12 +227,19 @@ The Streamlit dashboard currently includes:
 - historical/live mode separation
 - season selection
 - calendar-based game selection
-- team logos
+- team logos and team-specific visual styling
 - pregame records
 - current or final score
-- win-probability chart
+- dual-team win-probability chart
 - biggest turning points
+- Player Impact / WPA leaders
+- momentum runs
+- contextual "Why the Game Changed" analysis
+- automated Game Story
+- traditional and advanced box scores
+- starter / bench filtering
 - expandable prediction timeline
+- asynchronous analysis loading
 - live refresh controls
 
 Run it with:
@@ -230,6 +247,42 @@ Run it with:
 ```bash
 streamlit run dashboard/app.py
 ```
+
+## Performance Architecture
+
+Courtvision separates expensive computation from the main Streamlit render path.
+
+### Historical analysis
+
+Completed historical games use local processed play-by-play whenever available. Frozen V7 model artifacts and season tables are cached in-process, while reusable historical analysis results and season game catalogs are persisted under:
+
+```text
+data/cache/
+```
+
+These runtime caches are excluded from Git.
+
+### Player Impact
+
+Player Impact uses the frozen WPA v3 attribution system.
+
+The optimized pipeline includes:
+
+- batched same-time counterfactual V7 inference
+- shared-credit row construction without repeated pandas Series mutation
+- vectorized sequence-attribution candidate classification
+- persistent background inference service
+- in-memory reuse of the frozen V7 model and scaler
+- lazy per-season training-table caching
+- asynchronous dashboard polling
+
+The persistent service is started automatically with Courtvision and remains alive across game requests.
+
+A warm 2025-26 Player Impact request currently takes approximately 0.47 seconds for the core WPA computation on the development machine, compared with roughly 3.2-3.4 seconds for the earlier one-process-per-request path.
+
+### Box scores
+
+Historical box scores are loaded asynchronously when a cached result is unavailable. This prevents slow NBA API responses from blocking the rest of the dashboard.
 
 ## Project Structure
 
@@ -242,11 +295,14 @@ Courtvision/
 ├── data/
 │   ├── raw/
 │   ├── processed/
-│   └── training/
+│   ├── training/
+│   └── cache/                  # generated runtime cache
 ├── models/
 ├── results/
 ├── src/
 │   ├── analysis.py
+│   ├── box_score.py
+│   ├── contextual_explanations.py
 │   ├── evaluate_calibration.py
 │   ├── evaluate_frozen_v7.py
 │   ├── feature_engineering.py
@@ -254,15 +310,22 @@ Courtvision/
 │   ├── fetch_season.py
 │   ├── fetch_team_logos.py
 │   ├── game_catalog.py
+│   ├── game_story.py
 │   ├── live_analysis.py
 │   ├── model.py
+│   ├── momentum.py
+│   ├── player_impact.py
 │   ├── predict_game.py
 │   ├── preprocess.py
+│   ├── run_box_score_worker.py
+│   ├── run_player_impact_service.py
+│   ├── shared_attribution.py
 │   ├── team_metadata.py
 │   ├── test_live_polling.py
 │   ├── train_baseline.py
 │   ├── train_mlp.py
-│   └── validate_fake_live.py
+│   ├── validate_fake_live.py
+│   └── validate_game_story.py
 ├── README.md
 ├── requirements.txt
 └── .gitignore
@@ -378,6 +441,9 @@ Courtvision follows several modeling rules:
 - probability quality over raw classification accuracy
 - frozen future-season testing before further tuning
 - historical and live modes remain separate
+- frozen analytical components are not changed without validation
+- expensive derived intelligence should be reusable rather than recomputed
+- dashboard responsiveness should not depend on slow external API requests
 
 The main evaluation metrics are:
 
@@ -389,23 +455,54 @@ The main evaluation metrics are:
 
 ## Roadmap
 
+### Completed foundation
+
 ```text
-V7 temporal diagnostics
+Frozen V7 win probability
         ↓
-real live-polling validation
+Turning Points
         ↓
-freeze V7 infrastructure
+Player Impact / WPA v3
         ↓
-player-impact attribution
+Momentum v1
         ↓
-multi-play momentum sequences
+Contextual Explanations v1
         ↓
-richer turning-point explanations
+Automated Game Story v1
         ↓
-automatic game-story generation
-        ↓
-sequence-aware modeling if justified
+Performance + background-computation architecture
 ```
+
+### Current development direction
+
+```text
+Season Intelligence
+        ↓
+Team Courtvision Rating v1
+        ↓
+Opponent-adjusted game evaluation
+        ↓
+Game-by-game rating history
+        ↓
+Player Courtvision Rating
+        ↓
+Clutch Intelligence
+        ↓
+Run-Level Player Attribution
+        ↓
+Game Shape / Comeback Anatomy
+        ↓
+Real live end-to-end validation
+```
+
+### Additional planned infrastructure
+
+- backfill Player Impact support for prior NBA seasons
+- generate compatible historical season training datasets
+- validate frozen V7 / WPA v3 behavior season-by-season
+- show an intentional unavailable state for seasons without Player Impact coverage
+- enable live Player Impact only after real-game validation
+- consider V8 only if future evidence shows a meaningful improvement over frozen V7
 
 The longer-term goal is for Courtvision to explain:
 
@@ -413,7 +510,8 @@ The longer-term goal is for Courtvision to explain:
 what changed,
 when it changed,
 who caused it,
-and why it mattered.
+why it mattered,
+and what it says about teams and players over time.
 ```
 
 ## Tech Stack

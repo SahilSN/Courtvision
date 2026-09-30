@@ -1,4 +1,5 @@
 from pathlib import Path
+from functools import lru_cache
 
 import joblib
 import pandas as pd
@@ -43,7 +44,15 @@ SCALER_PATH = (
 )
 
 
+@lru_cache(maxsize=1)
 def load_live_artifacts():
+    """
+    Load frozen V7 artifacts once per Python process.
+
+    The model and scaler are immutable during inference, so
+    repeatedly reading them from disk adds unnecessary latency.
+    """
+
     device = torch.device(
         "mps"
         if torch.backends.mps.is_available()
@@ -136,10 +145,14 @@ def local_season_path(
     )
 
 
-def get_local_pregame_context(
-    game_id,
+@lru_cache(maxsize=8)
+def load_local_season_data(
     season,
 ):
+    """
+    Load each local season training table once per process.
+    """
+
     path = (
         local_season_path(
             season
@@ -149,9 +162,23 @@ def get_local_pregame_context(
     if not path.exists():
         return None
 
-    season_df = pd.read_csv(
+    return pd.read_csv(
         path
     )
+
+
+def get_local_pregame_context(
+    game_id,
+    season,
+):
+    season_df = (
+        load_local_season_data(
+            season
+        )
+    )
+
+    if season_df is None:
+        return None
 
     numeric_game_id = int(
         str(game_id)
@@ -689,6 +716,79 @@ def add_terminal_state(
     )
 
 
+
+def load_local_historical_game(
+    game_id,
+):
+    """
+    Load a completed game locally when possible.
+
+    Preference:
+      1. processed game state
+      2. raw saved PlayByPlayV3 data
+      3. caller falls back to NBA API
+
+    Returns
+    -------
+    (game_df, source)
+        game_df is None when no local file exists.
+    """
+
+    canonical_game_id = (
+        normalize_game_id(
+            game_id
+        )
+    )
+
+    processed_path = (
+        ROOT_DIR
+        / "data"
+        / "processed"
+        / f"{canonical_game_id}.csv"
+    )
+
+    if processed_path.exists():
+        game_df = pd.read_csv(
+            processed_path
+        )
+
+        if not game_df.empty:
+            return (
+                game_df,
+                "processed",
+            )
+
+    raw_path = (
+        ROOT_DIR
+        / "data"
+        / "raw"
+        / f"{canonical_game_id}.csv"
+    )
+
+    if raw_path.exists():
+        raw_df = pd.read_csv(
+            raw_path
+        )
+
+        if not raw_df.empty:
+            game_df = (
+                preprocess_live_game(
+                    raw_df
+                )
+            )
+
+            if not game_df.empty:
+                return (
+                    game_df,
+                    "raw",
+                )
+
+    return (
+        None,
+        None,
+    )
+
+
 def analyze_live_game(
     game_id,
     season,
@@ -703,17 +803,36 @@ def analyze_live_game(
         )
     )
 
-    raw_df = (
-        fetch_live_play_by_play(
+    game_df = None
+
+    # --------------------------------------------------------
+    # Completed historical games are immutable. Prefer the
+    # locally saved processed/raw game instead of making an
+    # unnecessary PlayByPlayV3 request.
+    #
+    # Live games continue to use the NBA endpoint.
+    # --------------------------------------------------------
+
+    if assume_final:
+        (
+            game_df,
+            _local_source,
+        ) = load_local_historical_game(
             canonical_game_id
         )
-    )
 
-    game_df = (
-        preprocess_live_game(
-            raw_df
+    if game_df is None:
+        raw_df = (
+            fetch_live_play_by_play(
+                canonical_game_id
+            )
         )
-    )
+
+        game_df = (
+            preprocess_live_game(
+                raw_df
+            )
+        )
 
     if game_df.empty:
         raise ValueError(

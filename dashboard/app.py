@@ -10,6 +10,10 @@ from pathlib import Path
 
 import plotly.graph_objects as go
 
+import json
+import os
+import pickle
+import subprocess
 import streamlit as st
 from nba_api.stats.endpoints import commonteamroster, commonplayerinfo
 
@@ -550,23 +554,12 @@ def get_full_player_name(row):
     )
 
 
-@st.cache_data(
-
-    show_spinner=False,
-
-)
-
-
-@st.cache_data(
-    ttl=86400,
-    show_spinner=False,
-)
 def cached_existing_player_summary(
     game_id,
 ):
     """
-    Load an already-computed WPA v3 summary without rerunning
-    the counterfactual player-impact pipeline.
+    Load an already-computed WPA v3 summary from disk and
+    normalize it to the column schema used by the dashboard.
     """
 
     result_path = (
@@ -586,6 +579,65 @@ def cached_existing_player_summary(
     except Exception:
         return None
 
+    # --------------------------------------------------------
+    # Saved player_impact.py output uses names such as:
+    #
+    #   playerName
+    #   teamTricode
+    #   netWPAPoints
+    #
+    # The dashboard/shared-attribution presentation uses:
+    #
+    #   player
+    #   team
+    #   net_wpa_pp
+    #
+    # Normalize either representation into one dashboard
+    # contract here.
+    # --------------------------------------------------------
+
+    rename_map = {
+        "playerName":
+            "player",
+
+        "teamTricode":
+            "team",
+
+        "netWPAPoints":
+            "net_wpa_pp",
+
+        "positiveWPAPoints":
+            "positive_wpa_pp",
+
+        "negativeWPAPoints":
+            "negative_wpa_pp",
+
+        "absoluteWPAPoints":
+            "absolute_wpa_pp",
+
+        "maxPositiveEventPoints":
+            "max_positive_event_pp",
+
+        "maxNegativeEventPoints":
+            "max_negative_event_pp",
+    }
+
+    summary = summary.copy()
+
+    # Preserve the canonical player-impact columns because
+    # existing dashboard helpers still use them. Add aliases
+    # instead of destructively renaming columns.
+    for old, new in rename_map.items():
+        if (
+            old in summary.columns
+            and new not in summary.columns
+        ):
+            summary[
+                new
+            ] = summary[
+                old
+            ]
+
     required = {
         "player",
         "team",
@@ -597,7 +649,29 @@ def cached_existing_player_summary(
     ):
         return None
 
+    numeric_columns = [
+        "net_wpa_pp",
+        "positive_wpa_pp",
+        "negative_wpa_pp",
+        "absolute_wpa_pp",
+        "max_positive_event_pp",
+        "max_negative_event_pp",
+        "events",
+    ]
+
+    for column in numeric_columns:
+        if column in summary.columns:
+            summary[
+                column
+            ] = pd.to_numeric(
+                summary[
+                    column
+                ],
+                errors="coerce",
+            )
+
     return summary
+
 
 
 def cached_player_impact(
@@ -3299,348 +3373,1055 @@ def render_wpa_list(
 
 
 
-def render_player_impact(
 
+def player_impact_runtime_dir():
+    return (
+        ROOT_DIR
+        / "results"
+        / ".runtime"
+        / "player_impact"
+    )
+
+
+def player_impact_status_path(
     game_id,
-
-    season,
-
-    home_team_metadata,
-
-    away_team_metadata,
-
-    live=False,
-
 ):
-
-    st.subheader(
-
-        "Player Impact"
-
+    return (
+        player_impact_runtime_dir()
+        / f"{game_id}.json"
     )
 
 
-
-    st.caption(
-
-        "Counterfactual Win Probability "
-
-        "Added (WPA v3). Positive WPA means "
-
-        "the player's attributed events "
-
-        "increased their team's modeled "
-
-        "chance of winning. Current WPA uses "
-
-        "primary-event attribution; assist and "
-
-        "shared-credit attribution will be "
-
-        "reflected here when that layer is added."
-
+def player_impact_log_path(
+    game_id,
+):
+    return (
+        player_impact_runtime_dir()
+        / f"{game_id}.log"
     )
 
 
+def player_impact_summary_path(
+    game_id,
+):
+    return (
+        ROOT_DIR
+        / "results"
+        / (
+            f"player_wpa_v3_"
+            f"{game_id}_summary.csv"
+        )
+    )
 
-    if live:
 
-        st.info(
-
-            "Player WPA is currently shown for "
-
-            "completed historical games. Live WPA "
-
-            "will be enabled once the live player-"
-
-            "impact pipeline is validated."
-
+def _process_is_alive(
+    pid,
+):
+    try:
+        pid = int(
+            pid
         )
 
-        return
+        os.kill(
+            pid,
+            0,
+        )
+
+        return True
+
+    except (
+        TypeError,
+        ValueError,
+        ProcessLookupError,
+    ):
+        return False
+
+    except PermissionError:
+        # The PID exists, even if we cannot signal it.
+        return True
 
 
+def player_impact_background_status(
+    game_id,
+):
+    game_id = str(
+        game_id
+    )
+
+    if player_impact_summary_path(
+        game_id
+    ).exists():
+        return {
+            "state":
+                "completed",
+        }
+
+    path = (
+        player_impact_status_path(
+            game_id
+        )
+    )
+
+    if not path.exists():
+        return {
+            "state":
+                "missing",
+        }
 
     try:
+        status = json.loads(
+            path.read_text()
+        )
 
-        impact = (
+    except Exception:
+        return {
+            "state":
+                "missing",
+        }
 
-            cached_player_impact(
+    state = (
+        status.get(
+            "state"
+        )
+    )
 
-                str(game_id),
+    if state in {
+        "launching",
+        "queued",
+        "running",
+    }:
+        pid = status.get(
+            "pid"
+        )
 
-                season,
-
-                "v3",
-
+        # "launching" may briefly have no PID yet.
+        if (
+            state == "running"
+            and pid is not None
+            and not _process_is_alive(
+                pid
             )
-
-        )
-
-
-
-    except Exception as error:
-
-        st.info(
-
-            "Player impact is not "
-
-            "available for this game."
-
-        )
-
-
-
-        with st.expander(
-
-            "Player impact details"
-
         ):
+            return {
+                **status,
+                "state":
+                    "failed",
 
-            st.code(
+                "error":
+                    (
+                        "The Player Impact worker "
+                        "stopped before producing a result."
+                    ),
+            }
 
-                str(error)
+    return status
 
+
+def player_impact_service_status_path():
+    return (
+        player_impact_runtime_dir()
+        / "service.json"
+    )
+
+
+def player_impact_request_dir():
+    return (
+        player_impact_runtime_dir()
+        / "requests"
+    )
+
+
+def ensure_player_impact_service():
+    """
+    Ensure exactly one long-lived WPA service is available.
+
+    The service keeps Frozen V7 model artifacts and loaded
+    season DataFrames resident across game requests.
+    """
+
+    runtime_dir = (
+        player_impact_runtime_dir()
+    )
+
+    runtime_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    status_path = (
+        player_impact_service_status_path()
+    )
+
+    if status_path.exists():
+        try:
+            status = json.loads(
+                status_path.read_text()
             )
 
+            pid = status.get(
+                "pid"
+            )
 
+            if (
+                pid is not None
+                and _process_is_alive(
+                    pid
+                )
+            ):
+                return status
+
+        except Exception:
+            pass
+
+    log_path = (
+        runtime_dir
+        / "service.log"
+    )
+
+    log_file = open(
+        log_path,
+        "a",
+    )
+
+    try:
+        process = subprocess.Popen(
+            [
+                sys.executable,
+                str(
+                    ROOT_DIR
+                    / "src"
+                    / "run_player_impact_service.py"
+                ),
+            ],
+            cwd=str(
+                ROOT_DIR
+            ),
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+
+    finally:
+        log_file.close()
+
+    # Record the PID immediately so rapid Streamlit reruns
+    # do not launch duplicate persistent workers.
+    status = {
+        "state":
+            "launching",
+
+        "pid":
+            process.pid,
+    }
+
+    temp = status_path.with_suffix(
+        ".json.tmp"
+    )
+
+    temp.write_text(
+        json.dumps(
+            status,
+            indent=2,
+        )
+    )
+
+    temp.replace(
+        status_path
+    )
+
+    return status
+
+
+@st.cache_resource(
+    show_spinner=False,
+)
+def warm_player_impact_service():
+    """
+    Start the persistent Player Impact service once per
+    Streamlit process.
+
+    This moves Python/model startup off the first WPA
+    request while preserving the existing lazy request
+    queue for individual games.
+    """
+
+    try:
+        return (
+            ensure_player_impact_service()
+        )
+
+    except Exception:
+        # Player Impact is supplemental. A warm-start failure
+        # must never prevent the main Courtvision dashboard
+        # from loading.
+        return None
+
+
+# Proactively warm the persistent WPA backend.
+warm_player_impact_service()
+
+
+def launch_player_impact_background(
+    game_id,
+    season,
+    force=False,
+):
+    game_id = str(
+        game_id
+    )
+
+    if (
+        player_impact_summary_path(
+            game_id
+        ).exists()
+        and not force
+    ):
+        return {
+            "state":
+                "completed",
+        }
+
+    current = (
+        player_impact_background_status(
+            game_id
+        )
+    )
+
+    if (
+        not force
+        and current.get(
+            "state"
+        )
+        in {
+            "launching",
+            "queued",
+            "running",
+        }
+    ):
+        return current
+
+    service = (
+        ensure_player_impact_service()
+    )
+
+    service_pid = (
+        service.get(
+            "pid"
+        )
+    )
+
+    request_dir = (
+        player_impact_request_dir()
+    )
+
+    request_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    status_path = (
+        player_impact_status_path(
+            game_id
+        )
+    )
+
+    status_payload = {
+        "state":
+            "queued",
+
+        "pid":
+            service_pid,
+
+        "game_id":
+            game_id,
+
+        "season":
+            season,
+    }
+
+    status_temp = (
+        status_path.with_suffix(
+            ".json.tmp"
+        )
+    )
+
+    status_temp.write_text(
+        json.dumps(
+            status_payload,
+            indent=2,
+        )
+    )
+
+    status_temp.replace(
+        status_path
+    )
+
+    request_path = (
+        request_dir
+        / f"{game_id}.json"
+    )
+
+    request_temp = (
+        request_path.with_suffix(
+            ".json.tmp"
+        )
+    )
+
+    request_temp.write_text(
+        json.dumps(
+            {
+                "game_id":
+                    game_id,
+
+                "season":
+                    season,
+
+                "top_k":
+                    10,
+
+                "force":
+                    bool(
+                        force
+                    ),
+            },
+            indent=2,
+        )
+    )
+
+    request_temp.replace(
+        request_path
+    )
+
+    return status_payload
+
+
+
+def render_player_impact_summary(
+    summary,
+    home_team,
+    away_team,
+    home_team_metadata,
+    away_team_metadata,
+):
+    (
+        home_high,
+        home_low,
+    ) = get_team_wpa_leaders(
+        summary,
+        home_team,
+    )
+
+    (
+        away_high,
+        away_low,
+    ) = get_team_wpa_leaders(
+        summary,
+        away_team,
+    )
+
+    home_color = (
+        home_team_metadata.get(
+            "chart_color",
+            "#58A6FF",
+        )
+    )
+
+    away_color = (
+        away_team_metadata.get(
+            "chart_color",
+            "#FF5C77",
+        )
+    )
+
+    home_col, away_col = (
+        st.columns(
+            2
+        )
+    )
+
+    with home_col:
+        st.markdown(
+            f"### {home_team}"
+        )
+
+        st.markdown(
+            "**Highest WPA contributors**"
+        )
+
+        render_wpa_list(
+            home_high,
+            home_color,
+        )
+
+        st.markdown(
+            "<div style='height:0.75rem'></div>",
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            "**Lowest WPA contributors**"
+        )
+
+        render_wpa_list(
+            home_low,
+            home_color,
+        )
+
+    with away_col:
+        st.markdown(
+            f"### {away_team}"
+        )
+
+        st.markdown(
+            "**Highest WPA contributors**"
+        )
+
+        render_wpa_list(
+            away_high,
+            away_color,
+        )
+
+        st.markdown(
+            "<div style='height:0.75rem'></div>",
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            "**Lowest WPA contributors**"
+        )
+
+        render_wpa_list(
+            away_low,
+            away_color,
+        )
+
+
+@st.fragment(
+    run_every=0.5,
+)
+def poll_player_impact_background(
+    game_id,
+):
+    """
+    Poll only.
+
+    Worker launch happens in the normal Streamlit render path so
+    Player Impact cannot silently fail to start because of fragment
+    execution behavior.
+    """
+
+    game_id = str(
+        game_id
+    )
+
+    summary = (
+        cached_existing_player_summary(
+            game_id
+        )
+    )
+
+    if summary is not None:
+        # One full rerun is useful here: it removes the temporary
+        # "analyzing" message and lets Game Story pick up its newly
+        # available player-impact enrichment too.
+        st.rerun()
+        return
+
+    status = (
+        player_impact_background_status(
+            game_id
+        )
+    )
+
+    state = (
+        status.get(
+            "state"
+        )
+    )
+
+    if state == "failed":
+        st.warning(
+            "Player Impact analysis did not complete."
+        )
+
+        error = (
+            status.get(
+                "error"
+            )
+        )
+
+        if error:
+            with st.expander(
+                "Player impact details"
+            ):
+                st.code(
+                    str(error)
+                )
+
+
+def render_player_impact(
+    game_id,
+    season,
+    home_team_metadata,
+    away_team_metadata,
+    live=False,
+):
+    st.subheader(
+        "Player Impact"
+    )
+
+    st.caption(
+        "Counterfactual Win Probability Added (WPA v3) "
+        "with shared credit for assists, steals, and blocks. "
+        "Positive WPA means a player's attributed events "
+        "increased their team's modeled chance of winning."
+    )
+
+    if live:
+        st.info(
+            "Player WPA is currently shown for completed "
+            "historical games. Live WPA will be enabled once "
+            "the live player-impact pipeline is validated."
+        )
+        return
+
+    game_id = str(
+        game_id
+    )
+
+    # --------------------------------------------------------
+    # Fast path: result already exists.
+    # --------------------------------------------------------
+
+    summary = (
+        cached_existing_player_summary(
+            game_id
+        )
+    )
+
+    if summary is not None:
+        render_player_impact_summary(
+            summary=summary,
+            home_team=(
+                home_team_metadata[
+                    "tricode"
+                ]
+            ),
+            away_team=(
+                away_team_metadata[
+                    "tricode"
+                ]
+            ),
+            home_team_metadata=(
+                home_team_metadata
+            ),
+            away_team_metadata=(
+                away_team_metadata
+            ),
+        )
 
         return
 
+    # --------------------------------------------------------
+    # Launch path.
+    #
+    # This happens in the normal Streamlit script execution,
+    # NOT inside a fragment. Popen() returns immediately, so
+    # the expensive WPA work still occurs outside Streamlit.
+    # --------------------------------------------------------
 
-
-    summary = (
-
-        impact[
-
-            "player_summary"
-
-        ]
-
+    status = (
+        player_impact_background_status(
+            game_id
+        )
     )
 
-
-
-    home_team = (
-
-        impact[
-
-            "home_team"
-
-        ]
-
+    state = (
+        status.get(
+            "state"
+        )
     )
 
+    if state == "missing":
+        try:
+            status = (
+                launch_player_impact_background(
+                    game_id=game_id,
+                    season=season,
+                )
+            )
 
+            state = (
+                status.get(
+                    "state"
+                )
+            )
 
-    away_team = (
+        except Exception as error:
+            st.error(
+                "Could not start Player Impact analysis."
+            )
 
-        impact[
+            with st.expander(
+                "Player impact details"
+            ):
+                st.code(
+                    str(error)
+                )
 
-            "away_team"
+            return
 
-        ]
-
-    )
-
-
-
-    (
-
-        home_high,
-
-        home_low,
-
-    ) = get_team_wpa_leaders(
-
-        summary,
-
-        home_team,
-
-    )
-
-
-
-    (
-
-        away_high,
-
-        away_low,
-
-    ) = get_team_wpa_leaders(
-
-        summary,
-
-        away_team,
-
-    )
-
-
-
-    home_color = home_team_metadata.get(
-
-        "chart_color",
-
-        "#58A6FF",
-
-    )
-
-
-
-    away_color = away_team_metadata.get(
-
-        "chart_color",
-
-        "#FF5C77",
-
-    )
-
-
-
-    home_col, away_col = (
-
-        st.columns(2)
-
-    )
-
-
-
-    with home_col:
-
-        st.markdown(
-
-            f"### {home_team}"
-
+    if state in {
+        "launching",
+        "queued",
+        "running",
+    }:
+        st.info(
+            "Analyzing Player Impact in the background. "
+            "The rest of Courtvision remains available while "
+            "the calculation finishes."
         )
 
-
-
-        st.markdown(
-
-            "**Highest WPA contributors**"
-
+        poll_player_impact_background(
+            game_id
         )
 
+        return
 
-
-        render_wpa_list(
-
-            home_high,
-
-            home_color,
-
+    if state == "failed":
+        st.warning(
+            "Player Impact analysis did not complete."
         )
 
-
-
-        st.markdown(
-
-            "<div style='height:0.75rem'></div>",
-
-            unsafe_allow_html=True,
-
+        error = (
+            status.get(
+                "error"
+            )
         )
 
+        if error:
+            with st.expander(
+                "Player impact details"
+            ):
+                st.code(
+                    str(error)
+                )
 
+        if st.button(
+            "Retry Player Impact",
+            key=(
+                f"courtvision_retry_player_impact_"
+                f"{game_id}_{season}"
+            ),
+        ):
+            try:
+                launch_player_impact_background(
+                    game_id=game_id,
+                    season=season,
+                    force=True,
+                )
 
-        st.markdown(
+                st.rerun()
 
-            "**Lowest WPA contributors**"
+            except Exception as error:
+                st.error(
+                    "Could not restart Player Impact analysis."
+                )
 
-        )
+                st.code(
+                    str(error)
+                )
 
-
-
-        render_wpa_list(
-
-            home_low,
-
-            home_color,
-
-        )
-
-
-
-    with away_col:
-
-        st.markdown(
-
-            f"### {away_team}"
-
-        )
-
-
-
-        st.markdown(
-
-            "**Highest WPA contributors**"
-
-        )
-
-
-
-        render_wpa_list(
-
-            away_high,
-
-            away_color,
-
-        )
-
-
-
-        st.markdown(
-
-            "<div style='height:0.75rem'></div>",
-
-            unsafe_allow_html=True,
-
-        )
-
-
-
-        st.markdown(
-
-            "**Lowest WPA contributors**"
-
-        )
-
-
-
-        render_wpa_list(
-
-            away_low,
-
-            away_color,
-
-        )
-
-
-
-
-
-# ============================================================
-
-# Renderer
-
-# ============================================================
-
-
+        return
 
 
 # ============================================================
 # Box score
 # ============================================================
 
-@st.cache_data(
-    ttl=86400,
-    show_spinner=False,
+BOX_SCORE_RUNTIME_DIR = (
+    ROOT_DIR
+    / "results"
+    / ".runtime"
+    / "box_score"
 )
+
+
+def box_score_background_status(
+    game_id,
+):
+    game_id = str(
+        game_id
+    )
+
+    cache_path = (
+        historical_box_score_cache_path(
+            game_id
+        )
+    )
+
+    if cache_path.exists():
+        return {
+            "state":
+                "completed",
+        }
+
+    status_path = (
+        BOX_SCORE_RUNTIME_DIR
+        / f"{game_id}.json"
+    )
+
+    if not status_path.exists():
+        return {
+            "state":
+                "missing",
+        }
+
+    try:
+        return json.loads(
+            status_path.read_text()
+        )
+
+    except Exception:
+        return {
+            "state":
+                "missing",
+        }
+
+
+def launch_box_score_background(
+    game_id,
+    season,
+):
+    game_id = str(
+        game_id
+    )
+
+    status = (
+        box_score_background_status(
+            game_id
+        )
+    )
+
+    if status.get(
+        "state"
+    ) in {
+        "running",
+        "completed",
+    }:
+        return status
+
+    BOX_SCORE_RUNTIME_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    status_path = (
+        BOX_SCORE_RUNTIME_DIR
+        / f"{game_id}.json"
+    )
+
+    status_path.write_text(
+        json.dumps(
+            {
+                "state":
+                    "running",
+
+                "game_id":
+                    game_id,
+
+                "season":
+                    season,
+            }
+        )
+    )
+
+    log_path = (
+        BOX_SCORE_RUNTIME_DIR
+        / f"{game_id}.log"
+    )
+
+    log_file = open(
+        log_path,
+        "a",
+    )
+
+    try:
+        process = subprocess.Popen(
+            [
+                sys.executable,
+                str(
+                    ROOT_DIR
+                    / "src"
+                    / "run_box_score_worker.py"
+                ),
+                game_id,
+                "--season",
+                season,
+            ],
+            cwd=str(
+                ROOT_DIR
+            ),
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+
+    finally:
+        log_file.close()
+
+    return {
+        "state":
+            "running",
+
+        "pid":
+            process.pid,
+    }
+
+
+BOX_SCORE_CACHE_VERSION = "v1"
+
+
+def historical_box_score_cache_path(
+    game_id,
+):
+    return (
+        ROOT_DIR
+        / "data"
+        / "cache"
+        / "box_score"
+        / BOX_SCORE_CACHE_VERSION
+        / f"{str(game_id)}.pkl"
+    )
+
+
+def load_persistent_box_score(
+    game_id,
+):
+    cache_path = (
+        historical_box_score_cache_path(
+            game_id
+        )
+    )
+
+    if not cache_path.exists():
+        return None
+
+    try:
+        with cache_path.open(
+            "rb"
+        ) as handle:
+            payload = pickle.load(
+                handle
+            )
+
+    except Exception:
+        return None
+
+    if not isinstance(
+        payload,
+        dict,
+    ):
+        return None
+
+    if (
+        payload.get(
+            "cache_version"
+        )
+        != BOX_SCORE_CACHE_VERSION
+    ):
+        return None
+
+    return payload.get(
+        "box_score"
+    )
+
+
+def save_persistent_box_score(
+    game_id,
+    box_score,
+):
+    """
+    Persist a completed historical box score.
+
+    We only persist when advanced stats were successfully
+    retrieved. If the advanced endpoint temporarily fails,
+    Courtvision still renders traditional stats but retries
+    on a future cold load instead of permanently caching the
+    degraded response.
+    """
+
+    if not box_score.get(
+        "advanced_available",
+        False,
+    ):
+        return
+
+    cache_path = (
+        historical_box_score_cache_path(
+            game_id
+        )
+    )
+
+    cache_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    temp_path = (
+        cache_path.with_suffix(
+            ".pkl.tmp"
+        )
+    )
+
+    payload = {
+        "cache_version":
+            BOX_SCORE_CACHE_VERSION,
+
+        "game_id":
+            str(game_id),
+
+        "box_score":
+            box_score,
+    }
+
+    try:
+        with temp_path.open(
+            "wb"
+        ) as handle:
+            pickle.dump(
+                payload,
+                handle,
+                protocol=pickle.HIGHEST_PROTOCOL,
+            )
+
+        temp_path.replace(
+            cache_path
+        )
+
+    except Exception:
+        try:
+            temp_path.unlink()
+        except FileNotFoundError:
+            pass
+
+        # Caching is an optimization only.
+        return
+
+
 def cached_historical_box_score(
     game_id,
 ):
-    return fetch_box_score(
-        game_id
+    """
+    Historical render path is disk-only.
+
+    Network fetching happens in the detached box-score worker.
+    """
+
+    return (
+        load_persistent_box_score(
+            str(game_id)
+        )
     )
 
 
@@ -3817,70 +4598,49 @@ def cached_team_position_map(
     season,
 ):
     """
-    Return personId -> roster position.
+    Disk-only position lookup.
 
-    Historical box-score starter rows usually contain a
-    position directly, while bench rows may not. The team
-    roster fills those missing bench positions.
+    Rendering must never block on CommonTeamRoster.
+    Position caches are warmed by the detached historical
+    box-score worker.
     """
 
-    try:
-        endpoint = (
-            commonteamroster
-            .CommonTeamRoster(
-                team_id=int(team_id),
-                season=season,
-                timeout=60,
-            )
-        )
+    cache_path = (
+        ROOT_DIR
+        / "data"
+        / "cache"
+        / "positions"
+        / "v1"
+        / f"{season}_{int(team_id)}.pkl"
+    )
 
-        frames = (
-            endpoint.get_data_frames()
-        )
-
-        if not frames:
-            return {}
-
-        roster_df = (
-            frames[0]
-            .copy()
-        )
-
-        positions = {}
-
-        for _, row in (
-            roster_df.iterrows()
-        ):
-            player_id = (
-                row.get(
-                    "PLAYER_ID"
-                )
-            )
-
-            if (
-                player_id is None
-                or player_id != player_id
-            ):
-                continue
-
-            positions[
-                int(player_id)
-            ] = (
-                normalize_box_position(
-                    row.get(
-                        "POSITION"
-                    )
-                )
-            )
-
-        return positions
-
-    except Exception:
-        # Position information is supplemental.
-        # Never make the box score fail because this
-        # secondary endpoint is unavailable.
+    if not cache_path.exists():
         return {}
 
+    try:
+        with cache_path.open(
+            "rb"
+        ) as handle:
+            payload = pickle.load(
+                handle
+            )
+
+        if not isinstance(
+            payload,
+            dict,
+        ):
+            return {}
+
+        return (
+            payload.get(
+                "positions",
+                {},
+            )
+            or {}
+        )
+
+    except Exception:
+        return {}
 
 
 @st.cache_data(
@@ -4170,51 +4930,10 @@ def prepare_box_score_rows(
             else direct_position
         )
 
-        # If both the box-score row and the team roster
-        # are missing a position, query the player's
-        # canonical NBA profile as a final fallback.
-        if (
-            position == "—"
-            and person_id is not None
-        ):
-            try:
-                if person_id == person_id:
-                    position = (
-                        cached_player_position(
-                            int(
-                                person_id
-                            )
-                        )
-                    )
-
-            except (
-                TypeError,
-                ValueError,
-            ):
-                pass
-
-        # If both the box-score row and the team roster
-        # are missing a position, query the player's
-        # canonical NBA profile as a final fallback.
-        if (
-            position == "—"
-            and person_id is not None
-        ):
-            try:
-                if person_id == person_id:
-                    position = (
-                        cached_player_position(
-                            int(
-                                person_id
-                            )
-                        )
-                    )
-
-            except (
-                TypeError,
-                ValueError,
-            ):
-                pass
+        # Do not perform per-player NBA API calls while
+        # rendering. If neither the box score nor the cached
+        # team roster provides a position, display an em dash.
+        # The background box-score worker warms roster data.
 
         def numeric_stat(
             column,
@@ -4794,15 +5513,6 @@ def render_game_story(
         ]
     )
 
-    momentum = (
-        detect_momentum_runs(
-            game_df,
-            home_team=home_team,
-            away_team=away_team,
-            top_k=3,
-        )
-    )
-
     player_summary = None
 
     if not live:
@@ -4813,13 +5523,11 @@ def render_game_story(
         )
 
     explanations = (
-        build_contextual_explanations(
-            game_df=game_df,
-            momentum_result=momentum,
-            home_team=home_team,
-            away_team=away_team,
-            player_summary=player_summary,
-            top_k=4,
+        cached_contextual_intelligence(
+            game_df,
+            home_team,
+            away_team,
+            player_summary,
         )
     )
 
@@ -5075,15 +5783,6 @@ def render_contextual_game_explanations(
         ]
     )
 
-    momentum = (
-        detect_momentum_runs(
-            game_df,
-            home_team=home_team,
-            away_team=away_team,
-            top_k=3,
-        )
-    )
-
     player_summary = None
 
     # Historical player WPA is validated. Live player WPA
@@ -5108,13 +5807,11 @@ def render_contextual_game_explanations(
             player_summary = None
 
     explanations = (
-        build_contextual_explanations(
-            game_df=game_df,
-            momentum_result=momentum,
-            home_team=home_team,
-            away_team=away_team,
-            player_summary=player_summary,
-            top_k=4,
+        cached_contextual_intelligence(
+            game_df,
+            home_team,
+            away_team,
+            player_summary,
         )
     )
 
@@ -5234,6 +5931,34 @@ def render_contextual_game_explanations(
 
 
 
+@st.fragment(
+    run_every=2,
+)
+def poll_historical_box_score(
+    game_id,
+):
+    """
+    Poll only for completion of the detached historical
+    box-score worker.
+
+    Network work is never performed in this fragment.
+    """
+
+    game_id = str(
+        game_id
+    )
+
+    cache_path = (
+        historical_box_score_cache_path(
+            game_id
+        )
+    )
+
+    if cache_path.exists():
+        st.rerun()
+        return
+
+
 def render_box_score(
     game_id,
     season,
@@ -5265,6 +5990,90 @@ def render_box_score(
                     str(game_id)
                 )
             )
+
+            if box_score is None:
+                status = (
+                    box_score_background_status(
+                        str(game_id)
+                    )
+                )
+
+                if (
+                    status.get(
+                        "state"
+                    )
+                    == "missing"
+                ):
+                    status = (
+                        launch_box_score_background(
+                            game_id=str(
+                                game_id
+                            ),
+                            season=season,
+                        )
+                    )
+
+                if (
+                    status.get(
+                        "state"
+                    )
+                    in {
+                        "running",
+                        "missing",
+                    }
+                ):
+                    st.info(
+                        "Loading the box score in the "
+                        "background. The rest of Courtvision "
+                        "is available while it finishes."
+                    )
+
+                    poll_historical_box_score(
+                        str(game_id)
+                    )
+
+                    return
+
+                if (
+                    status.get(
+                        "state"
+                    )
+                    == "failed"
+                ):
+                    st.info(
+                        "Box score is not currently available."
+                    )
+
+                    error = (
+                        status.get(
+                            "error"
+                        )
+                    )
+
+                    if error:
+                        with st.expander(
+                            "Box score details"
+                        ):
+                            st.code(
+                                str(error)
+                            )
+
+                    return
+
+                # The worker may have completed between the
+                # initial check and this point.
+                box_score = (
+                    load_persistent_box_score(
+                        str(game_id)
+                    )
+                )
+
+                if box_score is None:
+                    st.info(
+                        "Loading the box score in the "
+                        "background."
+                    )
+                    return
 
     except Exception as error:
         st.info(
@@ -5518,6 +6327,56 @@ def render_momentum_card(
 
 
 
+
+@st.cache_data(
+    ttl=86400,
+    show_spinner=False,
+)
+def cached_momentum_intelligence(
+    game_df,
+    home_team,
+    away_team,
+):
+    return (
+        detect_momentum_runs(
+            game_df,
+            home_team=home_team,
+            away_team=away_team,
+            top_k=3,
+        )
+    )
+
+
+@st.cache_data(
+    ttl=86400,
+    show_spinner=False,
+)
+def cached_contextual_intelligence(
+    game_df,
+    home_team,
+    away_team,
+    player_summary,
+):
+    momentum = (
+        cached_momentum_intelligence(
+            game_df,
+            home_team,
+            away_team,
+        )
+    )
+
+    return (
+        build_contextual_explanations(
+            game_df=game_df,
+            momentum_result=momentum,
+            home_team=home_team,
+            away_team=away_team,
+            player_summary=player_summary,
+            top_k=4,
+        )
+    )
+
+
 def render_momentum_runs(
     game_df,
     home_team_metadata,
@@ -5536,19 +6395,14 @@ def render_momentum_runs(
     )
 
     result = (
-        detect_momentum_runs(
+        cached_momentum_intelligence(
             game_df,
-            home_team=(
-                home_team_metadata[
-                    "tricode"
-                ]
-            ),
-            away_team=(
-                away_team_metadata[
-                    "tricode"
-                ]
-            ),
-            top_k=3,
+            home_team_metadata[
+                "tricode"
+            ],
+            away_team_metadata[
+                "tricode"
+            ],
         )
     )
 
@@ -6442,6 +7296,208 @@ def render_game(
 
 
 
+HISTORICAL_ANALYSIS_CACHE_VERSION = "v1_v7"
+
+
+def historical_analysis_cache_dir():
+    return (
+        ROOT_DIR
+        / "data"
+        / "cache"
+        / "analysis"
+        / HISTORICAL_ANALYSIS_CACHE_VERSION
+    )
+
+
+def historical_analysis_cache_path(
+    game_id,
+    season,
+    top_k,
+):
+    safe_season = (
+        str(season)
+        .replace("/", "-")
+        .replace(" ", "_")
+    )
+
+    return (
+        historical_analysis_cache_dir()
+        / (
+            f"{safe_season}_"
+            f"{str(game_id)}_"
+            f"top{int(top_k)}.pkl"
+        )
+    )
+
+
+def load_persistent_historical_analysis(
+    game_id,
+    season,
+    top_k,
+):
+    cache_path = (
+        historical_analysis_cache_path(
+            game_id=game_id,
+            season=season,
+            top_k=top_k,
+        )
+    )
+
+    if not cache_path.exists():
+        return None
+
+    try:
+        with cache_path.open("rb") as handle:
+            payload = pickle.load(
+                handle
+            )
+
+    except Exception:
+        # A stale/corrupt cache should never prevent
+        # Courtvision from analyzing the game normally.
+        return None
+
+    if not isinstance(
+        payload,
+        dict,
+    ):
+        return None
+
+    if (
+        payload.get(
+            "cache_version"
+        )
+        != HISTORICAL_ANALYSIS_CACHE_VERSION
+    ):
+        return None
+
+    return payload.get(
+        "result"
+    )
+
+
+def save_persistent_historical_analysis(
+    game_id,
+    season,
+    top_k,
+    result,
+):
+    cache_path = (
+        historical_analysis_cache_path(
+            game_id=game_id,
+            season=season,
+            top_k=top_k,
+        )
+    )
+
+    cache_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    temp_path = (
+        cache_path.with_suffix(
+            ".pkl.tmp"
+        )
+    )
+
+    payload = {
+        "cache_version":
+            HISTORICAL_ANALYSIS_CACHE_VERSION,
+
+        "game_id":
+            str(game_id),
+
+        "season":
+            str(season),
+
+        "top_k":
+            int(top_k),
+
+        "result":
+            result,
+    }
+
+    try:
+        with temp_path.open(
+            "wb"
+        ) as handle:
+            pickle.dump(
+                payload,
+                handle,
+                protocol=pickle.HIGHEST_PROTOCOL,
+            )
+
+        temp_path.replace(
+            cache_path
+        )
+
+    except Exception:
+        try:
+            temp_path.unlink()
+        except FileNotFoundError:
+            pass
+
+        # Cache writing is an optimization only.
+        # Never fail the game analysis because of it.
+        return
+
+
+@st.cache_data(
+    ttl=86400,
+    show_spinner=False,
+)
+def cached_historical_analysis(
+    game_id,
+    season,
+    game_date,
+    top_k=3,
+):
+    """
+    Historical analysis cache hierarchy:
+
+      1. Streamlit in-memory cache
+      2. persistent versioned disk cache
+      3. analyze_live_game() fallback
+
+    Completed games are immutable, so once Courtvision has
+    analyzed a historical game there is no reason to rebuild
+    the V7 timeline after every application restart.
+    """
+
+    game_id = str(
+        game_id
+    )
+
+    cached_result = (
+        load_persistent_historical_analysis(
+            game_id=game_id,
+            season=season,
+            top_k=top_k,
+        )
+    )
+
+    if cached_result is not None:
+        return cached_result
+
+    result = analyze_live_game(
+        game_id=game_id,
+        season=season,
+        game_date=game_date,
+        top_k=top_k,
+        assume_final=True,
+    )
+
+    save_persistent_historical_analysis(
+        game_id=game_id,
+        season=season,
+        top_k=top_k,
+        result=result,
+    )
+
+    return result
+
+
 def run_historical():
 
     if not st.session_state[
@@ -6472,7 +7528,7 @@ def run_historical():
 
         ):
 
-            result = analyze_live_game(
+            result = cached_historical_analysis(
 
                 game_id=selected_game_id,
 
@@ -6481,8 +7537,6 @@ def run_historical():
                 game_date=selected_date,
 
                 top_k=3,
-
-                assume_final=True,
 
             )
 

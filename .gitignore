@@ -46,3 +46,13 @@ results/player_wpa_v3_*.csv
 
 # Local dashboard backups
 dashboard/*.before_*
+
+# Runtime caches
+data/cache/
+
+# Runtime state
+results/.runtime/
+
+# Generated validation/debug outputs
+results/*_validation_failures.csv
+results/wpa_optimization_baseline/

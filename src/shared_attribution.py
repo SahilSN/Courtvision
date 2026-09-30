@@ -473,9 +473,13 @@ def make_credit_row(
     credit_role,
     shared,
 ):
-    row = (
-        source_row.copy()
-    )
+    """
+    Create a shared-credit output row.
+
+    Use a plain dict rather than repeatedly mutating a
+    pandas Series. The resulting DataFrame schema and
+    attribution semantics remain unchanged.
+    """
 
     original_wpa = float(
         source_row[
@@ -483,72 +487,65 @@ def make_credit_row(
         ]
     )
 
-    row[
-        "sourcePlayerWPA"
-    ] = original_wpa
-
-    row[
-        "sourcePlayerWPAPoints"
-    ] = (
-        original_wpa
-        * 100.0
-    )
-
-    row[
-        "personId"
-    ] = (
-        player[
-            "personId"
-        ]
-    )
-
-    row[
-        "playerName"
-    ] = (
-        player[
-            "playerName"
-        ]
-    )
-
-    row[
-        "teamTricode"
-    ] = (
-        player[
-            "teamTricode"
-        ]
-    )
-
-    row[
-        "playerWPA"
-    ] = float(
+    player_wpa = float(
         player_wpa
     )
 
-    row[
-        "playerWPAPoints"
-    ] = (
-        float(
-            player_wpa
+    row = (
+        source_row.to_dict()
+        if hasattr(
+            source_row,
+            "to_dict",
         )
-        * 100.0
+        else dict(
+            source_row
+        )
     )
 
-    row[
-        "creditShare"
-    ] = float(
-        credit_share
-    )
+    row.update(
+        {
+            "sourcePlayerWPA":
+                original_wpa,
 
-    row[
-        "creditRole"
-    ] = (
-        credit_role
-    )
+            "sourcePlayerWPAPoints":
+                original_wpa
+                * 100.0,
 
-    row[
-        "sharedCreditApplied"
-    ] = bool(
-        shared
+            "personId":
+                player[
+                    "personId"
+                ],
+
+            "playerName":
+                player[
+                    "playerName"
+                ],
+
+            "teamTricode":
+                player[
+                    "teamTricode"
+                ],
+
+            "playerWPA":
+                player_wpa,
+
+            "playerWPAPoints":
+                player_wpa
+                * 100.0,
+
+            "creditShare":
+                float(
+                    credit_share
+                ),
+
+            "creditRole":
+                credit_role,
+
+            "sharedCreditApplied":
+                bool(
+                    shared
+                ),
+        }
     )
 
     return row
