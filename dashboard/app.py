@@ -1317,13 +1317,38 @@ elif mode == "Live":
 
 else:
 
-    SEASON_INTELLIGENCE_SEASONS = [
+    season_intelligence_dir = (
+        ROOT_DIR
+        / "results"
+        / "season_intelligence"
+    )
 
-        "2025-26",
+    SEASON_INTELLIGENCE_SEASONS = sorted(
+        [
+            path.name.replace(
+                "_team_summary_v1.csv",
+                "",
+            )
+            for path in (
+                season_intelligence_dir.glob(
+                    "*_team_summary_v1.csv"
+                )
+            )
+            if (
+                season_intelligence_dir
+                / path.name.replace(
+                    "_team_summary_v1.csv",
+                    "_team_rating_games_v1.csv",
+                )
+            ).exists()
+        ],
+        reverse=True,
+    )
 
-        "2024-25",
-
-    ]
+    if not SEASON_INTELLIGENCE_SEASONS:
+        raise RuntimeError(
+            "No completed Season Intelligence seasons found."
+        )
 
 
 

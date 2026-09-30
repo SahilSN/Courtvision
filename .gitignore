@@ -56,3 +56,7 @@ results/.runtime/
 # Generated validation/debug outputs
 results/*_validation_failures.csv
 results/wpa_optimization_baseline/
+
+# Season Intelligence intermediate artifacts
+results/season_intelligence/*_game_features_v1.csv
+results/team_rating/*_courtvision_rating_history_v1.csv
