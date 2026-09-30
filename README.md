@@ -475,10 +475,28 @@ Performance + background-computation architecture
 
 ### Current development direction
 
+**Current:** Season Intelligence / Team Courtvision Rating v1
+
+The rating specification is frozen in:
+
+```text
+docs/team_courtvision_rating_v1.md
+```
+
+Implementation begins with the canonical game-level Season Intelligence dataset.
+
 ```text
 Season Intelligence
         ↓
 Team Courtvision Rating v1
+        ↓
+Canonical game-level intelligence dataset
+        ↓
+Standard Elo baseline
+        ↓
+Courtvision dominance rating
+        ↓
+Chronological validation + frozen temporal evaluation
         ↓
 Opponent-adjusted game evaluation
         ↓
