@@ -6,6 +6,7 @@ import pandas as pd
 
 from nba_api.stats.endpoints import (
     leaguegamelog,
+    scoreboardv3,
 )
 
 
@@ -130,6 +131,111 @@ def fetch_season_games(
 
     return df
 
+
+
+def fetch_game_statuses_for_date(
+    game_date,
+    timeout=60,
+):
+    """
+    Return authoritative NBA lifecycle status keyed by game ID.
+
+    This is intentionally separate from the season game catalog.
+    LeagueGameLog remains the matchup source; ScoreboardV3 is used
+    only for live lifecycle semantics such as Final / Final/OT.
+    """
+    formatted_date = (
+        pd.Timestamp(
+            game_date
+        )
+        .strftime(
+            "%Y-%m-%d"
+        )
+    )
+
+    scoreboard = (
+        scoreboardv3.ScoreboardV3(
+            game_date=formatted_date,
+            timeout=timeout,
+        )
+    )
+
+    frames = (
+        scoreboard.get_data_frames()
+    )
+
+    if len(frames) < 2:
+        return {}
+
+    games_df = (
+        frames[1].copy()
+    )
+
+    if games_df.empty:
+        return {}
+
+    statuses = {}
+
+    for _, row in games_df.iterrows():
+        game_id = str(
+            row["gameId"]
+        ).zfill(10)
+
+        raw_status = row.get(
+            "gameStatus"
+        )
+
+        game_status = (
+            None
+            if pd.isna(
+                raw_status
+            )
+            else int(
+                raw_status
+            )
+        )
+
+        raw_period = row.get(
+            "period"
+        )
+
+        period = (
+            None
+            if pd.isna(
+                raw_period
+            )
+            else int(
+                raw_period
+            )
+        )
+
+        statuses[
+            game_id
+        ] = {
+            "game_status":
+                game_status,
+
+            "game_status_text":
+                str(
+                    row.get(
+                        "gameStatusText",
+                        "",
+                    )
+                ).strip(),
+
+            "period":
+                period,
+
+            "game_clock":
+                str(
+                    row.get(
+                        "gameClock",
+                        "",
+                    )
+                ).strip(),
+        }
+
+    return statuses
 
 
 def games_for_date_from_season_df(

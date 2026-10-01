@@ -21,8 +21,13 @@ from model import (
 )
 
 from preprocess import (
+    IncompletePlayByPlayError,
     preprocess_live_game,
 )
+
+
+class LiveGameNotReadyError(RuntimeError):
+    """The live feed exists but is not yet analyzable."""
 
 
 ROOT_DIR = (
@@ -122,9 +127,9 @@ def fetch_live_play_by_play(
     )
 
     if df.empty:
-        raise ValueError(
-            "No PlayByPlayV3 data "
-            f"returned for "
+        raise LiveGameNotReadyError(
+            "The play-by-play feed has not "
+            "returned any events yet for "
             f"{canonical_game_id}."
         )
 
@@ -789,13 +794,74 @@ def load_local_historical_game(
     )
 
 
+
+def truncate_live_replay(
+    game_df,
+    cutoff_elapsed,
+):
+    """
+    Return only game states available through a historical
+    live-replay cutoff.
+
+    The cutoff is expressed in elapsed game seconds:
+      720  = end Q1
+      1440 = halftime
+      2160 = end Q3
+      2520 = 6:00 remaining in Q4
+      2880 = end regulation
+
+    Truncation happens before model inference and downstream
+    intelligence so replay mode cannot see future game states.
+    """
+    if cutoff_elapsed is None:
+        return game_df
+
+    cutoff_elapsed = float(
+        cutoff_elapsed
+    )
+
+    if cutoff_elapsed < 0:
+        raise ValueError(
+            "Replay cutoff must be non-negative."
+        )
+
+    if "elapsedGameTime" not in game_df.columns:
+        raise ValueError(
+            "Replay requires elapsedGameTime."
+        )
+
+    elapsed = pd.to_numeric(
+        game_df["elapsedGameTime"],
+        errors="coerce",
+    )
+
+    replay_df = (
+        game_df.loc[
+            elapsed <= cutoff_elapsed
+        ]
+        .copy()
+        .reset_index(
+            drop=True
+        )
+    )
+
+    if replay_df.empty:
+        raise ValueError(
+            "Replay cutoff occurs before the first "
+            "usable game state."
+        )
+
+    return replay_df
+
+
+
 def analyze_live_game(
     game_id,
     season,
     game_date,
     season_type="Regular Season",
     top_k=3,
-    assume_final=False,
+    assume_final=False,    replay_cutoff_elapsed=None,
 ):
     canonical_game_id = (
         normalize_game_id(
@@ -813,7 +879,10 @@ def analyze_live_game(
     # Live games continue to use the NBA endpoint.
     # --------------------------------------------------------
 
-    if assume_final:
+    if (
+        assume_final
+        or replay_cutoff_elapsed is not None
+    ):
         (
             game_df,
             _local_source,
@@ -828,16 +897,28 @@ def analyze_live_game(
             )
         )
 
-        game_df = (
-            preprocess_live_game(
-                raw_df
+        try:
+            game_df = (
+                preprocess_live_game(
+                    raw_df
+                )
             )
+
+        except IncompletePlayByPlayError as error:
+            raise LiveGameNotReadyError(
+                str(error)
+            ) from error
+
+    if replay_cutoff_elapsed is not None:
+        game_df = truncate_live_replay(
+            game_df,
+            replay_cutoff_elapsed,
         )
 
     if game_df.empty:
-        raise ValueError(
-            "No usable states "
-            "after preprocessing."
+        raise LiveGameNotReadyError(
+            "No usable game states are "
+            "available yet after preprocessing."
         )
 
     home_team_id = int(
@@ -941,16 +1022,43 @@ def analyze_live_game(
             game_df.copy()
         )
 
-        display_status = (
-            format_live_status(
-                state[
-                    "period"
-                ],
-                state[
-                    "clock"
-                ],
+        if replay_cutoff_elapsed is not None:
+            replay_boundary_status = {
+                720.0:
+                    "END Q1",
+
+                1440.0:
+                    "HALFTIME",
+
+                2160.0:
+                    "END Q3",
+
+                2880.0:
+                    "END REGULATION",
+            }
+
+            display_status = (
+                replay_boundary_status.get(
+                    float(
+                        replay_cutoff_elapsed
+                    )
+                )
             )
-        )
+
+        else:
+            display_status = None
+
+        if display_status is None:
+            display_status = (
+                format_live_status(
+                    state[
+                        "period"
+                    ],
+                    state[
+                        "clock"
+                    ],
+                )
+            )
 
         status = (
             "live_mode"

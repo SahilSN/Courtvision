@@ -3,6 +3,10 @@ import re
 import pandas as pd
 
 
+class IncompletePlayByPlayError(ValueError):
+    """Live PBP does not yet contain enough usable game state."""
+
+
 def parse_clock(clock, period_length):
     match = re.fullmatch(
         r"PT(?:(\d+)M)?(\d+(?:\.\d+)?)S",
@@ -440,11 +444,14 @@ def get_team_ids(df):
         is not None
     ):
         away_team_id = next(
-            team_id
-            for team_id
-            in team_ids
-            if team_id
-            != home_team_id
+            (
+                team_id
+                for team_id
+                in team_ids
+                if team_id
+                != home_team_id
+            ),
+            None,
         )
 
     elif (
@@ -452,11 +459,14 @@ def get_team_ids(df):
         is not None
     ):
         home_team_id = next(
-            team_id
-            for team_id
-            in team_ids
-            if team_id
-            != away_team_id
+            (
+                team_id
+                for team_id
+                in team_ids
+                if team_id
+                != away_team_id
+            ),
+            None,
         )
 
     return (
@@ -509,9 +519,9 @@ def _add_home_away_state(df):
         or away_team_id
         is None
     ):
-        raise ValueError(
-            "Could not determine "
-            "home/away team IDs."
+        raise IncompletePlayByPlayError(
+            "Not enough play-by-play to determine "
+            "home/away team IDs yet."
         )
 
     df[
@@ -598,6 +608,12 @@ def preprocess_live_game(df):
             drop=True
         )
     )
+
+    if df.empty:
+        raise IncompletePlayByPlayError(
+            "Not enough play-by-play to build "
+            "a usable possession state yet."
+        )
 
     return df
 

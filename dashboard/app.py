@@ -88,10 +88,13 @@ from box_score import (
     fetch_box_score,
     get_team_players,
 )
+from replay_box_score import build_replay_box_score
+from live_stints import build_live_stints
 
 
 from game_catalog import (
 
+    fetch_game_statuses_for_date,
     fetch_season_games,
     games_for_date_from_season_df,
 
@@ -101,6 +104,7 @@ from game_catalog import (
 
 from live_analysis import (
 
+    LiveGameNotReadyError,
     analyze_live_game,
 
 )
@@ -108,6 +112,7 @@ from live_analysis import (
 
 
 from player_impact import (
+    analyze_player_impact_from_game_df,
 
     analyze_player_impact,
 
@@ -487,6 +492,21 @@ def cached_season_game_log(
     return (
         fetch_season_games(
             season=season,
+            timeout=60,
+        )
+    )
+
+
+@st.cache_data(
+    ttl=15,
+    show_spinner=False,
+)
+def cached_live_game_statuses(
+    selected_date,
+):
+    return (
+        fetch_game_statuses_for_date(
+            game_date=selected_date,
             timeout=60,
         )
     )
@@ -1258,6 +1278,179 @@ elif mode == "Live":
 
 
     # --------------------------------------------------------
+    # Historical live replay
+    # --------------------------------------------------------
+
+    live_replay_mode = st.sidebar.toggle(
+        "Historical live replay",
+        value=False,
+        key="courtvision_live_replay_mode",
+    )
+
+    replay_cutoff_elapsed = None
+
+    if live_replay_mode:
+        st.sidebar.caption(
+            "Replay a completed game as if Courtvision "
+            "were watching it live."
+        )
+
+        replay_season = st.sidebar.selectbox(
+            "Replay season",
+            AVAILABLE_SEASONS,
+            index=(
+                AVAILABLE_SEASONS.index(
+                    "2025-26"
+                )
+                if "2025-26"
+                in AVAILABLE_SEASONS
+                else 0
+            ),
+            key="courtvision_replay_season",
+        )
+
+        replay_date = st.sidebar.date_input(
+            "Replay date",
+            value=default_date_for_season(
+                replay_season
+            ),
+            key=(
+                "courtvision_replay_date_"
+                f"{replay_season}"
+            ),
+        )
+
+        try:
+            replay_games = cached_games_for_date(
+                replay_season,
+                replay_date,
+            )
+
+        except Exception as error:
+            replay_games = []
+
+            st.sidebar.error(
+                "Could not load replay games: "
+                f"{error}"
+            )
+
+        selected_game_id = None
+
+        if replay_games:
+            replay_labels = [
+                game["label"]
+                for game in replay_games
+            ]
+
+            replay_label = st.sidebar.radio(
+                "Replay game",
+                replay_labels,
+                key="courtvision_replay_game",
+            )
+
+            replay_game = next(
+                game
+                for game in replay_games
+                if game["label"]
+                == replay_label
+            )
+
+            selected_game_id = (
+                replay_game["game_id"]
+            )
+
+        else:
+            st.sidebar.info(
+                "No games found on this replay date."
+            )
+
+        replay_points = {
+            "End Q1": 720,
+            "Halftime": 1440,
+            "End Q3": 2160,
+            "6:00 Q4": 2520,
+            "End Regulation": 2880,
+        }
+
+        if selected_game_id is not None:
+            replay_processed_path = (
+                ROOT_DIR
+                / "data"
+                / "processed"
+                / f"{selected_game_id}.csv"
+            )
+
+            if replay_processed_path.exists():
+                replay_processed_df = pd.read_csv(
+                    replay_processed_path,
+                    dtype={"gameId": str},
+                )
+
+                max_period = int(
+                    pd.to_numeric(
+                        replay_processed_df[
+                            "period"
+                        ],
+                        errors="coerce",
+                    )
+                    .dropna()
+                    .max()
+                )
+
+                if max_period > 4:
+                    for period in range(
+                        5,
+                        max_period + 1,
+                    ):
+                        overtime_number = (
+                            period - 4
+                        )
+
+                        replay_points[
+                            (
+                                f"End OT"
+                                f"{overtime_number}"
+                            )
+                        ] = (
+                            2880
+                            + (
+                                overtime_number
+                                * 300
+                            )
+                        )
+
+                    replay_points[
+                        "Final"
+                    ] = (
+                        2880
+                        + (
+                            (
+                                max_period - 4
+                            )
+                            * 300
+                        )
+                    )
+
+        replay_point = st.sidebar.selectbox(
+            "Replay point",
+            list(
+                replay_points.keys()
+            ),
+            index=1,
+            key="courtvision_replay_point",
+        )
+
+        replay_cutoff_elapsed = (
+            replay_points[
+                replay_point
+            ]
+        )
+
+        season = replay_season
+        selected_date = replay_date
+
+
+    # --------------------------------------------------------
 
     # Refresh controls
 
@@ -1302,6 +1495,14 @@ elif mode == "Live":
         )
 
     )
+
+
+    if live_replay_mode:
+        auto_refresh = False
+
+        st.sidebar.caption(
+            "Auto-refresh is disabled during historical replay."
+        )
 
 
 
@@ -4051,12 +4252,158 @@ def poll_player_impact_background(
                 )
 
 
+def player_impact_live_state_key(
+    game_id,
+    game_df,
+):
+    """
+    Identify the current live/replay PBP state for WPA caching.
+
+    Streamlit reruns may occur without any new play-by-play.
+    In that case, reuse the already-computed Player Impact result.
+    """
+
+    if (
+        game_df is None
+        or game_df.empty
+    ):
+        return (
+            str(game_id),
+            0,
+            None,
+            None,
+            None,
+            None,
+        )
+
+    if "homePossession" in game_df.columns:
+        resolved = (
+            game_df.loc[
+                game_df[
+                    "homePossession"
+                ].notna()
+            ]
+            .copy()
+        )
+    else:
+        resolved = game_df.copy()
+
+    if resolved.empty:
+        return (
+            str(game_id),
+            0,
+            None,
+            None,
+            None,
+            None,
+        )
+
+    last = resolved.iloc[-1]
+
+    action_identifier = None
+
+    for column in (
+        "actionId",
+        "actionNumber",
+    ):
+        if column in resolved.columns:
+            value = last.get(
+                column
+            )
+
+            if value == value:
+                action_identifier = str(
+                    value
+                )
+                break
+
+    return (
+        str(game_id),
+        len(resolved),
+        float(
+            last.get(
+                "elapsedGameTime",
+                0.0,
+            )
+        ),
+        int(
+            last.get(
+                "scoreHome",
+                0,
+            )
+        ),
+        int(
+            last.get(
+                "scoreAway",
+                0,
+            )
+        ),
+        action_identifier,
+    )
+
+
+def get_live_player_impact(
+    game_id,
+    game_df,
+):
+    """
+    Compute live/replay WPA only when the observed PBP state changes.
+    """
+
+    cache_key = (
+        player_impact_live_state_key(
+            game_id,
+            game_df,
+        )
+    )
+
+    cached = (
+        st.session_state.get(
+            "courtvision_live_player_impact"
+        )
+    )
+
+    if (
+        isinstance(
+            cached,
+            dict,
+        )
+        and cached.get(
+            "key"
+        ) == cache_key
+    ):
+        return cached[
+            "impact"
+        ]
+
+    impact = (
+        analyze_player_impact_from_game_df(
+            game_df,
+            top_k=10,
+        )
+    )
+
+    st.session_state[
+        "courtvision_live_player_impact"
+    ] = {
+        "key":
+            cache_key,
+
+        "impact":
+            impact,
+    }
+
+    return impact
+
+
 def render_player_impact(
     game_id,
     season,
     home_team_metadata,
     away_team_metadata,
     live=False,
+    simulation=False,
+    game_df=None,
 ):
     st.subheader(
         "Player Impact"
@@ -4070,11 +4417,79 @@ def render_player_impact(
     )
 
     if live:
-        st.info(
-            "Player WPA is currently shown for completed "
-            "historical games. Live WPA will be enabled once "
-            "the live player-impact pipeline is validated."
-        )
+        if game_df is None or game_df.empty:
+            st.info(
+                "Player Impact will appear once "
+                "play-by-play data is available."
+            )
+            return
+
+        try:
+            impact = (
+                get_live_player_impact(
+                    game_id=game_id,
+                    game_df=game_df,
+                )
+            )
+
+            render_player_impact_summary(
+                summary=impact[
+                    "summary"
+                ],
+                home_team=(
+                    home_team_metadata[
+                        "tricode"
+                    ]
+                ),
+                away_team=(
+                    away_team_metadata[
+                        "tricode"
+                    ]
+                ),
+                home_team_metadata=(
+                    home_team_metadata
+                ),
+                away_team_metadata=(
+                    away_team_metadata
+                ),
+            )
+
+        except ValueError as error:
+            if (
+                "No possession-resolved states"
+                in str(error)
+            ):
+                st.info(
+                    "Player Impact will appear after "
+                    "the first possession is established."
+                )
+
+            else:
+                st.warning(
+                    "Player Impact is temporarily unavailable "
+                    "for the current game state."
+                )
+
+                with st.expander(
+                    "Player impact details"
+                ):
+                    st.code(
+                        str(error)
+                    )
+
+        except Exception as error:
+            st.warning(
+                "Player Impact is temporarily unavailable "
+                "for the current game state."
+            )
+
+            with st.expander(
+                "Player impact details"
+            ):
+                st.code(
+                    str(error)
+                )
+
         return
 
     game_id = str(
@@ -5585,12 +6000,23 @@ def render_game_story(
     live=False,
 ):
     st.subheader(
-        "Game Story"
+        (
+            "Game Story So Far"
+            if live
+            else "Game Story"
+        )
     )
 
     st.caption(
-        "Courtvision's whole-game read, combining game flow, "
-        "momentum, win probability, and player impact."
+        (
+            "Courtvision's live read through the latest available "
+            "game state, combining game flow, momentum, and "
+            "win probability."
+            if live
+            else
+            "Courtvision's whole-game read, combining game flow, "
+            "momentum, win probability, and player impact."
+        )
     )
 
     home_team = (
@@ -5653,6 +6079,34 @@ def render_game_story(
         )
     )
 
+    if live:
+        current_home_score = int(
+            game_df[
+                "scoreHome"
+            ].iloc[-1]
+        )
+
+        current_away_score = int(
+            game_df[
+                "scoreAway"
+            ].iloc[-1]
+        )
+
+        if (
+            current_home_score
+            > current_away_score
+        ):
+            winner = home_team
+
+        elif (
+            current_away_score
+            > current_home_score
+        ):
+            winner = away_team
+
+        else:
+            winner = None
+
     winner_metadata = (
         metadata_by_team.get(
             winner,
@@ -5680,6 +6134,48 @@ def render_game_story(
             "",
         )
     )
+
+    if live:
+        current_home_score = int(
+            game_df[
+                "scoreHome"
+            ].iloc[-1]
+        )
+
+        current_away_score = int(
+            game_df[
+                "scoreAway"
+            ].iloc[-1]
+        )
+
+        if (
+            current_home_score
+            > current_away_score
+        ):
+            lead = (
+                f"{home_team} leads {away_team} "
+                f"{current_home_score}–{current_away_score}."
+            )
+
+        elif (
+            current_away_score
+            > current_home_score
+        ):
+            lead = (
+                f"{away_team} leads {home_team} "
+                f"{current_away_score}–{current_home_score}."
+            )
+
+        else:
+            lead = (
+                f"{home_team} and {away_team} are tied "
+                f"{current_home_score}–{current_away_score}."
+            )
+
+        subtitle = (
+            "Courtvision's read of the game through the "
+            "latest available state."
+        )
 
     header_html = (
         f'<div style="'
@@ -5794,6 +6290,26 @@ def render_game_story(
         }
     ]
 
+    if live:
+        for section in sections:
+            section_text = str(
+                section.get(
+                    "text",
+                    "",
+                )
+            )
+
+            section_text = (
+                section_text.replace(
+                    "most of the game",
+                    "most of the game so far",
+                )
+            )
+
+            section[
+                "text"
+            ] = section_text
+
     if sections:
         story_html = (
             '<div style="'
@@ -5872,13 +6388,24 @@ def render_contextual_game_explanations(
     """
 
     st.subheader(
-        "Why the Game Changed"
+        (
+            "Why the Game Is Changing"
+            if live
+            else "Why the Game Changed"
+        )
     )
 
     st.caption(
-        "Courtvision highlights the most distinct "
-        "game-changing stretches, prioritizing meaningful "
-        "score-state and win-probability shifts."
+        (
+            "Courtvision highlights the most distinct "
+            "game-changing stretches so far, prioritizing "
+            "meaningful score-state and win-probability shifts."
+            if live
+            else
+            "Courtvision highlights the most distinct "
+            "game-changing stretches, prioritizing meaningful "
+            "score-state and win-probability shifts."
+        )
     )
 
     home_team = (
@@ -6350,6 +6877,600 @@ def poll_historical_box_score(
     if cache_path.exists():
         st.rerun()
         return
+
+
+
+
+
+
+def validate_replay_box_score(
+    box_df,
+    game_df,
+    home_team,
+    away_team,
+):
+    """
+    Sanity-check reconstructed points against the visible score.
+
+    A mismatch does not expose future information, but it means
+    the replay parser missed an event type and should not display
+    a misleading box score.
+    """
+    if box_df.empty:
+        return
+
+    home_code = (
+        home_team[
+            "tricode"
+        ]
+    )
+
+    away_code = (
+        away_team[
+            "tricode"
+        ]
+    )
+
+    expected_home = int(
+        game_df[
+            "scoreHome"
+        ].iloc[-1]
+    )
+
+    expected_away = int(
+        game_df[
+            "scoreAway"
+        ].iloc[-1]
+    )
+
+    home_points = int(
+        box_df.loc[
+            box_df[
+                "Team"
+            ]
+            == home_code,
+            "PTS",
+        ].sum()
+    )
+
+    away_points = int(
+        box_df.loc[
+            box_df[
+                "Team"
+            ]
+            == away_code,
+            "PTS",
+        ].sum()
+    )
+
+    if (
+        home_points
+        != expected_home
+        or away_points
+        != expected_away
+    ):
+        raise ValueError(
+            "Replay box-score scoring validation failed: "
+            f"{away_code} {away_points} vs expected "
+            f"{expected_away}, "
+            f"{home_code} {home_points} vs expected "
+            f"{expected_home}."
+        )
+
+
+def format_replay_minutes(
+    minutes,
+):
+    try:
+        total_seconds = int(
+            round(
+                float(minutes)
+                * 60.0
+            )
+        )
+    except (
+        TypeError,
+        ValueError,
+    ):
+        return ""
+
+    total_seconds = max(
+        0,
+        total_seconds,
+    )
+
+    return (
+        f"{total_seconds // 60}:"
+        f"{total_seconds % 60:02d}"
+    )
+
+
+def add_replay_stint_stats(
+    box_df,
+    game_df,
+):
+    stint_result = (
+        build_live_stints(
+            game_df
+        )
+    )
+
+    stint_df = (
+        stint_result[
+            "players"
+        ][
+            [
+                "Team",
+                "PersonId",
+                "Player",
+                "Minutes",
+                "PlusMinus",
+            ]
+        ]
+        .copy()
+        .rename(
+            columns={
+                "Player":
+                    "_StintPlayer",
+
+                "Minutes":
+                    "_StintMinutes",
+
+                "PlusMinus":
+                    "+/-",
+            }
+        )
+    )
+
+    enriched = (
+        box_df
+        .merge(
+            stint_df,
+            on=[
+                "Team",
+                "PersonId",
+            ],
+            how="outer",
+            validate="one_to_one",
+        )
+    )
+
+    enriched[
+        "Player"
+    ] = (
+        enriched[
+            "Player"
+        ]
+        .fillna(
+            enriched[
+                "_StintPlayer"
+            ]
+        )
+    )
+
+    enriched[
+        "MIN"
+    ] = (
+        enriched[
+            "_StintMinutes"
+        ]
+        .apply(
+            format_replay_minutes
+        )
+    )
+
+    enriched[
+        "+/-"
+    ] = (
+        enriched[
+            "+/-"
+        ]
+        .fillna(0)
+        .astype(int)
+    )
+
+    for column in [
+        "PTS",
+        "REB",
+        "AST",
+        "STL",
+        "BLK",
+        "TO",
+    ]:
+        if column in enriched.columns:
+            enriched[
+                column
+            ] = (
+                enriched[
+                    column
+                ]
+                .fillna(0)
+                .astype(int)
+            )
+
+    for column in [
+        "FG",
+        "3PT",
+        "FT",
+    ]:
+        if column in enriched.columns:
+            enriched[
+                column
+            ] = (
+                enriched[
+                    column
+                ]
+                .fillna(
+                    "0-0"
+                )
+            )
+
+    enriched = (
+        enriched
+        .drop(
+            columns=[
+                "_StintPlayer",
+                "_StintMinutes",
+            ],
+            errors="ignore",
+        )
+    )
+
+    preferred_order = [
+        "Team",
+        "PersonId",
+        "Player",
+        "MIN",
+        "PTS",
+        "REB",
+        "AST",
+        "STL",
+        "BLK",
+        "TO",
+        "FG",
+        "3PT",
+        "FT",
+        "+/-",
+    ]
+
+    ordered_columns = [
+        column
+        for column
+        in preferred_order
+        if column
+        in enriched.columns
+    ]
+
+    remaining_columns = [
+        column
+        for column
+        in enriched.columns
+        if column
+        not in ordered_columns
+    ]
+
+    return (
+        enriched[
+            ordered_columns
+            + remaining_columns
+        ]
+        .reset_index(
+            drop=True
+        )
+    )
+
+
+def render_replay_team_box_score(
+    box_df,
+    team,
+):
+    team_code = (
+        team[
+            "tricode"
+        ]
+    )
+
+    color = (
+        team.get(
+            "chart_color",
+            "#9CA3AF",
+        )
+    )
+
+    team_df = (
+        box_df.loc[
+            box_df[
+                "Team"
+            ]
+            == team_code
+        ]
+        .drop(
+            columns=[
+                "Team",
+                "PersonId",
+            ],
+            errors="ignore",
+        )
+        .reset_index(
+            drop=True
+        )
+    )
+
+    preferred_columns = [
+        "Player",
+        "MIN",
+        "PTS",
+        "REB",
+        "AST",
+        "STL",
+        "BLK",
+        "TO",
+        "FG",
+        "3PT",
+        "FT",
+        "+/-",
+    ]
+
+    ordered_columns = [
+        column
+        for column in preferred_columns
+        if column in team_df.columns
+    ]
+
+    remaining_columns = [
+        column
+        for column in team_df.columns
+        if column not in ordered_columns
+    ]
+
+    team_df = team_df[
+        ordered_columns
+        + remaining_columns
+    ]
+
+    plus_minus_unavailable = (
+        "+/-" in team_df.columns
+        and team_df[
+            "+/-"
+        ].isna().all()
+    )
+
+    if plus_minus_unavailable:
+        team_df[
+            "+/-"
+        ] = "—"
+
+    header = (
+        '<div style="'
+        'background:rgba(128,128,128,0.035);'
+        'border:1px solid rgba(160,160,160,0.12);'
+        f'border-left:4px solid {color};'
+        'border-radius:8px;'
+        'padding:0.65rem 0.85rem;'
+        'margin-bottom:0.55rem;'
+        '">'
+        '<span style="'
+        'font-size:1.05rem;'
+        'font-weight:800;'
+        f'color:{color};'
+        '">'
+        f'{team_code}'
+        '</span>'
+        '<span style="'
+        'margin-left:0.5rem;'
+        'font-size:0.85rem;'
+        'color:rgba(225,225,225,0.72);'
+        '">'
+        f'{team["name"]}'
+        '</span>'
+        '</div>'
+    )
+
+    st.markdown(
+        header,
+        unsafe_allow_html=True,
+    )
+
+    if team_df.empty:
+        st.caption(
+            "No player statistics recorded yet."
+        )
+        return
+
+    st.dataframe(
+        team_df,
+        width="stretch",
+        hide_index=True,
+        column_config={
+            "Player":
+                st.column_config.TextColumn(
+                    "Player",
+                    width="large",
+                ),
+
+            "MIN":
+                st.column_config.TextColumn(
+                    "MIN",
+                    width="small",
+                ),
+
+            "PTS":
+                st.column_config.NumberColumn(
+                    "PTS",
+                    format="%d",
+                ),
+
+            "REB":
+                st.column_config.NumberColumn(
+                    "REB",
+                    format="%d",
+                ),
+
+            "AST":
+                st.column_config.NumberColumn(
+                    "AST",
+                    format="%d",
+                ),
+
+            "STL":
+                st.column_config.NumberColumn(
+                    "STL",
+                    format="%d",
+                ),
+
+            "BLK":
+                st.column_config.NumberColumn(
+                    "BLK",
+                    format="%d",
+                ),
+
+            "TO":
+                st.column_config.NumberColumn(
+                    "TO",
+                    format="%d",
+                ),
+
+            "+/-":
+                (
+                    st.column_config.TextColumn(
+                        "+/-",
+                        width="small",
+                    )
+                    if plus_minus_unavailable
+                    else st.column_config.NumberColumn(
+                        "+/-",
+                        format="%+d",
+                    )
+                ),
+        },
+    )
+
+
+def render_replay_box_score(
+    game_df,
+    away_team,
+    home_team,
+    simulation=False,
+):
+    st.subheader(
+        "Box Score"
+    )
+
+    st.caption(
+        (
+            "Player stats through the selected replay point. "
+            "Courtvision reconstructs these totals only from "
+            "play-by-play events available by this moment."
+        )
+        if simulation
+        else (
+            "Player stats through the latest available game state. "
+            "Courtvision reconstructs these totals from the current "
+            "play-by-play feed."
+        )
+    )
+
+    try:
+        box_df = (
+            build_replay_box_score(
+                game_df
+            )
+        )
+
+        validate_replay_box_score(
+            box_df,
+            game_df,
+            home_team,
+            away_team,
+        )
+
+    except Exception as error:
+        st.info(
+            "Replay box score could not be reconstructed "
+            "reliably for this game state."
+        )
+
+        with st.expander(
+            "Replay box score details"
+        ):
+            st.code(
+                str(error)
+            )
+
+        return
+
+    stint_error = None
+
+    try:
+        box_df = (
+            add_replay_stint_stats(
+                box_df,
+                game_df,
+            )
+        )
+
+    except Exception as error:
+        stint_error = error
+
+        box_df = (
+            box_df.copy()
+        )
+
+        box_df[
+            "MIN"
+        ] = "—"
+
+        box_df[
+            "+/-"
+        ] = float("nan")
+
+    render_replay_team_box_score(
+        box_df,
+        away_team,
+    )
+
+    st.markdown(
+        "<div style='height:0.75rem'></div>",
+        unsafe_allow_html=True,
+    )
+
+    render_replay_team_box_score(
+        box_df,
+        home_team,
+    )
+
+    if stint_error is None:
+        st.caption(
+            (
+                "Minutes and plus/minus are reconstructed from "
+                "the play-by-play available through this replay "
+                "point. Advanced metrics are not yet included."
+            )
+            if simulation
+            else (
+                "Minutes and plus/minus are reconstructed from "
+                "the latest available play-by-play. "
+                "Advanced metrics are not yet included."
+            )
+        )
+
+    else:
+        st.caption(
+            (
+                "Minutes and plus/minus are temporarily unavailable "
+                "because the available play-by-play does not uniquely "
+                "determine every lineup. Other player stats remain "
+                "available."
+            )
+        )
+
+        with st.expander(
+            "Lineup reconstruction details"
+        ):
+            st.code(
+                str(stint_error)
+            )
+
 
 
 def render_box_score(
@@ -6867,6 +7988,321 @@ def render_momentum_runs(
 
 
 
+def render_live_team_rating(
+    game_id,
+    season,
+    home_team_metadata,
+    away_team_metadata,
+):
+    st.subheader(
+        "Team Courtvision Rating"
+    )
+
+    st.caption(
+        "Pregame team strength and win expectation "
+        "entering this matchup."
+    )
+
+    try:
+        _, history = (
+            cached_team_season_intelligence(
+                season
+            )
+        )
+
+        normalized_game_id = (
+            str(
+                game_id
+            )
+            .zfill(
+                10
+            )
+        )
+
+        ids = (
+            history[
+                "gameId"
+            ]
+            .astype(
+                str
+            )
+            .str.zfill(
+                10
+            )
+        )
+
+        rows = history.loc[
+            ids
+            == normalized_game_id
+        ]
+
+        home_row = rows.loc[
+            rows[
+                "team"
+            ]
+            == home_team_metadata[
+                "tricode"
+            ]
+        ]
+
+        away_row = rows.loc[
+            rows[
+                "team"
+            ]
+            == away_team_metadata[
+                "tricode"
+            ]
+        ]
+
+        if (
+            len(home_row) != 1
+            or len(away_row) != 1
+        ):
+            raise ValueError(
+                "Pregame rating rows unavailable."
+            )
+
+        home_row = home_row.iloc[0]
+        away_row = away_row.iloc[0]
+
+        home_rating = float(
+            home_row[
+                "ratingBefore"
+            ]
+        )
+
+        away_rating = float(
+            away_row[
+                "ratingBefore"
+            ]
+        )
+
+        home_wp = float(
+            home_row[
+                "pregameWinProbability"
+            ]
+        )
+
+        away_wp = float(
+            away_row[
+                "pregameWinProbability"
+            ]
+        )
+
+        home_team = (
+            home_team_metadata[
+                "tricode"
+            ]
+        )
+
+        away_team = (
+            away_team_metadata[
+                "tricode"
+            ]
+        )
+
+        home_color = (
+            home_team_metadata.get(
+                "chart_color",
+                "#9CA3AF",
+            )
+        )
+
+        away_color = (
+            away_team_metadata.get(
+                "chart_color",
+                "#9CA3AF",
+            )
+        )
+
+        away_col, middle_col, home_col = (
+            st.columns(
+                [
+                    1.15,
+                    1.5,
+                    1.15,
+                ],
+                gap="small",
+            )
+        )
+
+        with away_col:
+            card = (
+                '<div style="'
+                'background:rgba(128,128,128,0.045);'
+                'border:1px solid rgba(160,160,160,0.16);'
+                f'border-top:3px solid {away_color};'
+                'border-radius:10px;'
+                'padding:1rem 1.05rem;'
+                'min-height:120px;'
+                '">'
+                '<div style="'
+                'font-size:0.78rem;'
+                'font-weight:800;'
+                'letter-spacing:0.055em;'
+                f'color:{away_color};'
+                '">'
+                f'{away_team}'
+                '</div>'
+                '<div style="'
+                'font-size:1.7rem;'
+                'font-weight:750;'
+                'line-height:1;'
+                'margin-top:0.55rem;'
+                'white-space:nowrap;'
+                '">'
+                f'{away_rating:.1f}'
+                '</div>'
+                '<div style="'
+                'font-size:0.78rem;'
+                'color:rgba(220,220,220,0.62);'
+                'margin-top:0.55rem;'
+                '">'
+                'Pregame Rating'
+                '</div>'
+                '</div>'
+            )
+
+            st.markdown(
+                card,
+                unsafe_allow_html=True,
+            )
+
+        with middle_col:
+            away_share = (
+                away_wp
+                * 100.0
+            )
+
+            card = (
+                '<div style="'
+                'background:rgba(128,128,128,0.045);'
+                'border:1px solid rgba(160,160,160,0.16);'
+                'border-radius:10px;'
+                'padding:1rem 1.05rem;'
+                'min-height:120px;'
+                '">'
+                '<div style="'
+                'font-size:0.72rem;'
+                'font-weight:800;'
+                'letter-spacing:0.055em;'
+                'color:rgba(220,220,220,0.58);'
+                'text-align:center;'
+                '">'
+                'PREGAME WIN EXPECTATION'
+                '</div>'
+                '<div style="'
+                'display:flex;'
+                'justify-content:space-between;'
+                'align-items:center;'
+                'gap:0.5rem;'
+                'font-size:0.96rem;'
+                'font-weight:750;'
+                'margin-top:0.62rem;'
+                'white-space:nowrap;'
+                '">'
+                f'<span style="color:{away_color};">'
+                f'{away_team} {away_wp:.1%}'
+                '</span>'
+                f'<span style="color:{home_color};">'
+                f'{home_team} {home_wp:.1%}'
+                '</span>'
+                '</div>'
+                '<div style="'
+                'height:5px;'
+                'border-radius:999px;'
+                'overflow:hidden;'
+                'margin-top:0.8rem;'
+                f'background:linear-gradient('
+                f'to right,'
+                f'{away_color} 0%,'
+                f'{away_color} {away_share:.1f}%,'
+                f'{home_color} {away_share:.1f}%,'
+                f'{home_color} 100%'
+                f');'
+                '">'
+                '</div>'
+                '</div>'
+            )
+
+            st.markdown(
+                card,
+                unsafe_allow_html=True,
+            )
+
+        with home_col:
+            card = (
+                '<div style="'
+                'background:rgba(128,128,128,0.045);'
+                'border:1px solid rgba(160,160,160,0.16);'
+                f'border-top:3px solid {home_color};'
+                'border-radius:10px;'
+                'padding:1rem 1.05rem;'
+                'min-height:120px;'
+                'text-align:right;'
+                '">'
+                '<div style="'
+                'font-size:0.78rem;'
+                'font-weight:800;'
+                'letter-spacing:0.055em;'
+                f'color:{home_color};'
+                '">'
+                f'{home_team}'
+                '</div>'
+                '<div style="'
+                'font-size:1.7rem;'
+                'font-weight:750;'
+                'line-height:1;'
+                'margin-top:0.55rem;'
+                'white-space:nowrap;'
+                '">'
+                f'{home_rating:.1f}'
+                '</div>'
+                '<div style="'
+                'font-size:0.78rem;'
+                'color:rgba(220,220,220,0.62);'
+                'margin-top:0.55rem;'
+                '">'
+                'Pregame Rating'
+                '</div>'
+                '</div>'
+            )
+
+            st.markdown(
+                card,
+                unsafe_allow_html=True,
+            )
+
+        st.caption(
+            "Ratings stay fixed during play and update "
+            "after the final result."
+        )
+
+    except Exception:
+        st.caption(
+            "Pregame Team Courtvision Rating data is "
+            "not available for this matchup yet."
+        )
+
+
+
+
+def render_component_error(
+    component_name,
+    error,
+):
+    st.warning(
+        f"{component_name} is temporarily unavailable."
+    )
+
+    with st.expander(
+        f"{component_name} details"
+    ):
+        st.code(
+            str(error)
+        )
+
+
 def render_game(
 
     result,
@@ -6876,6 +8312,8 @@ def render_game(
     season,
 
     live=False,
+
+    simulation=False,
 
 ):
 
@@ -7019,16 +8457,19 @@ def render_game(
 
 
 
+        live_indicator = (
+            "● LIVE SIMULATION"
+            if simulation
+            else "● LIVE MODE"
+        )
+
         st.markdown(
-
-            '<div class="live-indicator">'
-
-            '● LIVE MODE'
-
-            '</div>',
-
+            (
+                '<div class="live-indicator">'
+                f'{live_indicator}'
+                '</div>'
+            ),
             unsafe_allow_html=True,
-
         )
 
 
@@ -7123,11 +8564,13 @@ def render_game(
 
                 2,
 
-                1,
+                1.35,
 
                 2,
 
-            ]
+            ],
+
+            gap="small",
 
         )
 
@@ -7235,7 +8678,13 @@ def render_game(
 
                 "<div "
 
-                "class='courtvision-status'>"
+                "class='courtvision-status' "
+
+                "style='white-space:nowrap;"
+
+                "font-size:clamp(0.72rem,1.35vw,0.98rem);"
+
+                "letter-spacing:0.02em;'>"
 
                 f"{center_status}"
 
@@ -7376,13 +8825,11 @@ def render_game(
 
     if live:
         home_label = (
-            f"Current "
             f"{home_team['tricode']} "
             "Win Probability"
         )
 
         away_label = (
-            f"Current "
             f"{away_team['tricode']} "
             "Win Probability"
         )
@@ -7513,9 +8960,31 @@ def render_game(
 
     with state_metric:
         if live:
-            st.metric(
-                "Game State",
-                center_status,
+            state_card = (
+                '<div style="'
+                'padding-top:0.15rem;'
+                '">'
+                '<div style="'
+                'font-size:0.86rem;'
+                'color:rgba(220,220,220,0.68);'
+                'margin-bottom:0.3rem;'
+                '">'
+                'Game State'
+                '</div>'
+                '<div style="'
+                'font-size:1.7rem;'
+                'font-weight:400;'
+                'line-height:1.15;'
+                'white-space:nowrap;'
+                '">'
+                f'{center_status}'
+                '</div>'
+                '</div>'
+            )
+
+            st.markdown(
+                state_card,
+                unsafe_allow_html=True,
             )
 
         else:
@@ -7571,157 +9040,201 @@ def render_game(
         )
 
 
-    figure = (
-
-        build_win_probability_plot(
-
-            game_df,
-
-            home_swings,
-
-            away_swings,
-
-            home_team,
-
-            away_team,
-
-        )
-
-    )
-    st.caption(
-        "Both lines show each team's modeled chance "
-        "of winning. Turning-point values are always "
-        "expressed from the benefiting team's perspective."
-    )
-
-
-
-
-    st.plotly_chart(
-
-        figure,
-
-        width="stretch",
-
-        config={
-
-            "displayModeBar":
-
-                False,
-
-        },
-
-    )
-
-
-
-
-
-    render_game_story(
-        game_df=game_df,
-        game_id=game_id,
-        season=season,
-        home_team_metadata=home_team,
-        away_team_metadata=away_team,
-        live=live,
-    )
-
-    st.divider()
-
-    render_player_impact(
-
-        game_id=game_id,
-
-        season=season,
-
-        home_team_metadata=home_team,
-
-        away_team_metadata=away_team,
-
-        live=live,
-
-    )
-
-
-
-
-
-    st.divider()
-
-    render_contextual_game_explanations(
-        game_df=game_df,
-        game_id=game_id,
-        season=season,
-        home_team_metadata=home_team,
-        away_team_metadata=away_team,
-        live=live,
-    )
-
-    with st.expander(
-        "View all detected momentum runs",
-        expanded=False,
-    ):
-        render_momentum_runs(
-            game_df,
-            home_team,
-            away_team,
-        )
-
-    st.divider()
-
-    st.subheader(
-        "Biggest Turning Points"
-    )
-
-    home_column, away_column = (
-        st.columns(
-            2
-        )
-    )
-
-    with home_column:
-        st.markdown(
-            f"## {home_team['tricode']} Turning Points"
-        )
-
-        for _, row in home_swings.iterrows():
-            render_swing_card(
-                row,
+    try:
+        figure = (
+            build_win_probability_plot(
+                game_df,
+                home_swings,
+                away_swings,
                 home_team,
-                "home",
+                away_team,
             )
-
-    with away_column:
-        st.markdown(
-            f"## {away_team['tricode']} Turning Points"
         )
 
-        for _, row in away_swings.iterrows():
-            render_swing_card(
-                row,
-                away_team,
-                "away",
-            )
+        st.caption(
+            "Both lines show each team's modeled chance "
+            "of winning. Turning-point values are always "
+            "expressed from the benefiting team's perspective."
+        )
 
-    if not live:
-        st.divider()
+        st.plotly_chart(
+            figure,
+            width="stretch",
+            config={
+                "displayModeBar":
+                    False,
+            },
+        )
 
-        render_historical_team_rating(
+    except Exception as error:
+        render_component_error(
+            "Win Probability chart",
+            error,
+        )
+
+
+    try:
+        render_game_story(
+            game_df=game_df,
             game_id=game_id,
             season=season,
             home_team_metadata=home_team,
             away_team_metadata=away_team,
+            live=live,
+        )
+
+    except Exception as error:
+        render_component_error(
+            "Game Story",
+            error,
         )
 
     st.divider()
 
-    render_box_score(
+    render_player_impact(
         game_id=game_id,
         season=season,
-        away_team=away_team,
-        home_team=home_team,
+        home_team_metadata=home_team,
+        away_team_metadata=away_team,
         live=live,
+        simulation=simulation,
+        game_df=game_df,
     )
+
+    st.divider()
+
+    try:
+        render_contextual_game_explanations(
+            game_df=game_df,
+            game_id=game_id,
+            season=season,
+            home_team_metadata=home_team,
+            away_team_metadata=away_team,
+            live=live,
+        )
+
+    except Exception as error:
+        render_component_error(
+            "Contextual Explanations",
+            error,
+        )
+
+    try:
+        with st.expander(
+            "View all detected momentum runs",
+            expanded=False,
+        ):
+            render_momentum_runs(
+                game_df,
+                home_team,
+                away_team,
+            )
+
+    except Exception as error:
+        render_component_error(
+            "Momentum",
+            error,
+        )
+
+    st.divider()
+
+    try:
+        st.subheader(
+            (
+                "Biggest Turning Points So Far"
+                if live
+                else "Biggest Turning Points"
+            )
+        )
+
+        home_column, away_column = (
+            st.columns(
+                2
+            )
+        )
+
+        with home_column:
+            st.markdown(
+                f"## {home_team['tricode']} Turning Points"
+            )
+
+            for _, row in home_swings.iterrows():
+                render_swing_card(
+                    row,
+                    home_team,
+                    "home",
+                )
+
+        with away_column:
+            st.markdown(
+                f"## {away_team['tricode']} Turning Points"
+            )
+
+            for _, row in away_swings.iterrows():
+                render_swing_card(
+                    row,
+                    away_team,
+                    "away",
+                )
+
+    except Exception as error:
+        render_component_error(
+            "Turning Points",
+            error,
+        )
+
+    st.divider()
+
+    try:
+        if live:
+            render_live_team_rating(
+                game_id=game_id,
+                season=season,
+                home_team_metadata=home_team,
+                away_team_metadata=away_team,
+            )
+
+        else:
+            render_historical_team_rating(
+                game_id=game_id,
+                season=season,
+                home_team_metadata=home_team,
+                away_team_metadata=away_team,
+            )
+
+
+    except Exception as error:
+        render_component_error(
+            "Team Courtvision Rating",
+            error,
+        )
+
+    st.divider()
+
+    try:
+        if live:
+            render_replay_box_score(
+                game_df=game_df,
+                away_team=away_team,
+                home_team=home_team,
+                simulation=simulation,
+            )
+
+        else:
+            render_box_score(
+                game_id=game_id,
+                season=season,
+                away_team=away_team,
+                home_team=home_team,
+                live=False,
+            )
+
+
+    except Exception as error:
+        render_component_error(
+            "Box Score",
+            error,
+        )
 
     st.divider()
 
@@ -8297,6 +9810,7 @@ def render_season_team_identity(
 
 @st.cache_data(
     show_spinner=False,
+    ttl=30,
 )
 def cached_team_season_intelligence(
     season,
@@ -10270,6 +11784,39 @@ def run_live_once():
         return
 
 
+    live_context = (
+
+        str(selected_game_id),
+
+        str(season),
+
+        bool(live_replay_mode),
+
+        (
+            replay_cutoff_elapsed
+            if live_replay_mode
+            else None
+        ),
+
+    )
+
+    cached_result = st.session_state.get(
+        "courtvision_last_live_result"
+    )
+
+    cached_context = st.session_state.get(
+        "courtvision_last_live_context"
+    )
+
+    matching_cached_result = (
+        cached_result
+        if (
+            cached_result is not None
+            and cached_context == live_context
+        )
+        else None
+    )
+
 
     try:
 
@@ -10291,22 +11838,163 @@ def run_live_once():
 
                 assume_final=False,
 
+                replay_cutoff_elapsed=(
+                    replay_cutoff_elapsed
+                    if live_replay_mode
+                    else None
+                ),
+
             )
 
+
+        if not live_replay_mode:
+
+            try:
+                live_statuses = (
+                    cached_live_game_statuses(
+                        selected_date
+                    )
+                )
+
+                official_status = (
+                    live_statuses.get(
+                        str(
+                            selected_game_id
+                        ).zfill(10)
+                    )
+                )
+
+            except Exception:
+                # Lifecycle status is best-effort enrichment only.
+                # Never fail an otherwise successful live analysis
+                # because ScoreboardV3 is unavailable.
+                official_status = None
+
+
+            if official_status is not None:
+
+                game_status = (
+                    official_status.get(
+                        "game_status"
+                    )
+                )
+
+                status_text = str(
+                    official_status.get(
+                        "game_status_text",
+                        "",
+                    )
+                ).strip()
+
+                is_officially_final = (
+                    game_status == 3
+                    or status_text
+                    .lower()
+                    .startswith(
+                        "final"
+                    )
+                )
+
+                if is_officially_final:
+                    result = dict(
+                        result
+                    )
+
+                    result[
+                        "display_status"
+                    ] = (
+                        status_text.upper()
+                        if status_text
+                        else "FINAL"
+                    )
+
+                    result[
+                        "status"
+                    ] = "final"
+
+                    result[
+                        "is_final"
+                    ] = True
+
+
+        st.session_state[
+            "courtvision_last_live_result"
+        ] = result
+
+        st.session_state[
+            "courtvision_last_live_context"
+        ] = live_context
+
+
+    except LiveGameNotReadyError as error:
+
+        if matching_cached_result is None:
+
+            st.info(
+                "Waiting for enough play-by-play "
+                "to analyze this game."
+            )
+
+            with st.expander(
+                "Live feed details"
+            ):
+
+                st.code(
+                    str(error)
+                )
+
+            return
+
+
+        st.warning(
+            (
+                "Latest play-by-play is incomplete. "
+                "Showing the last successfully "
+                "loaded game state."
+            )
+        )
+
+        with st.expander(
+            "Live feed details"
+        ):
+
+            st.code(
+                str(error)
+            )
+
+        result = matching_cached_result
 
 
     except Exception as error:
 
-        st.error(
+        if matching_cached_result is None:
 
-            "Could not fetch game: "
+            st.error(
 
-            f"{error}"
+                "Could not fetch game: "
+                f"{error}"
 
+            )
+
+            return
+
+
+        st.warning(
+            (
+                "Refresh failed. Showing the last "
+                "successfully loaded game state."
+            )
         )
 
-        return
+        with st.expander(
+            "Refresh failure details"
+        ):
 
+            st.code(
+                str(error)
+            )
+
+        result = matching_cached_result
 
 
     render_game(
@@ -10319,9 +12007,9 @@ def run_live_once():
 
         live=True,
 
+        simulation=live_replay_mode,
+
     )
-
-
 
 
 

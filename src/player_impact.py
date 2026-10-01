@@ -2491,6 +2491,166 @@ def print_diagnostics(
 
 
 # ============================================================
+# Live / replay analysis API
+# ============================================================
+
+def analyze_player_impact_from_game_df(
+    game_df,
+    top_k=10,
+    model=None,
+    scaler=None,
+    device=None,
+):
+    """
+    Run frozen WPA v3 on an already-prepared game-state prefix.
+
+    This is the live/replay entry point. It does not load a full
+    historical game and does not write historical WPA result files.
+    """
+
+    if game_df is None or game_df.empty:
+        raise ValueError(
+            "Player Impact requires a non-empty game dataframe."
+        )
+
+    game_df = (
+        game_df
+        .copy()
+        .reset_index(drop=True)
+    )
+
+    # Historical WPA v3 operates on the model-state rows from
+    # the season training dataset, where possession is known.
+    # Live/replay timelines also contain opening administrative
+    # rows before possession has been established. Exclude those
+    # rows here so the live adapter has the same input contract
+    # as the frozen historical pipeline.
+    if "homePossession" not in game_df.columns:
+        raise ValueError(
+            "Live Player Impact requires homePossession."
+        )
+
+    game_df = (
+        game_df.loc[
+            game_df[
+                "homePossession"
+            ].notna()
+        ]
+        .copy()
+        .reset_index(drop=True)
+    )
+
+    if game_df.empty:
+        raise ValueError(
+            "No possession-resolved states are available "
+            "for Player Impact yet."
+        )
+
+    provided_model_artifacts = [
+        model is not None,
+        scaler is not None,
+        device is not None,
+    ]
+
+    if (
+        any(provided_model_artifacts)
+        and not all(provided_model_artifacts)
+    ):
+        raise ValueError(
+            "model, scaler, and device must either "
+            "all be supplied or all be omitted."
+        )
+
+    if model is None:
+        (
+            model,
+            scaler,
+            device,
+        ) = load_model()
+
+    if "winProbability" not in game_df.columns:
+        game_df = add_predictions(
+            game_df,
+            model,
+            scaler,
+            device,
+        )
+
+    # Historical WPA enriches attached play-by-play with the
+    # frozen derived event classification before attribution.
+    # Live/replay timelines already contain the underlying PBP
+    # fields, so reproduce that same derived column here.
+    if "eventType" not in game_df.columns:
+        game_df[
+            "eventType"
+        ] = game_df.apply(
+            infer_event_type,
+            axis=1,
+        )
+
+    (
+        events,
+        sequence_table,
+        home_team,
+        away_team,
+    ) = build_player_wpa_events(
+        game_df,
+        model,
+        scaler,
+        device,
+    )
+
+    events = apply_shared_credit(
+        events,
+        game_df,
+        home_team,
+        away_team,
+    )
+
+    summary = summarize_players(
+        events
+    )
+
+    top_events = biggest_events(
+        events,
+        top_k=top_k,
+    )
+
+    diagnostics = (
+        build_attribution_diagnostics(
+            events,
+            sequence_table,
+        )
+    )
+
+    return {
+        "game_df":
+            game_df,
+
+        "events":
+            events,
+
+        "sequence_table":
+            sequence_table,
+
+        "summary":
+            summary,
+
+        "top_events":
+            top_events,
+
+        "diagnostics":
+            diagnostics,
+
+        "home_team":
+            home_team,
+
+        "away_team":
+            away_team,
+    }
+
+
+# ============================================================
 # Main analysis API
 # ============================================================
 
