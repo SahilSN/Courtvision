@@ -238,6 +238,198 @@ def fetch_game_statuses_for_date(
     return statuses
 
 
+def fetch_games_for_date_from_scoreboard(
+    game_date,
+    timeout=60,
+):
+    """
+    Return scheduled/live/completed NBA games for one date.
+
+    ScoreboardV3 is the authoritative discovery source for
+    Courtvision Live mode. The returned records intentionally
+    match games_for_date_from_season_df().
+    """
+    formatted_date = (
+        pd.Timestamp(
+            game_date
+        )
+        .strftime(
+            "%Y-%m-%d"
+        )
+    )
+
+    scoreboard = (
+        scoreboardv3.ScoreboardV3(
+            game_date=formatted_date,
+            timeout=timeout,
+        )
+    )
+
+    frames = (
+        scoreboard.get_data_frames()
+    )
+
+    if len(frames) < 4:
+        return []
+
+    games_df = frames[1].copy()
+    teams_df = frames[2].copy()
+    leaders_df = frames[3].copy()
+
+    if games_df.empty:
+        return []
+
+    games = []
+
+    for _, game_row in games_df.iterrows():
+        game_id = str(
+            game_row[
+                "gameId"
+            ]
+        ).zfill(
+            10
+        )
+
+        game_teams = (
+            teams_df.loc[
+                teams_df[
+                    "gameId"
+                ].astype(str)
+                == str(
+                    game_row[
+                        "gameId"
+                    ]
+                )
+            ]
+            .copy()
+        )
+
+        game_leaders = (
+            leaders_df.loc[
+                leaders_df[
+                    "gameId"
+                ].astype(str)
+                == str(
+                    game_row[
+                        "gameId"
+                    ]
+                )
+            ]
+            .copy()
+        )
+
+        home_leaders = (
+            game_leaders.loc[
+                game_leaders[
+                    "leaderType"
+                ].astype(str)
+                .str.lower()
+                == "home"
+            ]
+        )
+
+        away_leaders = (
+            game_leaders.loc[
+                game_leaders[
+                    "leaderType"
+                ].astype(str)
+                .str.lower()
+                == "away"
+            ]
+        )
+
+        if (
+            home_leaders.empty
+            or away_leaders.empty
+        ):
+            continue
+
+        home_tricode = str(
+            home_leaders.iloc[0][
+                "teamTricode"
+            ]
+        ).strip()
+
+        away_tricode = str(
+            away_leaders.iloc[0][
+                "teamTricode"
+            ]
+        ).strip()
+
+        home_rows = (
+            game_teams.loc[
+                game_teams[
+                    "teamTricode"
+                ].astype(str)
+                == home_tricode
+            ]
+        )
+
+        away_rows = (
+            game_teams.loc[
+                game_teams[
+                    "teamTricode"
+                ].astype(str)
+                == away_tricode
+            ]
+        )
+
+        if (
+            home_rows.empty
+            or away_rows.empty
+        ):
+            continue
+
+        home = home_rows.iloc[0]
+        away = away_rows.iloc[0]
+
+        games.append(
+            {
+                "game_id":
+                    game_id,
+
+                "game_date":
+                    formatted_date,
+
+                "home_team_id":
+                    int(
+                        home[
+                            "teamId"
+                        ]
+                    ),
+
+                "away_team_id":
+                    int(
+                        away[
+                            "teamId"
+                        ]
+                    ),
+
+                "home_tricode":
+                    home_tricode,
+
+                "away_tricode":
+                    away_tricode,
+
+                "label":
+                    (
+                        f"{away_tricode} "
+                        f"@ "
+                        f"{home_tricode}"
+                    ),
+            }
+        )
+
+    games.sort(
+        key=lambda game:
+            game[
+                "label"
+            ]
+    )
+
+    return games
+
+
 def games_for_date_from_season_df(
     season_df,
     game_date,

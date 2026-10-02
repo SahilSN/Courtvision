@@ -324,12 +324,15 @@ def build_pregame_context(
     game_date,
     season_type="Regular Season",
 ):
-    local_context = (
-        get_local_pregame_context(
-            game_id,
-            season,
+    local_context = None
+
+    if season_type == "Regular Season":
+        local_context = (
+            get_local_pregame_context(
+                game_id,
+                season,
+            )
         )
-    )
 
     if (
         local_context

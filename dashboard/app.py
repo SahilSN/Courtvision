@@ -95,6 +95,7 @@ from live_stints import build_live_stints
 from game_catalog import (
 
     fetch_game_statuses_for_date,
+    fetch_games_for_date_from_scoreboard,
     fetch_season_games,
     games_for_date_from_season_df,
 
@@ -488,10 +489,12 @@ st.caption(
 )
 def cached_season_game_log(
     season,
+    season_type="Regular Season",
 ):
     return (
         fetch_season_games(
             season=season,
+            season_type=season_type,
             timeout=60,
         )
     )
@@ -512,13 +515,30 @@ def cached_live_game_statuses(
     )
 
 
+@st.cache_data(
+    ttl=15,
+    show_spinner=False,
+)
+def cached_live_games_for_date(
+    selected_date,
+):
+    return (
+        fetch_games_for_date_from_scoreboard(
+            game_date=selected_date,
+            timeout=60,
+        )
+    )
+
+
 def cached_games_for_date(
     season,
     selected_date,
+    season_type="Regular Season",
 ):
     season_df = (
         cached_season_game_log(
-            season
+            season,
+            season_type=season_type,
         )
     )
 
@@ -1073,11 +1093,16 @@ elif mode == "Live":
 
     season = "2026-27"
 
+    # Preseason live-validation window.
+    # Switch to "Regular Season" when the
+    # 2026-27 regular season begins.
+    season_type = "Pre Season"
+
 
 
     st.sidebar.caption(
 
-        f"Current season: {season}"
+        f"Current season: {season} · {season_type}"
 
     )
 
@@ -1123,12 +1148,8 @@ elif mode == "Live":
 
     try:
 
-        games = cached_games_for_date(
-
-            season,
-
+        games = cached_live_games_for_date(
             selected_date,
-
         )
 
 
@@ -1447,6 +1468,7 @@ elif mode == "Live":
         )
 
         season = replay_season
+        season_type = "Regular Season"
         selected_date = replay_date
 
 
@@ -10508,266 +10530,412 @@ def render_season_intelligence(
 
 
 
-    # --------------------------------------------------------
-    # League leader
-    # --------------------------------------------------------
-
-    leader = (
-        summary
-        .sort_values(
-            "ratingRank"
-        )
-        .iloc[
-            0
-        ]
-    )
-
-    leader_metadata = (
-        get_team_metadata_by_tricode(
-            leader[
-                "team"
-            ]
-        )
-    )
-
-    leader_color = (
-        leader_metadata.get(
-            "chart_color",
-            "#58A6FF",
-        )
-    )
-
-    st.markdown(
-        (
-            "<div style='"
-            f"height: 5px; background: {leader_color}; "
-            "border-radius: 999px; margin-bottom: 14px;"
-            "'></div>"
-        ),
-        unsafe_allow_html=True,
-    )
-
-    render_season_team_identity(
-        leader_metadata,
-        subtitle=(
-            f"No. 1 Team · "
-            f"{int(leader['wins'])}-"
-            f"{int(leader['losses'])}"
-        ),
-        logo_width=78,
-    )
-
-    leader_col_1, leader_col_2, leader_col_3 = (
-        st.columns(
-            3
-        )
-    )
-
-    with leader_col_1:
-        st.metric(
-            "Courtvision Rating",
-            f"{leader['currentRating']:.1f}",
-            delta=(
-                f"{leader['seasonRatingChange']:+.1f} "
-                "this season"
-            ),
-        )
-
-    with leader_col_2:
-        st.metric(
-            "Last 5",
-            format_signed_rating(
-                leader[
-                    "last5RatingChange"
-                ]
-            ),
-        )
-
-    with leader_col_3:
-        st.metric(
-            "Last 10",
-            format_signed_rating(
-                leader[
-                    "last10RatingChange"
-                ]
-            ),
-        )
-
-
-
-    st.divider()
-
-
-
-    # --------------------------------------------------------
-    # League leaderboard
-    # --------------------------------------------------------
-
-    st.markdown(
-        "### Team Ratings"
-    )
-
-    leaderboard = (
-        summary[
-            [
-                "ratingRank",
-                "team",
-                "wins",
-                "losses",
-                "currentRating",
-                "last5RatingChange",
-                "last10RatingChange",
-                "seasonRatingChange",
-            ]
-        ]
-        .copy()
-    )
-
-    leaderboard[
-        "Record"
-    ] = (
-        leaderboard[
-            "wins"
-        ]
-        .astype(
-            int
-        )
-        .astype(
-            str
-        )
-        + "-"
-        + leaderboard[
-            "losses"
-        ]
-        .astype(
-            int
-        )
-        .astype(
-            str
-        )
-    )
-
-    leaderboard = (
-        leaderboard
-        .rename(
-            columns={
-                "ratingRank":
-                    "Rank",
-
-                "team":
-                    "Team",
-
-                "currentRating":
-                    "Rating",
-
-                "last5RatingChange":
-                    "Last 5",
-
-                "last10RatingChange":
-                    "Last 10",
-
-                "seasonRatingChange":
-                    "Season Δ",
-            }
-        )
+    league_tab, team_tab = st.tabs(
         [
-            [
-                "Rank",
-                "Team",
-                "Record",
-                "Rating",
-                "Last 5",
-                "Last 10",
-                "Season Δ",
-            ]
+            "League Overview",
+            "Team Explorer",
         ]
     )
 
-    def style_leaderboard_row(
-        row,
-    ):
-        styles = [
-            ""
-            for _ in row.index
-        ]
 
-        rank = int(
-            row[
-                "Rank"
+    with league_tab:
+
+        # --------------------------------------------------------
+        # League leader
+        # --------------------------------------------------------
+
+        leader = (
+            summary
+            .sort_values(
+                "ratingRank"
+            )
+            .iloc[
+                0
             ]
         )
 
-        if rank == 1:
-            background = (
-                "background-color: rgba(255, 215, 0, 0.08);"
+        leader_metadata = (
+            get_team_metadata_by_tricode(
+                leader[
+                    "team"
+                ]
+            )
+        )
+
+        leader_color = (
+            leader_metadata.get(
+                "chart_color",
+                "#58A6FF",
+            )
+        )
+
+        st.markdown(
+            (
+                "<div style='"
+                f"height: 5px; background: {leader_color}; "
+                "border-radius: 999px; margin-bottom: 14px;"
+                "'></div>"
+            ),
+            unsafe_allow_html=True,
+        )
+
+        render_season_team_identity(
+            leader_metadata,
+            subtitle=(
+                f"No. 1 Team · "
+                f"{int(leader['wins'])}-"
+                f"{int(leader['losses'])}"
+            ),
+            logo_width=78,
+        )
+
+        leader_col_1, leader_col_2, leader_col_3 = (
+            st.columns(
+                3
+            )
+        )
+
+        with leader_col_1:
+            st.metric(
+                "Courtvision Rating",
+                f"{leader['currentRating']:.1f}",
+                delta=(
+                    f"{leader['seasonRatingChange']:+.1f} "
+                    "this season"
+                ),
             )
 
-        elif rank <= 3:
-            background = (
-                "background-color: rgba(148, 163, 184, 0.06);"
+        with leader_col_2:
+            st.metric(
+                "Last 5",
+                format_signed_rating(
+                    leader[
+                        "last5RatingChange"
+                    ]
+                ),
             )
 
-        else:
-            background = ""
+        with leader_col_3:
+            st.metric(
+                "Last 10",
+                format_signed_rating(
+                    leader[
+                        "last10RatingChange"
+                    ]
+                ),
+            )
 
-        if background:
+
+
+        st.divider()
+
+
+
+        # --------------------------------------------------------
+        # League leaderboard
+        # --------------------------------------------------------
+
+        st.markdown(
+            "### Team Ratings"
+        )
+
+        leaderboard = (
+            summary[
+                [
+                    "ratingRank",
+                    "team",
+                    "wins",
+                    "losses",
+                    "currentRating",
+                    "last5RatingChange",
+                    "last10RatingChange",
+                    "seasonRatingChange",
+                ]
+            ]
+            .copy()
+        )
+
+        leaderboard[
+            "Record"
+        ] = (
+            leaderboard[
+                "wins"
+            ]
+            .astype(
+                int
+            )
+            .astype(
+                str
+            )
+            + "-"
+            + leaderboard[
+                "losses"
+            ]
+            .astype(
+                int
+            )
+            .astype(
+                str
+            )
+        )
+
+        leaderboard = (
+            leaderboard
+            .rename(
+                columns={
+                    "ratingRank":
+                        "Rank",
+
+                    "team":
+                        "Team",
+
+                    "currentRating":
+                        "Rating",
+
+                    "last5RatingChange":
+                        "Last 5",
+
+                    "last10RatingChange":
+                        "Last 10",
+
+                    "seasonRatingChange":
+                        "Season Δ",
+                }
+            )
+            [
+                [
+                    "Rank",
+                    "Team",
+                    "Record",
+                    "Rating",
+                    "Last 5",
+                    "Last 10",
+                    "Season Δ",
+                ]
+            ]
+        )
+
+        def style_leaderboard_row(
+            row,
+        ):
             styles = [
-                background
+                ""
                 for _ in row.index
             ]
 
-        return styles
-
-
-
-    def movement_style(
-        value,
-    ):
-        try:
-            numeric = float(
-                str(
-                    value
-                )
-                .replace(
-                    "+",
-                    "",
-                )
+            rank = int(
+                row[
+                    "Rank"
+                ]
             )
 
-        except Exception:
+            if rank == 1:
+                background = (
+                    "background-color: rgba(255, 215, 0, 0.08);"
+                )
+
+            elif rank <= 3:
+                background = (
+                    "background-color: rgba(148, 163, 184, 0.06);"
+                )
+
+            else:
+                background = ""
+
+            if background:
+                styles = [
+                    background
+                    for _ in row.index
+                ]
+
+            return styles
+
+
+
+        def movement_style(
+            value,
+        ):
+            try:
+                numeric = float(
+                    str(
+                        value
+                    )
+                    .replace(
+                        "+",
+                        "",
+                    )
+                )
+
+            except Exception:
+                return ""
+
+            if numeric > 0:
+                return (
+                    "color: #2ECC71; "
+                    "font-weight: 600;"
+                )
+
+            if numeric < 0:
+                return (
+                    "color: #FF5C77; "
+                    "font-weight: 600;"
+                )
+
             return ""
 
-        if numeric > 0:
-            return (
-                "color: #2ECC71; "
-                "font-weight: 600;"
-            )
-
-        if numeric < 0:
-            return (
-                "color: #FF5C77; "
-                "font-weight: 600;"
-            )
-
-        return ""
 
 
+        leaderboard_display = (
+            leaderboard
+            .copy()
+        )
 
-    leaderboard_display = (
-        leaderboard
-        .copy()
-    )
-
-    for column in [
-        "Last 5",
-        "Last 10",
-        "Season Δ",
-    ]:
-        leaderboard_display[
-            column
-        ] = (
+        for column in [
+            "Last 5",
+            "Last 10",
+            "Season Δ",
+        ]:
             leaderboard_display[
                 column
+            ] = (
+                leaderboard_display[
+                    column
+                ]
+                .map(
+                    lambda value:
+                        f"{float(value):+.1f}"
+                )
+            )
+
+        leaderboard_display[
+            "Rating"
+        ] = (
+            leaderboard_display[
+                "Rating"
+            ]
+            .map(
+                lambda value:
+                    f"{float(value):.1f}"
+            )
+        )
+
+        leaderboard_styled = (
+            leaderboard_display
+            .style
+            .apply(
+                style_leaderboard_row,
+                axis=1,
+            )
+            .map(
+                movement_style,
+                subset=[
+                    "Last 5",
+                    "Last 10",
+                    "Season Δ",
+                ],
+            )
+            .set_properties(
+                subset=[
+                    "Rating",
+                ],
+                **{
+                    "font-weight":
+                        "700",
+                },
+            )
+            .set_properties(
+                subset=[
+                    "Rank",
+                ],
+                **{
+                    "font-weight":
+                        "700",
+                    "color":
+                        "#AAB2C0",
+                },
+            )
+        )
+
+        st.dataframe(
+            leaderboard_styled,
+            hide_index=True,
+            width="stretch",
+            height=510,
+        )
+
+
+
+        # --------------------------------------------------------
+        # Recent form
+        # --------------------------------------------------------
+
+        st.markdown(
+            "### Recent Form"
+        )
+
+        riser_col, faller_col = (
+            st.columns(
+                2
+            )
+        )
+
+        risers = (
+            summary
+            .sort_values(
+                "last5RatingChange",
+                ascending=False,
+            )
+            .head(
+                5
+            )
+            [
+                [
+                    "team",
+                    "last5RatingChange",
+                ]
+            ]
+            .rename(
+                columns={
+                    "team":
+                        "Team",
+
+                    "last5RatingChange":
+                        "Last 5",
+                }
+            )
+        )
+
+        fallers = (
+            summary
+            .sort_values(
+                "last5RatingChange",
+                ascending=True,
+            )
+            .head(
+                5
+            )
+            [
+                [
+                    "team",
+                    "last5RatingChange",
+                ]
+            ]
+            .rename(
+                columns={
+                    "team":
+                        "Team",
+
+                    "last5RatingChange":
+                        "Last 5",
+                }
+            )
+        )
+
+        risers[
+            "Rating Δ"
+        ] = (
+            risers[
+                "Last 5"
             ]
             .map(
                 lambda value:
@@ -10775,899 +10943,811 @@ def render_season_intelligence(
             )
         )
 
-    leaderboard_display[
-        "Rating"
-    ] = (
-        leaderboard_display[
-            "Rating"
-        ]
-        .map(
-            lambda value:
-                f"{float(value):.1f}"
-        )
-    )
-
-    leaderboard_styled = (
-        leaderboard_display
-        .style
-        .apply(
-            style_leaderboard_row,
-            axis=1,
-        )
-        .map(
-            movement_style,
-            subset=[
-                "Last 5",
-                "Last 10",
-                "Season Δ",
-            ],
-        )
-        .set_properties(
-            subset=[
-                "Rating",
-            ],
-            **{
-                "font-weight":
-                    "700",
-            },
-        )
-        .set_properties(
-            subset=[
-                "Rank",
-            ],
-            **{
-                "font-weight":
-                    "700",
-                "color":
-                    "#AAB2C0",
-            },
-        )
-    )
-
-    st.dataframe(
-        leaderboard_styled,
-        hide_index=True,
-        width="stretch",
-        height=510,
-    )
-
-
-
-    # --------------------------------------------------------
-    # Recent form
-    # --------------------------------------------------------
-
-    st.markdown(
-        "### Recent Form"
-    )
-
-    riser_col, faller_col = (
-        st.columns(
-            2
-        )
-    )
-
-    risers = (
-        summary
-        .sort_values(
-            "last5RatingChange",
-            ascending=False,
-        )
-        .head(
-            5
-        )
-        [
+        risers = risers[
             [
-                "team",
-                "last5RatingChange",
+                "Team",
+                "Rating Δ",
             ]
         ]
-        .rename(
-            columns={
-                "team":
-                    "Team",
 
-                "last5RatingChange":
-                    "Last 5",
-            }
-        )
-    )
-
-    fallers = (
-        summary
-        .sort_values(
-            "last5RatingChange",
-            ascending=True,
-        )
-        .head(
-            5
-        )
-        [
-            [
-                "team",
-                "last5RatingChange",
-            ]
-        ]
-        .rename(
-            columns={
-                "team":
-                    "Team",
-
-                "last5RatingChange":
-                    "Last 5",
-            }
-        )
-    )
-
-    risers[
-        "Rating Δ"
-    ] = (
-        risers[
-            "Last 5"
-        ]
-        .map(
-            lambda value:
-                f"{float(value):+.1f}"
-        )
-    )
-
-    risers = risers[
-        [
-            "Team",
-            "Rating Δ",
-        ]
-    ]
-
-    fallers[
-        "Rating Δ"
-    ] = (
         fallers[
-            "Last 5"
-        ]
-        .map(
-            lambda value:
-                f"{float(value):+.1f}"
-        )
-    )
-
-    fallers = fallers[
-        [
-            "Team",
-            "Rating Δ",
-        ]
-    ]
-
-    with riser_col:
-        st.markdown(
-            "**Biggest Risers — Last 5 Games**"
-        )
-
-        for _, row in (
-            risers.iterrows()
-        ):
-            render_recent_form_team(
-                row[
-                    "Team"
-                ],
-                row[
-                    "Rating Δ"
-                ],
-            )
-
-    with faller_col:
-        st.markdown(
-            "**Biggest Fallers — Last 5 Games**"
-        )
-
-        for _, row in (
-            fallers.iterrows()
-        ):
-            render_recent_form_team(
-                row[
-                    "Team"
-                ],
-                row[
-                    "Rating Δ"
-                ],
-            )
-
-
-
-    st.divider()
-
-
-
-    # --------------------------------------------------------
-    # Team detail
-    # --------------------------------------------------------
-
-    st.markdown(
-        "### Team Detail"
-    )
-
-    team_options = (
-        summary
-        .sort_values(
-            "ratingRank"
-        )[
-            "team"
-        ]
-        .tolist()
-    )
-
-    selected_team = (
-        st.selectbox(
-            "Team",
-            team_options,
-            key=(
-                "courtvision_season_intelligence_team"
-            ),
-        )
-    )
-
-    team_summary = (
-        summary.loc[
-            summary[
-                "team"
-            ]
-            == selected_team
-        ]
-        .iloc[
-            0
-        ]
-    )
-
-    selected_team_metadata = (
-        get_team_metadata_by_tricode(
-            selected_team
-        )
-    )
-
-    selected_team_color = (
-        selected_team_metadata.get(
-            "chart_color",
-            "#58A6FF",
-        )
-    )
-
-    selected_team_secondary = (
-        selected_team_metadata.get(
-            "secondary_color",
-            selected_team_color,
-        )
-    )
-
-    st.markdown(
-        (
-            "<div style='"
-            f"height: 5px; background: linear-gradient("
-            f"90deg, {selected_team_color}, "
-            f"{selected_team_secondary}); "
-            "border-radius: 999px; margin: 8px 0 14px 0;"
-            "'></div>"
-        ),
-        unsafe_allow_html=True,
-    )
-
-    render_season_team_identity(
-        selected_team_metadata,
-        subtitle=(
-            f"#{int(team_summary['ratingRank'])} in NBA · "
-            f"{int(team_summary['wins'])}-"
-            f"{int(team_summary['losses'])}"
-        ),
-        logo_width=82,
-    )
-
-
-
-    team_games = (
-        history.loc[
-            history[
-                "team"
-            ]
-            == selected_team
-        ]
-        .sort_values(
-            [
-                "gameDate",
-                "teamGameNumber",
-            ],
-            kind="mergesort",
-        )
-        .reset_index(
-            drop=True
-        )
-    )
-
-
-
-    peak_rank = int(
-        team_games[
-            "leagueRankAfterGame"
-        ].min()
-    )
-
-    lowest_rank = int(
-        team_games[
-            "leagueRankAfterGame"
-        ].max()
-    )
-
-    metric_col_1, metric_col_2, metric_col_3, metric_col_4 = (
-        st.columns(
-            4
-        )
-    )
-
-    with metric_col_1:
-        st.metric(
-            "Current Rating",
-            f"{team_summary['currentRating']:.1f}",
-            help=(
-                f"Current NBA rank: "
-                f"#{int(team_summary['ratingRank'])}"
-            ),
-        )
-
-    with metric_col_2:
-        st.metric(
-            "Peak Rating",
-            f"{team_summary['peakRating']:.1f}",
-            help=(
-                f"Best league rank reached after a game: "
-                f"#{peak_rank}"
-            ),
-        )
-
-    with metric_col_3:
-        st.metric(
-            "Lowest Rating",
-            f"{team_summary['lowestRating']:.1f}",
-            help=(
-                f"Worst league rank reached after a game: "
-                f"#{lowest_rank}"
-            ),
-        )
-
-    with metric_col_4:
-        st.metric(
-            "Season Change",
-            format_signed_rating(
-                team_summary[
-                    "seasonRatingChange"
-                ]
-            ),
-        )
-
-
-
-    # --------------------------------------------------------
-    # Rating history chart
-    # --------------------------------------------------------
-
-    chart = go.Figure()
-
-    team_games[
-        "resultLabel"
-    ] = np.where(
-        team_games[
-            "teamWin"
-        ]
-        == 1,
-        "W",
-        "L",
-    )
-
-    chart.add_trace(
-        go.Scatter(
-            x=team_games[
-                "gameDate"
-            ],
-
-            y=team_games[
-                "ratingAfter"
-            ],
-
-            mode="lines+markers",
-
-            name=selected_team,
-
-            line={
-                "color":
-                    selected_team_color,
-
-                "width":
-                    3,
-            },
-
-            marker={
-                "color":
-                    selected_team_color,
-
-                "size":
-                    6,
-
-                "line": {
-                    "width":
-                        1,
-
-                    "color":
-                        selected_team_secondary,
-                },
-            },
-
-            customdata=np.column_stack(
-                [
-                    team_games[
-                        "opponent"
-                    ],
-
-                    team_games[
-                        "resultLabel"
-                    ],
-
-                    team_games[
-                        "ratingChange"
-                    ],
-
-                    team_games[
-                        "leagueRankAfterGame"
-                    ],
-                ]
-            ),
-
-            hovertemplate=(
-                "Rating: %{y:.1f}"
-                "<br>Opponent: %{customdata[0]}"
-                "<br>Result: %{customdata[1]}"
-                "<br>League Rank: #%{customdata[3]}"
-                "<br>Change: %{customdata[2]:+.1f}"
-                "<extra></extra>"
-            ),
-        )
-    )
-
-    chart.add_hline(
-        y=1500.0,
-        line_dash="dash",
-        opacity=0.45,
-        annotation_text="League baseline",
-        annotation_position="bottom right",
-    )
-
-    chart.update_layout(
-        title=(
-            f"{selected_team_metadata['name']} "
-            "Courtvision Rating"
-        ),
-
-        xaxis_title=None,
-
-        yaxis_title="Rating",
-
-        hovermode="x unified",
-
-        height=430,
-
-        margin={
-            "l": 20,
-            "r": 20,
-            "t": 55,
-            "b": 20,
-        },
-    )
-
-    st.plotly_chart(
-        chart,
-        width="stretch",
-    )
-
-
-
-    # --------------------------------------------------------
-    # Form + per-game impact
-    # --------------------------------------------------------
-
-    detail_col_1, detail_col_2, detail_col_3, detail_col_4 = (
-        st.columns(
-            4
-        )
-    )
-
-    with detail_col_1:
-        st.metric(
-            "Last 5",
-            format_signed_rating(
-                team_summary[
-                    "last5RatingChange"
-                ]
-            ),
-        )
-
-    with detail_col_2:
-        st.metric(
-            "Last 10",
-            format_signed_rating(
-                team_summary[
-                    "last10RatingChange"
-                ]
-            ),
-        )
-
-    with detail_col_3:
-        st.metric(
-            "Biggest Gain",
-            format_signed_rating(
-                team_summary[
-                    "largestSingleGameGain"
-                ]
-            ),
-        )
-
-    with detail_col_4:
-        st.metric(
-            "Biggest Loss",
-            format_signed_rating(
-                team_summary[
-                    "largestSingleGameLoss"
-                ]
-            ),
-        )
-
-
-
-    # --------------------------------------------------------
-    # Recent games
-    # --------------------------------------------------------
-
-    st.markdown(
-        "#### Recent Rating Changes"
-    )
-
-    recent_games = (
-        team_games
-        .tail(
-            10
-        )
-        .sort_values(
-            "gameDate",
-            ascending=False,
-        )
-        .copy()
-    )
-
-    recent_games[
-        "Result"
-    ] = np.where(
-        recent_games[
-            "teamWin"
-        ]
-        == 1,
-        "W",
-        "L",
-    )
-
-    recent_games[
-        "Date"
-    ] = (
-        recent_games[
-            "gameDate"
-        ]
-        .dt.strftime(
-            "%b %d, %Y"
-        )
-    )
-
-    recent_games = (
-        recent_games
-        .rename(
-            columns={
-                "opponent":
-                    "Opponent",
-
-                "ratingChange":
-                    "Rating Δ",
-
-                "ratingAfter":
-                    "Rating",
-
-                "leagueRankAfterGame":
-                    "Rank",
-            }
-        )
-        [
-            [
-                "Date",
-                "Opponent",
-                "Result",
-                "Rating Δ",
-                "Rating",
-                "Rank",
-            ]
-        ]
-    )
-
-    recent_games[
-        "Rating Δ"
-    ] = (
-        recent_games[
             "Rating Δ"
-        ]
-        .map(
-            lambda value:
-                f"{float(value):+.1f}"
+        ] = (
+            fallers[
+                "Last 5"
+            ]
+            .map(
+                lambda value:
+                    f"{float(value):+.1f}"
+            )
         )
-    )
 
-    recent_games[
-        "Rating"
-    ] = (
-        recent_games[
-            "Rating"
-        ]
-        .map(
-            lambda value:
-                f"{float(value):.1f}"
-        )
-    )
-
-    recent_games[
-        "Rank"
-    ] = (
-        recent_games[
-            "Rank"
-        ]
-        .map(
-            lambda value:
-                f"#{int(value)}"
-        )
-    )
-
-
-    recent_games_styled = (
-        recent_games
-        .style
-        .map(
-            lambda value:
-                (
-                    "color: #2ECC71; "
-                    "font-weight: 700;"
-                )
-                if value == "W"
-                else (
-                    "color: #FF5C77; "
-                    "font-weight: 700;"
-                ),
-            subset=[
-                "Result",
-            ],
-        )
-        .map(
-            movement_style,
-            subset=[
+        fallers = fallers[
+            [
+                "Team",
                 "Rating Δ",
-            ],
-        )
-        .set_properties(
-            subset=[
-                "Rating",
-            ],
-            **{
-                "font-weight":
-                    "700",
-            },
-        )
-        .set_properties(
-            subset=[
-                "Rank",
-            ],
-            **{
-                "font-weight":
-                    "700",
-                "color":
-                    "#AAB2C0",
-            },
-        )
-        .set_properties(
-            subset=[
-                "Date",
-            ],
-            **{
-                "color":
-                    "#AAB2C0",
-            },
-        )
-    )
-
-    st.dataframe(
-        recent_games_styled,
-        hide_index=True,
-        width="stretch",
-        height=390,
-    )
-
-
-
-    # --------------------------------------------------------
-    # Explain a rating change
-    # --------------------------------------------------------
-
-    st.markdown(
-        "#### Why Did the Rating Change?"
-    )
-
-    explanation_games = (
-        team_games
-        .tail(
-            10
-        )
-        .sort_values(
-            "gameDate",
-            ascending=False,
-        )
-        .copy()
-    )
-
-    explanation_games[
-        "explanationLabel"
-    ] = (
-        explanation_games.apply(
-            lambda row:
-                (
-                    f"{row['gameDate'].strftime('%b %d')} · "
-                    f"{'W' if int(row['teamWin']) == 1 else 'L'} "
-                    f"vs {row['opponent']} · "
-                    f"{float(row['ratingChange']):+.1f}"
-                ),
-            axis=1,
-        )
-    )
-
-    explanation_labels = (
-        explanation_games[
-            "explanationLabel"
-        ].tolist()
-    )
-
-    selected_explanation_label = (
-        st.selectbox(
-            "Game",
-            explanation_labels,
-            key=(
-                "courtvision_rating_explanation_game_"
-                f"{season}_{selected_team}"
-            ),
-            label_visibility="collapsed",
-        )
-    )
-
-    explanation_row = (
-        explanation_games.loc[
-            explanation_games[
-                "explanationLabel"
             ]
-            == selected_explanation_label
         ]
-        .iloc[
-            0
-        ]
-    )
 
-    opponent_metadata = (
-        get_team_metadata_by_tricode(
-            explanation_row[
-                "opponent"
-            ]
-        )
-    )
-
-    result_is_win = (
-        int(
-            explanation_row[
-                "teamWin"
-            ]
-        )
-        == 1
-    )
-
-    explanation_color = (
-        "#2ECC71"
-        if result_is_win
-        else "#FF5C77"
-    )
-
-    explanation_container = (
-        st.container(
-            border=True,
-        )
-    )
-
-    with explanation_container:
-
-        logo_col, matchup_col, delta_col = (
-            st.columns(
-                [
-                    1,
-                    6,
-                    2,
-                ],
-                vertical_alignment="center",
-            )
-        )
-
-        with logo_col:
-            opponent_logo = (
-                opponent_metadata.get(
-                    "logo"
-                )
+        with riser_col:
+            st.markdown(
+                "**Biggest Risers — Last 5 Games**"
             )
 
-            if (
-                opponent_logo
-                and Path(
-                    opponent_logo
-                ).exists()
+            for _, row in (
+                risers.iterrows()
             ):
-                st.image(
-                    opponent_logo,
-                    width=48,
+                render_recent_form_team(
+                    row[
+                        "Team"
+                    ],
+                    row[
+                        "Rating Δ"
+                    ],
                 )
 
-        with matchup_col:
+        with faller_col:
             st.markdown(
-                (
-                    f"**{'Win' if result_is_win else 'Loss'} "
-                    f"vs {explanation_row['opponent']}**  "
-                    f"· "
-                    f"{explanation_row['gameDate'].strftime('%b %d, %Y')}"
-                )
+                "**Biggest Fallers — Last 5 Games**"
             )
 
-            st.caption(
-                (
-                    f"Pregame expectation: "
-                    f"{float(explanation_row['pregameWinProbability']) * 100.0:.1f}% "
-                    f"· Opponent rating: "
-                    f"{float(explanation_row['opponentRatingBefore']):.1f} "
-                    f"· Margin: "
-                    f"{abs(float(explanation_row['signedMargin'])):.0f}"
+            for _, row in (
+                fallers.iterrows()
+            ):
+                render_recent_form_team(
+                    row[
+                        "Team"
+                    ],
+                    row[
+                        "Rating Δ"
+                    ],
                 )
-            )
 
-        with delta_col:
-            st.markdown(
-                (
-                    "<div style='"
-                    "text-align:right; "
-                    "font-size:1.45rem; "
-                    "font-weight:750; "
-                    f"color:{explanation_color};"
-                    "'>"
-                    f"{float(explanation_row['ratingChange']):+.1f}"
-                    "</div>"
+
+
+        st.divider()
+
+
+
+
+
+    with team_tab:
+
+        # --------------------------------------------------------
+        # Team Explorer
+        # --------------------------------------------------------
+
+        st.markdown(
+            "### Team Explorer"
+        )
+
+        team_options = (
+            summary
+            .sort_values(
+                "ratingRank"
+            )[
+                "team"
+            ]
+            .tolist()
+        )
+
+        selected_team = (
+            st.selectbox(
+                "Team",
+                team_options,
+                key=(
+                    "courtvision_season_intelligence_team"
                 ),
-                unsafe_allow_html=True,
             )
+        )
 
-            st.caption(
-                "rating points"
+        team_summary = (
+            summary.loc[
+                summary[
+                    "team"
+                ]
+                == selected_team
+            ]
+            .iloc[
+                0
+            ]
+        )
+
+        selected_team_metadata = (
+            get_team_metadata_by_tricode(
+                selected_team
             )
+        )
+
+        selected_team_color = (
+            selected_team_metadata.get(
+                "chart_color",
+                "#58A6FF",
+            )
+        )
+
+        selected_team_secondary = (
+            selected_team_metadata.get(
+                "secondary_color",
+                selected_team_color,
+            )
+        )
 
         st.markdown(
             (
                 "<div style='"
-                "margin-top: 8px; "
-                "padding: 12px 14px; "
-                "border-radius: 10px; "
-                "background: rgba(148, 163, 184, 0.06); "
-                f"border-left: 4px solid {selected_team_color};"
-                "'>"
-                f"{html.escape(build_rating_change_explanation(explanation_row))}"
-                "</div>"
+                f"height: 5px; background: linear-gradient("
+                f"90deg, {selected_team_color}, "
+                f"{selected_team_secondary}); "
+                "border-radius: 999px; margin: 8px 0 14px 0;"
+                "'></div>"
             ),
             unsafe_allow_html=True,
         )
+
+        render_season_team_identity(
+            selected_team_metadata,
+            subtitle=(
+                f"#{int(team_summary['ratingRank'])} in NBA · "
+                f"{int(team_summary['wins'])}-"
+                f"{int(team_summary['losses'])}"
+            ),
+            logo_width=82,
+        )
+
+
+
+        team_games = (
+            history.loc[
+                history[
+                    "team"
+                ]
+                == selected_team
+            ]
+            .sort_values(
+                [
+                    "gameDate",
+                    "teamGameNumber",
+                ],
+                kind="mergesort",
+            )
+            .reset_index(
+                drop=True
+            )
+        )
+
+
+
+        peak_rank = int(
+            team_games[
+                "leagueRankAfterGame"
+            ].min()
+        )
+
+        lowest_rank = int(
+            team_games[
+                "leagueRankAfterGame"
+            ].max()
+        )
+
+        metric_col_1, metric_col_2, metric_col_3, metric_col_4 = (
+            st.columns(
+                4
+            )
+        )
+
+        with metric_col_1:
+            st.metric(
+                "Current Rating",
+                f"{team_summary['currentRating']:.1f}",
+                help=(
+                    f"Current NBA rank: "
+                    f"#{int(team_summary['ratingRank'])}"
+                ),
+            )
+
+        with metric_col_2:
+            st.metric(
+                "Peak Rating",
+                f"{team_summary['peakRating']:.1f}",
+                help=(
+                    f"Best league rank reached after a game: "
+                    f"#{peak_rank}"
+                ),
+            )
+
+        with metric_col_3:
+            st.metric(
+                "Lowest Rating",
+                f"{team_summary['lowestRating']:.1f}",
+                help=(
+                    f"Worst league rank reached after a game: "
+                    f"#{lowest_rank}"
+                ),
+            )
+
+        with metric_col_4:
+            st.metric(
+                "Season Change",
+                format_signed_rating(
+                    team_summary[
+                        "seasonRatingChange"
+                    ]
+                ),
+            )
+
+
+
+        # --------------------------------------------------------
+        # Rating history chart
+        # --------------------------------------------------------
+
+        chart = go.Figure()
+
+        team_games[
+            "resultLabel"
+        ] = np.where(
+            team_games[
+                "teamWin"
+            ]
+            == 1,
+            "W",
+            "L",
+        )
+
+        chart.add_trace(
+            go.Scatter(
+                x=team_games[
+                    "gameDate"
+                ],
+
+                y=team_games[
+                    "ratingAfter"
+                ],
+
+                mode="lines+markers",
+
+                name=selected_team,
+
+                line={
+                    "color":
+                        selected_team_color,
+
+                    "width":
+                        3,
+                },
+
+                marker={
+                    "color":
+                        selected_team_color,
+
+                    "size":
+                        6,
+
+                    "line": {
+                        "width":
+                            1,
+
+                        "color":
+                            selected_team_secondary,
+                    },
+                },
+
+                customdata=np.column_stack(
+                    [
+                        team_games[
+                            "opponent"
+                        ],
+
+                        team_games[
+                            "resultLabel"
+                        ],
+
+                        team_games[
+                            "ratingChange"
+                        ],
+
+                        team_games[
+                            "leagueRankAfterGame"
+                        ],
+                    ]
+                ),
+
+                hovertemplate=(
+                    "Rating: %{y:.1f}"
+                    "<br>Opponent: %{customdata[0]}"
+                    "<br>Result: %{customdata[1]}"
+                    "<br>League Rank: #%{customdata[3]}"
+                    "<br>Change: %{customdata[2]:+.1f}"
+                    "<extra></extra>"
+                ),
+            )
+        )
+
+        chart.add_hline(
+            y=1500.0,
+            line_dash="dash",
+            opacity=0.45,
+            annotation_text="League baseline",
+            annotation_position="bottom right",
+        )
+
+        chart.update_layout(
+            title=(
+                f"{selected_team_metadata['name']} "
+                "Courtvision Rating"
+            ),
+
+            xaxis_title=None,
+
+            yaxis_title="Rating",
+
+            hovermode="x unified",
+
+            height=430,
+
+            margin={
+                "l": 20,
+                "r": 20,
+                "t": 55,
+                "b": 20,
+            },
+        )
+
+        st.plotly_chart(
+            chart,
+            width="stretch",
+        )
+
+
+
+        # --------------------------------------------------------
+        # Form + per-game impact
+        # --------------------------------------------------------
+
+        detail_col_1, detail_col_2, detail_col_3, detail_col_4 = (
+            st.columns(
+                4
+            )
+        )
+
+        with detail_col_1:
+            st.metric(
+                "Last 5",
+                format_signed_rating(
+                    team_summary[
+                        "last5RatingChange"
+                    ]
+                ),
+            )
+
+        with detail_col_2:
+            st.metric(
+                "Last 10",
+                format_signed_rating(
+                    team_summary[
+                        "last10RatingChange"
+                    ]
+                ),
+            )
+
+        with detail_col_3:
+            st.metric(
+                "Biggest Gain",
+                format_signed_rating(
+                    team_summary[
+                        "largestSingleGameGain"
+                    ]
+                ),
+            )
+
+        with detail_col_4:
+            st.metric(
+                "Biggest Loss",
+                format_signed_rating(
+                    team_summary[
+                        "largestSingleGameLoss"
+                    ]
+                ),
+            )
+
+
+
+        # --------------------------------------------------------
+        # Game log
+        # --------------------------------------------------------
+
+        st.markdown(
+            "#### Game Log"
+        )
+
+        game_log_scope = st.selectbox(
+            "Games shown",
+            [
+                "Last 10",
+                "Last 20",
+                "All Games",
+            ],
+            index=0,
+            key=(
+                "courtvision_season_game_log_scope_"
+                f"{season}_{selected_team}"
+            ),
+        )
+
+        if game_log_scope == "All Games":
+            recent_games = (
+                team_games
+                .copy()
+            )
+
+        else:
+            game_count = int(
+                game_log_scope
+                .split()[1]
+            )
+
+            recent_games = (
+                team_games
+                .tail(
+                    game_count
+                )
+                .copy()
+            )
+
+        recent_games = (
+            recent_games
+            .sort_values(
+                "gameDate",
+                ascending=False,
+            )
+            .copy()
+        )
+
+
+        recent_games[
+            "Result"
+        ] = np.where(
+            recent_games[
+                "teamWin"
+            ]
+            == 1,
+            "W",
+            "L",
+        )
+
+        recent_games[
+            "Date"
+        ] = (
+            recent_games[
+                "gameDate"
+            ]
+            .dt.strftime(
+                "%b %d, %Y"
+            )
+        )
+
+        recent_games = (
+            recent_games
+            .rename(
+                columns={
+                    "opponent":
+                        "Opponent",
+
+                    "ratingChange":
+                        "Rating Δ",
+
+                    "ratingAfter":
+                        "Rating",
+
+                    "leagueRankAfterGame":
+                        "Rank",
+                }
+            )
+            [
+                [
+                    "Date",
+                    "Opponent",
+                    "Result",
+                    "Rating Δ",
+                    "Rating",
+                    "Rank",
+                ]
+            ]
+        )
+
+        recent_games[
+            "Rating Δ"
+        ] = (
+            recent_games[
+                "Rating Δ"
+            ]
+            .map(
+                lambda value:
+                    f"{float(value):+.1f}"
+            )
+        )
+
+        recent_games[
+            "Rating"
+        ] = (
+            recent_games[
+                "Rating"
+            ]
+            .map(
+                lambda value:
+                    f"{float(value):.1f}"
+            )
+        )
+
+        recent_games[
+            "Rank"
+        ] = (
+            recent_games[
+                "Rank"
+            ]
+            .map(
+                lambda value:
+                    f"#{int(value)}"
+            )
+        )
+
+
+        recent_games_styled = (
+            recent_games
+            .style
+            .map(
+                lambda value:
+                    (
+                        "color: #2ECC71; "
+                        "font-weight: 700;"
+                    )
+                    if value == "W"
+                    else (
+                        "color: #FF5C77; "
+                        "font-weight: 700;"
+                    ),
+                subset=[
+                    "Result",
+                ],
+            )
+            .map(
+                movement_style,
+                subset=[
+                    "Rating Δ",
+                ],
+            )
+            .set_properties(
+                subset=[
+                    "Rating",
+                ],
+                **{
+                    "font-weight":
+                        "700",
+                },
+            )
+            .set_properties(
+                subset=[
+                    "Rank",
+                ],
+                **{
+                    "font-weight":
+                        "700",
+                    "color":
+                        "#AAB2C0",
+                },
+            )
+            .set_properties(
+                subset=[
+                    "Date",
+                ],
+                **{
+                    "color":
+                        "#AAB2C0",
+                },
+            )
+        )
+
+        st.dataframe(
+            recent_games_styled,
+            hide_index=True,
+            width="stretch",
+            height=390,
+        )
+
+
+
+        # --------------------------------------------------------
+        # Explain a rating change
+        # --------------------------------------------------------
+
+        st.markdown(
+            "#### Why Did the Rating Change?"
+        )
+
+        if game_log_scope == "All Games":
+            explanation_games = (
+                team_games
+                .copy()
+            )
+
+        else:
+            explanation_games = (
+                team_games
+                .tail(
+                    game_count
+                )
+                .copy()
+            )
+
+        explanation_games = (
+            explanation_games
+            .sort_values(
+                "gameDate",
+                ascending=False,
+            )
+            .copy()
+        )
+
+        explanation_games[
+            "explanationLabel"
+        ] = (
+            explanation_games.apply(
+                lambda row:
+                    (
+                        f"{row['gameDate'].strftime('%b %d')} · "
+                        f"{'W' if int(row['teamWin']) == 1 else 'L'} "
+                        f"vs {row['opponent']} · "
+                        f"{float(row['ratingChange']):+.1f}"
+                    ),
+                axis=1,
+            )
+        )
+
+        explanation_labels = (
+            explanation_games[
+                "explanationLabel"
+            ].tolist()
+        )
+
+        selected_explanation_label = (
+            st.selectbox(
+                "Game",
+                explanation_labels,
+                key=(
+                    "courtvision_rating_explanation_game_"
+                    f"{season}_{selected_team}"
+                ),
+                label_visibility="collapsed",
+            )
+        )
+
+        explanation_row = (
+            explanation_games.loc[
+                explanation_games[
+                    "explanationLabel"
+                ]
+                == selected_explanation_label
+            ]
+            .iloc[
+                0
+            ]
+        )
+
+        opponent_metadata = (
+            get_team_metadata_by_tricode(
+                explanation_row[
+                    "opponent"
+                ]
+            )
+        )
+
+        result_is_win = (
+            int(
+                explanation_row[
+                    "teamWin"
+                ]
+            )
+            == 1
+        )
+
+        explanation_color = (
+            "#2ECC71"
+            if result_is_win
+            else "#FF5C77"
+        )
+
+        explanation_container = (
+            st.container(
+                border=True,
+            )
+        )
+
+        with explanation_container:
+
+            logo_col, matchup_col, delta_col = (
+                st.columns(
+                    [
+                        1,
+                        6,
+                        2,
+                    ],
+                    vertical_alignment="center",
+                )
+            )
+
+            with logo_col:
+                opponent_logo = (
+                    opponent_metadata.get(
+                        "logo"
+                    )
+                )
+
+                if (
+                    opponent_logo
+                    and Path(
+                        opponent_logo
+                    ).exists()
+                ):
+                    st.image(
+                        opponent_logo,
+                        width=48,
+                    )
+
+            with matchup_col:
+                st.markdown(
+                    (
+                        f"**{'Win' if result_is_win else 'Loss'} "
+                        f"vs {explanation_row['opponent']}**  "
+                        f"· "
+                        f"{explanation_row['gameDate'].strftime('%b %d, %Y')}"
+                    )
+                )
+
+                st.caption(
+                    (
+                        f"Pregame expectation: "
+                        f"{float(explanation_row['pregameWinProbability']) * 100.0:.1f}% "
+                        f"· Opponent rating: "
+                        f"{float(explanation_row['opponentRatingBefore']):.1f} "
+                        f"· Margin: "
+                        f"{abs(float(explanation_row['signedMargin'])):.0f}"
+                    )
+                )
+
+            with delta_col:
+                st.markdown(
+                    (
+                        "<div style='"
+                        "text-align:right; "
+                        "font-size:1.45rem; "
+                        "font-weight:750; "
+                        f"color:{explanation_color};"
+                        "'>"
+                        f"{float(explanation_row['ratingChange']):+.1f}"
+                        "</div>"
+                    ),
+                    unsafe_allow_html=True,
+                )
+
+                st.caption(
+                    "rating points"
+                )
+
+            st.markdown(
+                (
+                    "<div style='"
+                    "margin-top: 8px; "
+                    "padding: 12px 14px; "
+                    "border-radius: 10px; "
+                    "background: rgba(148, 163, 184, 0.06); "
+                    f"border-left: 4px solid {selected_team_color};"
+                    "'>"
+                    f"{html.escape(build_rating_change_explanation(explanation_row))}"
+                    "</div>"
+                ),
+                unsafe_allow_html=True,
+            )
 
 
 
@@ -11789,6 +11869,7 @@ def run_live_once():
         str(selected_game_id),
 
         str(season),
+        str(season_type),
 
         bool(live_replay_mode),
 
@@ -11833,6 +11914,7 @@ def run_live_once():
                 season=season,
 
                 game_date=selected_date,
+                season_type=season_type,
 
                 top_k=3,
 

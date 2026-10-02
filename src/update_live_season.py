@@ -624,6 +624,24 @@ def update_live_season(
             "Use a separate --runtime-root for preseason testing."
         )
 
+    if (
+        season_type == "Pre Season"
+        and publish
+        and Path(
+            publish_dir
+        ).resolve()
+        == Path(
+            SEASON_INTELLIGENCE_DIR
+        ).resolve()
+        and not dry_run
+    ):
+        raise ValueError(
+            "Refusing to publish preseason games into the "
+            "production Season Intelligence directory. "
+            "Use --no-publish or provide a separate "
+            "--publish-dir for preseason testing."
+        )
+
     games = (
         fetch_completed_season_games(
             season=season,
