@@ -11017,10 +11017,6 @@ def render_season_intelligence(
         # Team Explorer
         # --------------------------------------------------------
 
-        st.markdown(
-            "### Team Explorer"
-        )
-
         team_options = (
             summary
             .sort_values(
