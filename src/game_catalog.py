@@ -17,6 +17,12 @@ ROOT_DIR = (
     .parents[1]
 )
 
+BUNDLED_GAME_CATALOG_DIR = (
+    ROOT_DIR
+    / "data"
+    / "game_catalog"
+)
+
 GAME_CATALOG_CACHE_DIR = (
     ROOT_DIR
     / "data"
@@ -61,13 +67,31 @@ def fetch_season_games(
         .replace(" ", "_")
     )
 
+    catalog_filename = (
+        f"leaguegamelog_{season}_"
+        f"{safe_season_type}.csv"
+    )
+
+    bundled_path = (
+        BUNDLED_GAME_CATALOG_DIR
+        / catalog_filename
+    )
+
     cache_path = (
         GAME_CATALOG_CACHE_DIR
-        / (
-            f"leaguegamelog_{season}_"
-            f"{safe_season_type}.csv"
-        )
+        / catalog_filename
     )
+
+    if (
+        bundled_path.exists()
+        and not force_refresh
+    ):
+        return pd.read_csv(
+            bundled_path,
+            dtype={
+                "GAME_ID": str,
+            },
+        )
 
     if (
         cache_path.exists()
