@@ -60,3 +60,7 @@ results/wpa_optimization_baseline/
 # Season Intelligence intermediate artifacts
 results/season_intelligence/*_game_features_v1.csv
 results/team_rating/*_courtvision_rating_history_v1.csv
+
+# Frozen production model artifacts required at runtime
+!models/win_probability_mlp_v7.pt
+!models/win_probability_scaler_v7.pkl

@@ -88,7 +88,7 @@ models/win_probability_mlp_v7.pt
 models/win_probability_scaler_v7.pkl
 ```
 
-Generated model artifacts are excluded from Git.
+The frozen V7 production model and scaler are tracked for deployment; other generated model artifacts remain excluded from Git.
 
 ## V7 Features
 
