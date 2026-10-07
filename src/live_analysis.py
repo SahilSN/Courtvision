@@ -25,6 +25,11 @@ from preprocess import (
     preprocess_live_game,
 )
 
+from espn_live import (
+    ESPNLiveFeedError,
+    fetch_espn_live_play_by_play,
+)
+
 
 class LiveGameNotReadyError(RuntimeError):
     """The live feed exists but is not yet analyzable."""
@@ -104,6 +109,13 @@ def fetch_live_play_by_play(
     game_id,
     timeout=60,
 ):
+    """
+    Fetch the canonical NBA PlayByPlayV3 feed.
+
+    This remains the historical/completed-game source and
+    the fallback provider for true live games.
+    """
+
     canonical_game_id = (
         normalize_game_id(
             game_id
@@ -128,12 +140,62 @@ def fetch_live_play_by_play(
 
     if df.empty:
         raise LiveGameNotReadyError(
-            "The play-by-play feed has not "
+            "The NBA play-by-play feed has not "
             "returned any events yet for "
             f"{canonical_game_id}."
         )
 
+    df.attrs[
+        "courtvision_pbp_source"
+    ] = "nba"
+
     return df
+
+
+def fetch_true_live_play_by_play(
+    game_id,
+    game_date,
+    season,
+    timeout=60,
+):
+    """
+    Fetch play-by-play for an actively observed game.
+
+    ESPN is preferred because NBA PlayByPlayV3 may remain
+    empty during live preseason games. NBA remains the
+    fallback and canonical completed-game source.
+    """
+
+    canonical_game_id = (
+        normalize_game_id(
+            game_id
+        )
+    )
+
+    try:
+        return (
+            fetch_espn_live_play_by_play(
+                game_id=(
+                    canonical_game_id
+                ),
+                game_date=(
+                    game_date
+                ),
+                season=season,
+                timeout=min(
+                    timeout,
+                    30,
+                ),
+            )
+        )
+
+    except ESPNLiveFeedError:
+        return (
+            fetch_live_play_by_play(
+                canonical_game_id,
+                timeout=timeout,
+            )
+        )
 
 
 def local_season_path(
@@ -893,10 +955,36 @@ def analyze_live_game(
             canonical_game_id
         )
 
+    pbp_source = None
+
     if game_df is None:
-        raw_df = (
-            fetch_live_play_by_play(
-                canonical_game_id
+        if (
+            not assume_final
+            and replay_cutoff_elapsed
+            is None
+        ):
+            raw_df = (
+                fetch_true_live_play_by_play(
+                    game_id=(
+                        canonical_game_id
+                    ),
+                    game_date=(
+                        game_date
+                    ),
+                    season=season,
+                )
+            )
+
+        else:
+            raw_df = (
+                fetch_live_play_by_play(
+                    canonical_game_id
+                )
+            )
+
+        pbp_source = (
+            raw_df.attrs.get(
+                "courtvision_pbp_source"
             )
         )
 
@@ -1070,6 +1158,9 @@ def analyze_live_game(
     result = {
         "game_id":
             canonical_game_id,
+
+        "pbp_source":
+            pbp_source,
 
         "game_date":
             str(
