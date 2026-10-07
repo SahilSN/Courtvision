@@ -1330,6 +1330,19 @@ elif mode == "Live":
             key="courtvision_replay_season",
         )
 
+        replay_season_type = st.sidebar.selectbox(
+            "Replay season type",
+            [
+                "Regular Season",
+                "Pre Season",
+            ],
+            index=0,
+            key=(
+                "courtvision_replay_season_type_"
+                f"{replay_season}"
+            ),
+        )
+
         replay_date = st.sidebar.date_input(
             "Replay date",
             value=default_date_for_season(
@@ -1337,7 +1350,8 @@ elif mode == "Live":
             ),
             key=(
                 "courtvision_replay_date_"
-                f"{replay_season}"
+                f"{replay_season}_"
+                f"{replay_season_type}"
             ),
         )
 
@@ -1345,6 +1359,9 @@ elif mode == "Live":
             replay_games = cached_games_for_date(
                 replay_season,
                 replay_date,
+                season_type=(
+                    replay_season_type
+                ),
             )
 
         except Exception as error:
@@ -1468,7 +1485,7 @@ elif mode == "Live":
         )
 
         season = replay_season
-        season_type = "Regular Season"
+        season_type = replay_season_type
         selected_date = replay_date
 
 
