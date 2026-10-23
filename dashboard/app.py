@@ -11935,9 +11935,104 @@ def render_season_intelligence(
 
 
 
+def player_visual_theme(team):
+    metadata = get_team_metadata_by_tricode(team)
+    return metadata, metadata.get("chart_color", "#58A6FF")
+
+
+def render_player_identity(name, team, subtitle, badge=None):
+    metadata, color = player_visual_theme(team)
+    logo = metadata.get("logo")
+    with st.container(border=True):
+        logo_col, identity_col = st.columns([1, 8], vertical_alignment="center")
+        with logo_col:
+            if logo and Path(logo).exists():
+                st.image(logo, width=76)
+        with identity_col:
+            badge_html = (
+                f"<span class='cv-player-badge'>{html.escape(badge)}</span>" if badge else ""
+            )
+            st.markdown(
+                f"<div class='cv-player-identity' style='border-color:{color}'>"
+                f"<div class='cv-player-eyebrow'>{html.escape(team)} · PLAYER INTELLIGENCE</div>"
+                f"<div class='cv-player-name'>{html.escape(name)}</div>"
+                f"<div class='cv-player-subtitle'>{html.escape(subtitle)} {badge_html}</div></div>",
+                unsafe_allow_html=True,
+            )
+
+
+def render_player_design():
+    st.markdown("""<style>
+        .cv-player-identity {border-left:4px solid;padding:4px 0 4px 18px;}
+        .cv-player-eyebrow {font-size:.7rem;font-weight:650;letter-spacing:.13em;color:#94a3b8;}
+        .cv-player-name {font-size:clamp(1.4rem,3vw,2.2rem);font-weight:750;line-height:1.25;margin:5px 0;}
+        .cv-player-subtitle {font-size:.88rem;color:#94a3b8;line-height:1.8;}
+        .cv-player-badge {display:inline-block;border:1px solid rgba(148,163,184,.25);border-radius:99px;padding:0 9px;font-size:.73rem;margin-left:6px;}
+        .cv-player-metrics {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px 0 22px;}
+        .cv-player-metric {background:rgba(148,163,184,.045);border:1px solid rgba(148,163,184,.14);border-radius:12px;padding:18px 20px;}
+        .cv-player-label {font-size:.76rem;color:#94a3b8;margin-bottom:7px;}
+        .cv-player-number {font-size:clamp(1.3rem,2.5vw,1.9rem);font-weight:720;line-height:1.2;font-variant-numeric:tabular-nums;}
+        .cv-player-note {font-size:.7rem;color:#94a3b8;margin-top:7px;}
+        .cv-player-coverage {border:1px solid rgba(245,184,65,.24);background:rgba(245,184,65,.045);border-radius:10px;padding:13px 17px;margin:10px 0 16px;color:#c5a96d;font-size:.84rem;line-height:1.6;}
+        @media(max-width:640px) {.cv-player-metrics {grid-template-columns:repeat(2,minmax(0,1fr));}.cv-player-metric {padding:14px;}}
+    </style>""", unsafe_allow_html=True)
+
+
+def render_player_metrics(items):
+    cards = []
+    for label, value, note in items:
+        cards.append(
+            "<div class='cv-player-metric'>"
+            f"<div class='cv-player-label'>{html.escape(str(label))}</div>"
+            f"<div class='cv-player-number'>{html.escape(str(value))}</div>"
+            f"<div class='cv-player-note'>{html.escape(str(note))}</div></div>"
+        )
+    st.markdown("<div class='cv-player-metrics'>" + "".join(cards) + "</div>", unsafe_allow_html=True)
+
+
+def style_player_table(frame):
+    def status_color(value):
+        colors = {"Qualified": "#6ac8a1", "Provisional": "#e5ba69", "Limited": "#94a3b8",
+                  "Partial": "#e5ba69", "Complete": "#6ac8a1", "W": "#6ac8a1", "L": "#ef8793"}
+        return f"color:{colors[value]};font-weight:600;" if value in colors else ""
+
+    styled = frame.style.set_properties(**{"border-color": "rgba(148,163,184,.12)"})
+    for column in ["Rating", "Rating After", "Player"]:
+        if column in frame.columns:
+            styled = styled.set_properties(subset=[column], **{"font-weight": "650"})
+    for column in ["Status", "Sample Status", "Season Coverage", "Coverage", "Result"]:
+        if column in frame.columns:
+            styled = styled.map(status_color, subset=[column])
+    for column in ["Season Value", "Game WPA"]:
+        if column in frame.columns:
+            styled = styled.map(
+                lambda value: "color:#6ac8a1" if float(value) > 0 else "color:#ef8793" if float(value) < 0 else "",
+                subset=[column],
+            )
+    return styled
+
+
+def polish_player_chart(chart):
+    chart.update_layout(
+        height=390, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=15, r=20, t=35, b=20), hovermode="closest",
+        legend=dict(orientation="h", y=1.12, x=0),
+        font=dict(color="#aab2c0"),
+    )
+    chart.update_xaxes(showgrid=False, zeroline=False)
+    if chart.layout.xaxis.type != "category":
+        chart.update_xaxes(tickformat="%b %d")
+        dates = [pd.Timestamp(value) for trace in chart.data for value in trace.x]
+        if dates and min(dates) == max(dates):
+            chart.update_xaxes(range=[dates[0] - pd.Timedelta(days=1), dates[0] + pd.Timedelta(days=1)])
+    chart.update_yaxes(gridcolor="rgba(148,163,184,.10)", zeroline=False)
+    return chart
+
+
 def render_player_intelligence(
     season,
 ):
+    render_player_design()
     st.subheader(
         "Player Intelligence"
     )
@@ -11983,10 +12078,11 @@ def render_player_intelligence(
             f"{coverage['processedGames']:,} of {expected:,} completed league games"
             if expected else f"{coverage['processedGames']:,} processed league games"
         )
-        st.warning(
-            f"{coverage['coverageStatus']} coverage: {coverage_text}. "
-            "Totals, trends, and ranks use processed games only. "
-            "Missing appearances are not zero-impact games."
+        st.markdown(
+            "<div class='cv-player-coverage'>"
+            f"<strong>{html.escape(coverage['coverageStatus'])} coverage</strong> · {coverage_text}<br>"
+            "Stats reflect processed games. Missing appearances are not zero-impact games.</div>",
+            unsafe_allow_html=True,
         )
     else:
         st.caption(f"Complete regular-season coverage: {coverage['processedGames']:,} games.")
@@ -12004,33 +12100,12 @@ def render_player_intelligence(
         "ratingStatus"
     ].eq("Qualified")
 
-    metric_col_1, metric_col_2, metric_col_3, metric_col_4 = (
-        st.columns(4)
-    )
-
-    with metric_col_1:
-        st.metric(
-            "Games Processed",
-            f"{games['gameId'].nunique():,}",
-        )
-
-    with metric_col_2:
-        st.metric(
-            "Players Tracked",
-            f"{len(ratings):,}",
-        )
-
-    with metric_col_3:
-        st.metric(
-            "Leaderboard Eligible",
-            f"{int(eligible.sum()):,}",
-        )
-
-    with metric_col_4:
-        st.metric(
-            "Qualified",
-            f"{int(qualified.sum()):,}",
-        )
+    render_player_metrics([
+        ("Games processed", f"{games['gameId'].nunique():,}", f"{season} regular season"),
+        ("Players tracked", f"{len(ratings):,}", "Across processed games"),
+        ("Leaderboard eligible", f"{int(eligible.sum()):,}", "At least 3 appearances"),
+        ("Qualified", f"{int(qualified.sum()):,}", "10+ games · 60% reliability"),
+    ])
 
     with st.expander(
         "How Player Courtvision Rating works"
@@ -12116,7 +12191,7 @@ def render_player_intelligence(
         )
 
         st.dataframe(
-            progress,
+            style_player_table(progress),
             hide_index=True,
             width="stretch",
         )
@@ -12137,6 +12212,14 @@ def render_player_intelligence(
     )
 
     with leaderboard_tab:
+        leaders = ratings.loc[eligible & team_mask].sort_values("courtvisionRank")
+        if not leaders.empty:
+            leader = leaders.iloc[0]
+            render_player_identity(
+                leader["playerName"], leader["currentTeam"],
+                f"Rating {leader['courtvisionRating']:.1f} · {int(leader['games'])} games · {leader['ratingStatus']}",
+                badge="Leading eligible player" if selected_team == "All teams" else "Team leader",
+            )
         st.markdown(
             "### Player Ratings"
         )
@@ -12217,9 +12300,9 @@ def render_player_intelligence(
         if leaderboard.empty:
             st.info("No players on this team have reached three processed games yet.")
         st.dataframe(
-            leaderboard.rename(columns={
+            style_player_table(leaderboard.rename(columns={
                 "NBA Rank": "Sample Rank", "NBA Value Rank": "Sample Value Rank",
-            }) if coverage["coverageStatus"] in ("Partial", "Unknown") else leaderboard,
+            }) if coverage["coverageStatus"] in ("Partial", "Unknown") else leaderboard),
             hide_index=True,
             width="stretch",
             height=560,
@@ -12285,41 +12368,17 @@ def render_player_explorer(ratings, games, season):
             else "Not ranked"
         )
 
-        st.markdown(
-            f"### {player['playerName']} · {player['currentTeam']}"
+        render_player_identity(
+            player["playerName"], player["currentTeam"],
+            f"{season} regular season · {rank_label} in processed coverage",
+            badge=player["ratingStatus"],
         )
-
-        st.caption(
-            f"{player['ratingStatus']} · {rank_label}"
-        )
-
-        player_col_1, player_col_2, player_col_3, player_col_4 = (
-            st.columns(4)
-        )
-
-        with player_col_1:
-            st.metric(
-                "Courtvision Rating",
-                f"{float(player['courtvisionRating']):.1f}",
-            )
-
-        with player_col_2:
-            st.metric(
-                "Season Value",
-                f"{float(player['seasonNetWPA']):+.2f}",
-            )
-
-        with player_col_3:
-            st.metric(
-                "Games",
-                f"{int(player['games'])}",
-            )
-
-        with player_col_4:
-            st.metric(
-                "Reliability",
-                f"{float(player['ratingReliability']):.0%}",
-            )
+        render_player_metrics([
+            ("Courtvision Rating", f"{float(player['courtvisionRating']):.1f}", "100 · historical reference"),
+            ("Season Value", f"{float(player['seasonNetWPA']):+.2f}", "Cumulative attributed impact"),
+            ("Games", f"{int(player['games'])}", f"{float(player['minutes']):,.0f} minutes processed"),
+            ("Reliability", f"{float(player['ratingReliability']):.0%}", player["ratingStatus"]),
+        ])
 
         if player["ratingStatus"] == "Limited":
             st.warning(
@@ -12346,6 +12405,8 @@ def render_player_explorer(ratings, games, season):
             y=history["courtvisionRating"],
             mode="lines+markers",
             name="Courtvision Rating",
+            line=dict(color=player_visual_theme(player["currentTeam"])[1], width=3),
+            marker=dict(size=7),
             customdata=history[["opponentTricode", "ratingStatus", "seasonNetWPA"]],
             hovertemplate=(
                 "%{x|%b %d, %Y}<br>Rating: %{y:.1f}"
@@ -12357,7 +12418,7 @@ def render_player_explorer(ratings, games, season):
                         annotation_text="Historical reference")
         chart.update_layout(height=350, xaxis_title=None, yaxis_title="Rating",
                             margin=dict(l=20, r=20, t=30, b=20))
-        st.plotly_chart(chart, width="stretch")
+        st.plotly_chart(polish_player_chart(chart), width="stretch")
 
         st.markdown("#### Game Log")
         scope = st.selectbox("Games shown", ["Last 10", "Last 20", "All Games"],
@@ -12377,8 +12438,8 @@ def render_player_explorer(ratings, games, season):
         for column in ["Minutes", "Rating After"]:
             log[column] = log[column].map(lambda value: f"{value:.1f}")
         log["Reliability"] = log["Reliability"].map(lambda value: f"{value:.0%}")
-        st.dataframe(log[["Date", "Team", "Matchup", "Result", "Minutes", "Game WPA",
-                          "Season Value", "Rating After", "Status", "Reliability"]],
+        st.dataframe(style_player_table(log[["Date", "Team", "Matchup", "Result", "Minutes", "Game WPA",
+                          "Season Value", "Rating After", "Status", "Reliability"]]),
                      hide_index=True, width="stretch")
         st.caption("Game WPA and Season Value are attributed win-probability impact, not wins added.")
         render_player_comparison(ratings, games, season, selected_player)
@@ -12402,6 +12463,14 @@ def render_player_comparison(ratings, games, season, selected_player):
         return
 
     selected = players_by_id.loc[[selected_player, comparison_id]]
+    comparison_colors = ["#58A6FF", "#F5B841"]
+    for column, (_, player) in zip(st.columns(2), selected.iterrows()):
+        with column:
+            render_player_identity(
+                player["playerName"], player["currentTeam"],
+                f"Rating {player['courtvisionRating']:.1f} · {int(player['games'])} games",
+                badge=player["ratingStatus"],
+            )
     comparison = selected[[
         "playerName", "currentTeam", "games", "minutes", "courtvisionRating",
         "seasonNetWPA", "ratingStatus", "ratingReliability", "courtvisionRank",
@@ -12421,7 +12490,7 @@ def render_player_comparison(ratings, games, season, selected_player):
         "seasonNetWPA": "Season Value", "ratingStatus": "Status",
         "ratingReliability": "Reliability", "courtvisionRank": "NBA Rank",
     })
-    st.dataframe(comparison, hide_index=True, width="stretch")
+    st.dataframe(style_player_table(comparison), hide_index=True, width="stretch")
     if selected["ratingStatus"].ne("Qualified").any():
         st.info(
             "At least one player has a limited or provisional sample. "
@@ -12433,11 +12502,12 @@ def render_player_comparison(ratings, games, season, selected_player):
         "processed appearances on its actual game dates; schedules may differ."
     )
     chart = go.Figure()
-    for person_id, player in selected.iterrows():
+    for color, (person_id, player) in zip(comparison_colors, selected.iterrows()):
         history = build_player_rating_history(games, person_id)
         chart.add_trace(go.Scatter(
             x=history["gameDate"], y=history["courtvisionRating"],
             mode="lines+markers", name=player["playerName"],
+            line=dict(color=color, width=3), marker=dict(size=6),
             customdata=history[["games", "ratingStatus"]],
             hovertemplate=(
                 "%{x|%b %d, %Y}<br>Rating: %{y:.1f}"
@@ -12449,7 +12519,7 @@ def render_player_comparison(ratings, games, season, selected_player):
                     annotation_text="Historical reference")
     chart.update_layout(height=350, xaxis_title=None, yaxis_title="Rating",
                         margin=dict(l=20, r=20, t=30, b=20))
-    st.plotly_chart(chart, width="stretch")
+    st.plotly_chart(polish_player_chart(chart), width="stretch")
 
 
 
@@ -12460,6 +12530,7 @@ def cached_player_career_data():
 
 
 def render_player_career():
+    render_player_design()
     st.subheader("Player Career")
     st.caption("Regular-season Player Intelligence across published seasons")
     try:
@@ -12481,25 +12552,30 @@ def render_player_career():
         key="courtvision_player_career_person",
     )
     career = build_player_career(games, person_id)
-    st.markdown(f"### {players.loc[person_id, 'playerName']}")
-    st.warning(
-        "Covered seasons only — these are not complete NBA career totals. "
-        "Partial historical seasons and the current season may omit appearances. "
-        "Seasons before the published archive are not included."
+    player = players.loc[person_id]
+    render_player_identity(
+        player["playerName"], player["teamTricode"],
+        f"Career profile · {career['seasons']} published {'season' if career['seasons'] == 1 else 'seasons'}",
+        badge="Covered games only",
     )
-    columns = st.columns(4)
-    for column, label, value in zip(columns, [
-        "Seasons Covered", "Covered Games", "Covered Minutes", "Covered Season Value",
-    ], [f"{career['seasons']}", f"{career['games']:,}", f"{career['minutes']:,.1f}",
-        f"{career['seasonNetWPA']:+.2f}"]):
-        column.metric(label, value)
-    st.caption(
-        f"Covered-games rating: {career['coveredRating']:.1f} · "
-        f"Raw WPA per 36: {career['netWPAper36']:+.3f}. "
-        "The covered-games rating pools minutes and impact across appearances "
-        "with one historical prior; it is not an average of season ratings. "
-        "Season Value is attributed win-probability impact, not wins added."
+    st.markdown(
+        "<div class='cv-player-coverage'><strong>Coverage note</strong> · "
+        "These are covered-season totals, not complete NBA career totals. "
+        "Partial seasons and unpublished years may omit appearances.</div>", unsafe_allow_html=True,
     )
+    render_player_metrics([
+        ("Covered-games rating", f"{career['coveredRating']:.1f}", "Pooled impact · 100 reference"),
+        ("Career Season Value", f"{career['seasonNetWPA']:+.2f}", "Across covered appearances"),
+        ("Games covered", f"{career['games']:,}", f"{career['minutes']:,.0f} minutes"),
+        ("Seasons covered", f"{career['seasons']}", "Regular season only"),
+    ])
+    with st.expander("About career ratings and coverage"):
+        st.write(
+            f"Raw WPA per 36: {career['netWPAper36']:+.3f}. The covered-games rating "
+            "pools minutes and impact with one historical prior, rather than averaging "
+            "season ratings. Season Value is attributed win-probability impact, not wins added. "
+            "Seasons before the published archive are excluded."
+        )
     seasons = summaries.loc[summaries["personId"].eq(person_id)].merge(
         coverage, on="season", validate="one_to_one"
     ).sort_values("season")
@@ -12522,7 +12598,7 @@ def render_player_career():
     for name in ["Minutes", "Rating"]:
         display[name] = display[name].map(lambda value: f"{value:.1f}")
     display["Season Value"] = display["Season Value"].map(lambda value: f"{value:+.2f}")
-    st.dataframe(display, hide_index=True, width="stretch")
+    st.dataframe(style_player_table(display), hide_index=True, width="stretch")
     st.caption(
         "Sample status measures the amount of processed playing time; it does "
         "not certify season completeness. An absent player-season means no "
@@ -12530,6 +12606,8 @@ def render_player_career():
     )
     chart = go.Figure(go.Scatter(
         x=seasons["season"], y=seasons["courtvisionRating"], mode="lines+markers",
+        line=dict(color=player_visual_theme(player["teamTricode"])[1], width=3),
+        marker=dict(size=9),
         customdata=seasons[["games", "coverageStatus", "League Games Covered"]],
         hovertemplate=("%{x}<br>Rating: %{y:.1f}<br>Player games: %{customdata[0]}"
                        "<br>Coverage: %{customdata[1]}<br>League games: %{customdata[2]}<extra></extra>"),
@@ -12538,12 +12616,12 @@ def render_player_career():
                     annotation_text="Historical reference")
     chart.update_layout(height=350, xaxis_title="Season", yaxis_title="Season Rating")
     chart.update_xaxes(type="category")
-    st.plotly_chart(chart, width="stretch")
-    st.markdown("#### Archive Coverage")
-    st.dataframe(coverage.rename(columns={
-        "season": "Season", "processedGames": "Processed Games",
-        "expectedGames": "Completed League Games", "coverageStatus": "Coverage",
-    }), hide_index=True, width="stretch")
+    st.plotly_chart(polish_player_chart(chart), width="stretch")
+    with st.expander("Archive coverage · all published seasons"):
+        st.dataframe(style_player_table(coverage.rename(columns={
+            "season": "Season", "processedGames": "Processed Games",
+            "expectedGames": "Completed League Games", "coverageStatus": "Coverage",
+        })), hide_index=True, width="stretch")
 
 
 def run_season_intelligence():
