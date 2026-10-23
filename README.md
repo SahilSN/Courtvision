@@ -823,6 +823,20 @@ The next major analytical feature will extend Courtvision's player-level game at
 
 Phase 1 is now defined in `docs/player_courtvision_rating.md`. The initial dataset layer joins frozen WPA v3 attribution to box-score participation so every positive-minute player is represented, including appearances with no attributed WPA events.
 
+Historical research samples can be expanded safely with the deterministic,
+resumable backfill command:
+
+```bash
+python src/backfill_player_rating_sample.py \
+    --season 2025-26 \
+    --sample-size 50 \
+    --max-new-games 10
+```
+
+The command skips complete games, regenerates only missing WPA or box-score
+artifacts, and rebuilds the ignored player-game research dataset after each run.
+Use `--dry-run` to inspect the selected games without changing local data.
+
 Planned work includes:
 
 - define the player-rating objective

@@ -88,3 +88,27 @@ rating formula must not quietly become a conventional box-score rating.
 5. Backfill completed historical seasons.
 6. Add incremental current-season updates.
 7. Build the player leaderboard and player profile UI.
+
+## Controlled historical backfill
+
+`src/backfill_player_rating_sample.py` selects games evenly across a season and
+builds the missing WPA v3 and box-score inputs. The selection is deterministic,
+and complete inputs are skipped, so interrupted backfills can be resumed without
+changing the research sample or repeating completed work.
+
+Start with a dry run, then cap each live-data batch:
+
+```bash
+python src/backfill_player_rating_sample.py \
+    --season 2025-26 \
+    --sample-size 50 \
+    --dry-run
+
+python src/backfill_player_rating_sample.py \
+    --season 2025-26 \
+    --sample-size 50 \
+    --max-new-games 10
+```
+
+Generated player-game datasets remain local research artifacts. Expanding the
+sample does not change frozen V7 or freeze a player-rating formula.
