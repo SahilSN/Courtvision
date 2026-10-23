@@ -821,6 +821,8 @@ The validation target includes:
 
 The next major analytical feature will extend Courtvision's player-level game attribution into a season-level player rating.
 
+Phase 1 is now defined in `docs/player_courtvision_rating.md`. The initial dataset layer joins frozen WPA v3 attribution to box-score participation so every positive-minute player is represented, including appearances with no attributed WPA events.
+
 Planned work includes:
 
 - define the player-rating objective
