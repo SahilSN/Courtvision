@@ -857,16 +857,17 @@ python src/player_rating.py --season 2025-26
 The v1 quality index is centered at a fixed historical reference of 100 and is
 shown alongside cumulative Season Value, sample status, and reliability.
 
-Planned work includes:
+The existing hourly/nightly Season Intelligence workflow also runs
+`src/update_player_intelligence.py`. It processes only newly completed
+regular-season games, retains failed games for a later retry, and publishes the
+2026-27 player-game and rating artifacts used by the dashboard.
 
-- define the player-rating objective
-- determine how Player WPA and opportunity should contribute
-- contextual normalization
-- historical backfill
-- validation
-- player season summaries
-- NBA player leaderboard
-- dashboard integration
+Open Season Intelligence → Players for current-season coverage and sample
+progress. The leaderboard appears once players reach three games; Player
+Explorer shows rating, cumulative Season Value, status, and reliability.
+Historical player samples remain research datasets rather than full-season
+leaderboards. Further work includes broader historical coverage and richer
+player game logs and trends.
 
 ### Later exploration
 

@@ -1641,6 +1641,31 @@ else:
     )
 
 
+    intelligence_view = st.sidebar.radio(
+
+        "Intelligence",
+
+        (
+            [
+                "Teams",
+
+                "Players",
+
+            ]
+            if season == CURRENT_SEASON
+            else [
+                "Teams",
+
+            ]
+        ),
+
+        key="courtvision_season_intelligence_view",
+
+        horizontal=True,
+
+    )
+
+
 
     selected_game_id = None
 
@@ -9946,6 +9971,64 @@ def cached_team_season_intelligence(
 
 
 
+@st.cache_data(
+    show_spinner=False,
+    ttl=30,
+)
+def cached_player_season_intelligence(
+    season,
+):
+    ratings_path = (
+        ROOT_DIR
+        / "results"
+        / "player_intelligence"
+        / f"{season}_player_ratings_v1.csv"
+    )
+
+    games_path = (
+        ROOT_DIR
+        / "results"
+        / "player_intelligence"
+        / f"{season}_player_game_v1.csv"
+    )
+
+    if not ratings_path.exists() or not games_path.exists():
+        raise FileNotFoundError(
+            "Player Intelligence has not been published for "
+            f"{season} yet."
+        )
+
+    ratings = pd.read_csv(
+        ratings_path,
+    )
+
+    games = pd.read_csv(
+        games_path,
+        dtype={
+            "gameId": str,
+        },
+    )
+
+    games[
+        "gameDate"
+    ] = pd.to_datetime(
+        games[
+            "gameDate"
+        ],
+        errors="coerce",
+    )
+
+    if games["gameDate"].isna().any():
+        raise ValueError(
+            "Invalid gameDate in Player Intelligence data."
+        )
+
+    return ratings, games
+
+
+
+
+
 def add_historical_league_ranks(
     history,
 ):
@@ -11853,11 +11936,360 @@ def render_season_intelligence(
 
 
 
-def run_season_intelligence():
-
-    render_season_intelligence(
-        season
+def render_player_intelligence(
+    season,
+):
+    st.subheader(
+        "Player Intelligence"
     )
+
+    st.caption(
+        (
+            f"{season} regular season · "
+            "Player Courtvision Rating v1"
+        )
+    )
+
+    try:
+        ratings, games = (
+            cached_player_season_intelligence(
+                season
+            )
+        )
+
+    except FileNotFoundError:
+        st.info(
+            "Player ratings will appear after completed "
+            "regular-season games are processed."
+        )
+        return
+
+    except Exception as error:
+        st.error(
+            "Could not load Player Intelligence: "
+            f"{error}"
+        )
+        return
+
+    eligible = (
+        ratings[
+            "leaderboardEligible"
+        ]
+        .astype(str)
+        .str.lower()
+        .eq("true")
+    )
+
+    qualified = ratings[
+        "ratingStatus"
+    ].eq("Qualified")
+
+    metric_col_1, metric_col_2, metric_col_3, metric_col_4 = (
+        st.columns(4)
+    )
+
+    with metric_col_1:
+        st.metric(
+            "Games Processed",
+            f"{games['gameId'].nunique():,}",
+        )
+
+    with metric_col_2:
+        st.metric(
+            "Players Tracked",
+            f"{len(ratings):,}",
+        )
+
+    with metric_col_3:
+        st.metric(
+            "Leaderboard Eligible",
+            f"{int(eligible.sum()):,}",
+        )
+
+    with metric_col_4:
+        st.metric(
+            "Qualified",
+            f"{int(qualified.sum()):,}",
+        )
+
+    with st.expander(
+        "How Player Courtvision Rating works"
+    ):
+        st.write(
+            "The rating measures a player's win-probability "
+            "impact per 36 minutes and shrinks small samples "
+            "toward a fixed historical baseline. A player "
+            "enters the leaderboard after three games and "
+            "becomes Qualified after at least 10 games with "
+            "60% reliability. Season Value separately tracks "
+            "cumulative impact."
+        )
+
+    if not eligible.any():
+        st.info(
+            "The official player leaderboard opens after "
+            "players reach three completed games. No player "
+            "has reached that threshold yet."
+        )
+
+        st.markdown(
+            "### Sample Progress"
+        )
+
+        progress = (
+            ratings[
+                [
+                    "playerName",
+                    "currentTeam",
+                    "games",
+                    "minutes",
+                    "ratingStatus",
+                ]
+            ]
+            .sort_values(
+                [
+                    "games",
+                    "minutes",
+                    "playerName",
+                ],
+                ascending=[
+                    False,
+                    False,
+                    True,
+                ],
+                kind="mergesort",
+            )
+            .head(25)
+            .rename(
+                columns={
+                    "playerName": "Player",
+                    "currentTeam": "Team",
+                    "games": "Games",
+                    "minutes": "Minutes",
+                    "ratingStatus": "Status",
+                }
+            )
+        )
+
+        progress[
+            "Minutes"
+        ] = progress[
+            "Minutes"
+        ].map(
+            lambda value: f"{float(value):.1f}"
+        )
+
+        st.dataframe(
+            progress,
+            hide_index=True,
+            width="stretch",
+        )
+
+        st.caption(
+            "Limited players are tracked but intentionally "
+            "not ranked. This page will update automatically "
+            "as completed games are published."
+        )
+        return
+
+    leaderboard_tab, explorer_tab = st.tabs(
+        [
+            "Leaderboard",
+            "Player Explorer",
+        ]
+    )
+
+    with leaderboard_tab:
+        st.markdown(
+            "### Player Ratings"
+        )
+
+        leaderboard = (
+            ratings.loc[
+                eligible,
+                [
+                    "courtvisionRank",
+                    "playerName",
+                    "currentTeam",
+                    "games",
+                    "courtvisionRating",
+                    "ratingStatus",
+                    "ratingReliability",
+                    "seasonNetWPA",
+                    "seasonValueRank",
+                ],
+            ]
+            .sort_values(
+                "courtvisionRank"
+            )
+            .rename(
+                columns={
+                    "courtvisionRank": "Rank",
+                    "playerName": "Player",
+                    "currentTeam": "Team",
+                    "games": "Games",
+                    "courtvisionRating": "Rating",
+                    "ratingStatus": "Status",
+                    "ratingReliability": "Reliability",
+                    "seasonNetWPA": "Season Value",
+                    "seasonValueRank": "Value Rank",
+                }
+            )
+        )
+
+        leaderboard[
+            "Rank"
+        ] = leaderboard[
+            "Rank"
+        ].map(
+            lambda value: f"#{int(value)}"
+        )
+
+        leaderboard[
+            "Value Rank"
+        ] = leaderboard[
+            "Value Rank"
+        ].map(
+            lambda value: f"#{int(value)}"
+        )
+
+        leaderboard[
+            "Rating"
+        ] = leaderboard[
+            "Rating"
+        ].map(
+            lambda value: f"{float(value):.1f}"
+        )
+
+        leaderboard[
+            "Reliability"
+        ] = leaderboard[
+            "Reliability"
+        ].map(
+            lambda value: f"{float(value):.0%}"
+        )
+
+        leaderboard[
+            "Season Value"
+        ] = leaderboard[
+            "Season Value"
+        ].map(
+            lambda value: f"{float(value):+.2f}"
+        )
+
+        st.dataframe(
+            leaderboard,
+            hide_index=True,
+            width="stretch",
+            height=560,
+        )
+
+        st.caption(
+            "Provisional ratings remain meaningfully "
+            "sample-adjusted. Qualified status requires at "
+            "least 10 games and 60% reliability."
+        )
+
+    with explorer_tab:
+        player_options = (
+            ratings
+            .sort_values(
+                [
+                    "leaderboardEligible",
+                    "courtvisionRank",
+                    "courtvisionRating",
+                ],
+                ascending=[
+                    False,
+                    True,
+                    False,
+                ],
+                na_position="last",
+            )
+            [
+                "playerName"
+            ]
+            .tolist()
+        )
+
+        selected_player = st.selectbox(
+            "Player",
+            player_options,
+            key="courtvision_player_intelligence_player",
+        )
+
+        player = (
+            ratings.loc[
+                ratings[
+                    "playerName"
+                ]
+                == selected_player
+            ]
+            .iloc[0]
+        )
+
+        rank_label = (
+            f"#{int(player['courtvisionRank'])}"
+            if pd.notna(player["courtvisionRank"])
+            else "Not ranked"
+        )
+
+        st.markdown(
+            f"### {player['playerName']} · {player['currentTeam']}"
+        )
+
+        st.caption(
+            f"{player['ratingStatus']} · {rank_label}"
+        )
+
+        player_col_1, player_col_2, player_col_3, player_col_4 = (
+            st.columns(4)
+        )
+
+        with player_col_1:
+            st.metric(
+                "Courtvision Rating",
+                f"{float(player['courtvisionRating']):.1f}",
+            )
+
+        with player_col_2:
+            st.metric(
+                "Season Value",
+                f"{float(player['seasonNetWPA']):+.2f}",
+            )
+
+        with player_col_3:
+            st.metric(
+                "Games",
+                f"{int(player['games'])}",
+            )
+
+        with player_col_4:
+            st.metric(
+                "Reliability",
+                f"{float(player['ratingReliability']):.0%}",
+            )
+
+        if player["ratingStatus"] == "Limited":
+            st.warning(
+                "This estimate is based on fewer than three "
+                "games and is intentionally excluded from the "
+                "leaderboard."
+            )
+
+
+
+
+def run_season_intelligence():
+    if intelligence_view == "Players":
+        render_player_intelligence(
+            season
+        )
+
+    else:
+        render_season_intelligence(
+            season
+        )
 
 
 
