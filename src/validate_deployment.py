@@ -143,6 +143,10 @@ def validate_published_app(entrypoint="dashboard/app.py"):
             card.click().run()
             check_render(app)
             require(app.slider[0].value == swings[0][1], "Turning-point card missed its exact event")
+            require(any("Selected-event win probability" in text.value for text in app.markdown),
+                    "Replay must expose selected probabilities outside the chart")
+            labels = [button.label for button in app.button if str(button.key).startswith(f"replay_card_{game_id}_")]
+            require(len(labels) == len(set(labels)), "Turning-point buttons need distinct accessible labels")
         require(any("full-game" in caption.value.lower() for caption in app.caption),
                 "Replay must disclose full-game precomputation")
         app.sidebar.radio(key="courtvision_season_intelligence_view").set_value("Player Career").run()

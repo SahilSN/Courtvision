@@ -17,11 +17,17 @@ Automated checks in `src/validate_deployment.py`:
 - No feed requests or subprocess/worker launches occur in these flows.
 - Frozen V7 artifacts still load and infer on CPU; no formula changes.
 
-Local regression suite: 87 tests. These are functional checks, not a performance,
+Local regression suite: 88 tests. These are functional checks, not a performance,
 security, accessibility, cross-browser, or load-test certification. Simulated
 failure states are not changes to actual published health.
 
-Before widening the beta: gather feedback from explicitly authorized testers,
-check keyboard/screen-reader accessibility and a second mobile browser, measure
+Replay accessibility improvements: chart legend sits above the plot with reserved
+axis-title space; solid/dashed named lines supplement color; selected-event score,
+play and probabilities appear as text; slider help documents keyboard controls;
+turning-point buttons have distinct play-number/clock labels. Automated checks
+cover these semantics, chart placement and unchanged plotted values.
+
+Tester feedback is deferred at the user's request; no invitations are sent.
+Before widening the beta: check a real screen reader and a second mobile browser, measure
 cold/warm load times, and complete the remaining historical player backfill.
 Career totals remain covered-archive totals, not complete NBA career totals.

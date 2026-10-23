@@ -4,10 +4,10 @@ import pandas as pd
 
 from replay_collection import clock_label, final_label, load_collection
 from replay_exploration import game_overview, replay_bookmarks, set_replay_event
+from replay_chart import build_replay_chart
 
 
 def render_replay_view():
-    import plotly.graph_objects as go
     import streamlit as st
 
     st.subheader("Historical Replay · Collection")
@@ -42,21 +42,18 @@ def render_replay_view():
                           on_click=set_replay_event, args=(selected, swings[swing][1]))
         if len(swings) != len(data["turningPoints"]):
             st.caption("Only uniquely matched turning points are offered as jumps.")
-    index = st.slider("Inspect timeline event", 0, len(timeline) - 1, len(timeline) - 1, key=f"replay_event_{selected}")
+    index = st.slider("Inspect timeline event", 0, len(timeline) - 1, len(timeline) - 1, key=f"replay_event_{selected}",
+                      help="Keyboard: arrow keys move between events; Home and End select the first and last events. Full-game spoilers remain visible.")
     row = timeline.iloc[index]
     period = int(row.period)
     label = f"Q{period}" if period <= 4 else f"OT{period - 4}"
     st.caption(f"{label} · {clock_label(row.clock)} · {away['tricode']} {int(row.scoreAway)} – {home['tricode']} {int(row.scoreHome)}")
     st.write(str(row.description))
-    chart = go.Figure()
-    for name, values, color in [(home["tricode"], timeline.winProbability * 100, "#58A6FF"),
-                                (away["tricode"], (1 - timeline.winProbability) * 100, "#F5B841")]:
-        chart.add_trace(go.Scatter(x=timeline.elapsedGameTime / 60, y=values, name=name, line=dict(color=color, width=2),
-            hovertemplate="%{x:.1f} min · %{y:.1f}%<extra>%{fullData.name}</extra>"))
-    chart.add_vline(x=float(row.elapsedGameTime) / 60, line_dash="dot")
-    chart.update_layout(height=350, margin=dict(l=10, r=10, t=20, b=10), xaxis_title="Elapsed minutes",
-                        yaxis_title="Win probability (%)", yaxis_range=[0, 100], legend=dict(orientation="h"))
-    st.plotly_chart(chart, width="stretch")
+    st.write(f"Selected-event win probability: {home['tricode']} {float(row.winProbability):.1%}; "
+             f"{away['tricode']} {1 - float(row.winProbability):.1%}.")
+    st.caption(f"Chart key: {home['tricode']} solid blue; {away['tricode']} dashed gold. "
+               "The text above gives the selected score and probabilities without relying on chart color or hover.")
+    st.plotly_chart(build_replay_chart(data, timeline, index), width="stretch")
     turning, impact, box = st.tabs(["Turning Points", "Player Impact", "Box Score"])
     with turning:
         st.caption("Cached full-game swings. Signed changes are from the home team's perspective.")
@@ -67,7 +64,7 @@ def render_replay_view():
                 st.caption(f"{home['tricode']} win probability change: {point['Home probability change (pp)']:+.2f} percentage points")
                 match = next((index for text, index in swings if text.startswith(f"{number}. ")), None)
                 if match is not None:
-                    st.button("Inspect this play", key=f"replay_card_{selected}_{number}",
+                    st.button(f"Inspect play {number} · P{point['Period']} {clock_label(point['Clock'])}", key=f"replay_card_{selected}_{number}",
                               on_click=set_replay_event, args=(selected, match))
     with impact:
         st.caption("Frozen attributed full-game WPA in percentage points—not wins added or a causal estimate.")
