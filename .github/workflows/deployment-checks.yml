@@ -10,6 +10,7 @@ on:
       - 'models/**'
       - 'results/player_intelligence/**'
       - 'results/season_intelligence/**'
+      - 'results/replay_pilot/**'
       - 'requirements.txt'
       - 'requirements-deployment.txt'
       - '.github/workflows/deployment-checks.yml'
