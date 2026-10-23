@@ -718,6 +718,8 @@ python -m compileall -q src dashboard
 
 The live-season updater supports both regular-season production use and isolated preseason testing.
 
+The repository runs the production updater automatically through GitHub Actions. In `America/Los_Angeles` time it runs hourly from 4:00 PM through 11:00 PM, plus a 1:00 AM nightly catch-up. The workflow rebuilds the current-season state, validates the output, and commits the two dashboard Season Intelligence artifacts only when completed games changed them. It can also be run manually from the Actions tab.
+
 Regular-season production is the default:
 
 ```bash

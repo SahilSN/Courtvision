@@ -1,0 +1,64 @@
+name: Update Season Intelligence
+
+on:
+  schedule:
+    - cron: "0 16-23 * * *"
+      timezone: "America/Los_Angeles"
+    - cron: "0 1 * * *"
+      timezone: "America/Los_Angeles"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-season-intelligence
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out Courtvision
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: requirements-updater.txt
+
+      - name: Install updater dependencies
+        run: python -m pip install -r requirements-updater.txt
+
+      - name: Update current-season artifacts
+        env:
+          PYTHONPATH: src
+        run: python src/update_live_season.py
+
+      - name: Validate early-season intelligence
+        env:
+          PYTHONPATH: src
+        run: python -m unittest src/test_early_season_intelligence.py
+
+      - name: Check generated diff
+        run: git diff --check
+
+      - name: Commit updated artifacts
+        run: |
+          git add \
+            results/season_intelligence/2026-27_team_rating_games_v1.csv \
+            results/season_intelligence/2026-27_team_summary_v1.csv
+
+          if git diff --cached --quiet; then
+            echo "No new completed games to publish."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "update 2026-27 season intelligence"
+          git push
