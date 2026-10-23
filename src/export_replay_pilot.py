@@ -6,11 +6,12 @@ from pathlib import Path
 
 from player_rating_dataset import load_cached_box_players, load_wpa_summary
 from published_replay import PILOT_PATH, load_replay
+from nba_api.stats.static import teams
+from replay_collection import GAME_IDS, load_collection
 
 
-def main():
+def export_game(game_id):
     root = Path(__file__).resolve().parents[1]
-    game_id = "0022500001"
     with (root / f"data/cache/analysis/v1_v7/2025-26_{game_id}_top3.pkl").open("rb") as handle:
         cached = pickle.load(handle)
     result = cached["result"]
@@ -22,25 +23,36 @@ def main():
     if box is None:
         raise ValueError("Missing offline box score")
     impact = load_wpa_summary(game_id)
+    names = {team["id"]: team["abbreviation"] for team in teams.get_teams()}
+    home, away = names[result["home_team_id"]], names[result["away_team_id"]]
+    if not box.gameId.astype(str).str.zfill(10).eq(game_id).all():
+        raise ValueError("Wrong box-score identity")
     swings = []
     for side in ("home", "away"):
         for _, row in result[f"{side}_swings"].iterrows():
-            swings.append({"Side": "OKC" if side == "home" else "HOU", "Period": int(row.period),
+            swings.append({"Side": home if side == "home" else away, "Period": int(row.period),
                            "Clock": row.clock, "Play": row.description,
                            "Home probability change (pp)": round(float(row.probabilityChange) * 100, 2)})
     data = {"schemaVersion": 1, "model": "Frozen V7", "gameId": game_id, "season": "2025-26",
-            "date": result["game_date"], "home": {"tricode": "OKC", "score": result["final_home_score"]},
-            "away": {"tricode": "HOU", "score": result["final_away_score"]},
+            "date": result["game_date"], "home": {"tricode": home, "score": result["final_home_score"]},
+            "away": {"tricode": away, "score": result["final_away_score"]},
             "timeline": json.loads(timeline.to_json(orient="records", double_precision=15)),
             "turningPoints": swings,
             "playerImpact": json.loads(impact[["playerName", "teamTricode", "events", "netWPAPoints"]].to_json(orient="records")),
             "boxScore": json.loads(box[["fullName", "teamTricode", "minutesDisplay", "points", "reboundsTotal", "assists", "steals", "blocks", "turnovers"]].to_json(orient="records"))}
     PILOT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    temporary = PILOT_PATH.with_suffix(".json.tmp")
+    destination = PILOT_PATH.parent / f"{game_id}.json"
+    temporary = destination.with_suffix(".json.tmp")
     temporary.write_text(json.dumps(data, allow_nan=False, separators=(",", ":")) + "\n")
     load_replay(temporary)
-    temporary.replace(PILOT_PATH)
-    print(f"Validated offline replay: {PILOT_PATH} ({PILOT_PATH.stat().st_size:,} bytes)")
+    temporary.replace(destination)
+    print(f"Validated offline replay: {destination} ({destination.stat().st_size:,} bytes)")
+
+
+def main():
+    for game_id in GAME_IDS:
+        export_game(game_id)
+    load_collection()
 
 
 if __name__ == "__main__":

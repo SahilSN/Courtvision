@@ -1023,8 +1023,11 @@ the current season; the dashboard performs no historical backfill itself.
 
 ### Later exploration
 
-The private beta includes one read-only Replay Pilot: HOU at OKC, October21,
-2025 (125–124,2OT). Its checked-in JSON contains the existing frozen V7 timeline,
+The private beta's Replay Pilot includes four curated games: HOU@OKC (Oct21,
+2025,125–124,2OT), CLE@NYK (Dec25,2025,126–124), PHX@MIN (Dec8,2025,108–105),
+and OKC@HOU (Jan15,2026,111–91). A game picker switches the timeline and panels;
+each game's slider and box-team selection have independent state. Readable clocks
+and final/overtime labels reflect the selected game. Checked-in JSON contains the existing frozen V7 timeline,
 turning points, full-game player WPA, and cached box score. Both box-score point
 totals reconcile to the final timeline. `src/export_replay_pilot.py` is a local,
 offline build step from trusted caches; hosted requests only parse JSON and

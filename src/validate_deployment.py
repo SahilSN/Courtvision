@@ -121,13 +121,19 @@ def validate_published_app(entrypoint="dashboard/app.py"):
 
         app.sidebar.radio(key="courtvision_season_intelligence_view").set_value("Replay Pilot").run()
         check_render(app)
-        app.slider[0].set_value(0).run()
-        check_render(app)
+        from replay_collection import GAME_IDS
+        for game_id in GAME_IDS:
+            app.selectbox(key="published_replay_game").set_value(game_id).run()
+            check_render(app)
+            app.slider[0].set_value(0).run()
+            check_render(app)
+            app.slider[0].set_value(app.slider[0].max).run()
+            check_render(app)
         require(any("full-game" in caption.value.lower() for caption in app.caption),
                 "Replay must disclose full-game precomputation")
         app.sidebar.radio(key="courtvision_season_intelligence_view").set_value("Player Career").run()
         check_render(app)
-        print("PASS: offline replay pilot, first-event inspection, and return to career")
+        print("PASS: all four offline replays, first/final event inspection, and return to career")
 
         second = AppTest.from_file(str(entrypoint_path), default_timeout=90).run()
         check_render(second)

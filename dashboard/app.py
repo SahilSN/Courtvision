@@ -813,7 +813,7 @@ mode = st.sidebar.radio(
 
 if DEPLOYMENT_PROFILE == "published":
     st.sidebar.info(
-        "Published beta · Team and Player Intelligence plus one precomputed replay pilot. "
+        "Published beta · Team and Player Intelligence plus four curated offline replays. "
         "Live games and unrestricted replay are not enabled. "
         "Historical player coverage may be partial."
     )
@@ -12742,8 +12742,8 @@ def render_career_season_comparison(summaries, coverage, person_id, season_optio
 
 def run_season_intelligence():
     if intelligence_view == "Replay Pilot":
-        from published_replay import render_replay
-        render_replay()
+        from replay_collection import render_replay_collection
+        render_replay_collection()
         return
     if intelligence_view == "Player Career":
         render_player_career()
