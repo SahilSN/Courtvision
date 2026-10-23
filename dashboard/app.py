@@ -12742,8 +12742,11 @@ def render_career_season_comparison(summaries, coverage, person_id, season_optio
 
 def run_season_intelligence():
     if intelligence_view == "Replay Pilot":
-        from replay_view import render_replay_view
-        render_replay_view()
+        # The dashboard itself is loaded through runpy on Community Cloud.
+        # Give its UI renderer a fresh namespace too, avoiding stale imported
+        # screen functions after a hot deployment. Models/data are not reloaded.
+        import runpy
+        runpy.run_path(str(SRC_DIR / "replay_view.py"))["render_replay_view"]()
         return
     if intelligence_view == "Player Career":
         render_player_career()

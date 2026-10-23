@@ -27,6 +27,12 @@ play and probabilities appear as text; slider help documents keyboard controls;
 turning-point buttons have distinct play-number/clock labels. Automated checks
 cover these semantics, chart placement and unchanged plotted values.
 
+Sampled rendered dark-theme contrast against RGB(14,17,23): body text18.11:1,
+60%-opacity captions6.94:1, blue trace7.48:1, gold trace10.63:1. These sampled
+colors are not a whole-app contrast audit or a screen-reader certification.
+The replay UI executes in an isolated namespace on each rerun so renderer-only
+hot deployments do not require interrupting users to restart the host.
+
 Tester feedback is deferred at the user's request; no invitations are sent.
 Before widening the beta: check a real screen reader and a second mobile browser, measure
 cold/warm load times, and complete the remaining historical player backfill.

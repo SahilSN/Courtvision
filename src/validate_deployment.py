@@ -154,7 +154,7 @@ def validate_published_app(entrypoint="dashboard/app.py"):
         print("PASS: all four offline replays, first/final event inspection, and return to career")
 
         app.sidebar.radio(key="courtvision_season_intelligence_view").set_value("Replay Pilot").run()
-        with patch("replay_view.load_collection", side_effect=FileNotFoundError("missing artifact")):
+        with patch("replay_collection.load_collection", side_effect=FileNotFoundError("missing artifact")):
             app.run()
             require(not app.exception and bool(app.error), "Missing replay must show a recoverable error")
         app.sidebar.radio(key="courtvision_season_intelligence_view").set_value("Teams").run()
