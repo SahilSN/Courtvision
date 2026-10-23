@@ -1,5 +1,7 @@
 # Community Cloud discovers requirements alongside its entry point.
---extra-index-url https://download.pytorch.org/whl/cpu
 -r ../requirements-deployment.txt
-# Avoid installing the large CUDA runtime on Community Cloud's Linux CPU host.
-torch==2.11.0+cpu ; sys_platform == 'linux'
+# Direct official wheel avoids uv's multi-index ambiguity without weakening its
+# dependency-confusion protections. Target: Community Cloud, CPython 3.12 x86-64.
+torch @ https://download-r2.pytorch.org/whl/cpu/torch-2.11.0%2Bcpu-cp312-cp312-manylinux_2_28_x86_64.whl#sha256=f82e2ae20c1545bb03997d1cc3143d94e14b800038669ee1aca45808a9acc338 ; sys_platform == 'linux' and platform_machine == 'x86_64' and python_version == '3.12' and implementation_name == 'cpython'
+# Match Community Cloud's runtime safety replacement for the Arrow 25 series.
+pyarrow==24.0.0

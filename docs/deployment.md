@@ -36,7 +36,7 @@ PYTHONPATH=src .venv/bin/python -m unittest discover -s src -p 'test_*.py'
 
 The Deployment checks workflow performs a clean Python 3.12 installation on
 Linux and macOS and executes these regressions. The Linux job installs the pinned
-PyTorch CPU build from the official PyTorch CPU wheel index before requirements.
+PyTorch CPU artifact referenced by `cloud/requirements.txt`.
 The SciPy wheel workaround and loader error are documented in the
 [upstream issue](https://github.com/scipy/scipy/issues/25635) and the official
 [release artifact listing](https://pypi.org/project/scipy/1.15.3/).
@@ -90,6 +90,23 @@ COURTVISION_CLOUD_READY = "1"
 Do not commit secrets files. Do not copy GitHub tokens or Mac scheduler credentials
 to this app; it reads committed artifacts and does not run the updater.
 The setup notice is expected until that readiness flag is explicitly enabled.
+
+The cloud requirements use a hash-pinned official CPU wheel rather than adding a
+second package index, so Community Cloud's uv resolver does not shadow unrelated
+PyPI packages. Arrow is pinned to 24.0.0, matching the host's safety replacement
+for the Arrow 25 series observed during deployment. Community Cloud also manages
+its own pip/certificate-package updates; its final environment can differ from
+the local environment despite direct dependency pins.
+
+Staging was deployed on October 23, 2026 at
+<https://bucpjmvcsl28fxcedurbyj.streamlit.app/>. Sharing is restricted to specific
+people, with no additional viewer invitations sent. A fresh unauthenticated
+HTTP session followed redirects through Streamlit authentication before the
+setup latch was enabled. Team, Player, and Career views were verified in the
+signed-in browser. This is staging, not a public production release.
+
+The app tracks `main`. Git-triggered updates are configured by Community Cloud;
+the first real overnight data publication still requires end-to-end confirmation.
 
 Offline cloud-wrapper regression:
 
