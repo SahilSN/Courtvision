@@ -129,6 +129,16 @@ def validate_published_app(entrypoint="dashboard/app.py"):
             check_render(app)
             app.slider[0].set_value(app.slider[0].max).run()
             check_render(app)
+            from replay_exploration import replay_bookmarks
+            from replay_collection import load_collection
+            data, timeline = load_collection()[game_id]
+            periods, swings = replay_bookmarks(data, timeline)
+            app.button(key=f"replay_jump_period_{game_id}").click().run()
+            check_render(app)
+            require(app.slider[0].value == periods[0][1], "Period jump missed its exact event")
+            app.button(key=f"replay_jump_swing_{game_id}").click().run()
+            check_render(app)
+            require(app.slider[0].value == swings[0][1], "Turning-point jump missed its exact event")
         require(any("full-game" in caption.value.lower() for caption in app.caption),
                 "Replay must disclose full-game precomputation")
         app.sidebar.radio(key="courtvision_season_intelligence_view").set_value("Player Career").run()

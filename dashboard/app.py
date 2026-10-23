@@ -12742,8 +12742,8 @@ def render_career_season_comparison(summaries, coverage, person_id, season_optio
 
 def run_season_intelligence():
     if intelligence_view == "Replay Pilot":
-        from replay_collection import render_replay_collection
-        render_replay_collection()
+        from replay_exploration import render_explorable_replays
+        render_explorable_replays()
         return
     if intelligence_view == "Player Career":
         render_player_career()

@@ -1035,6 +1035,12 @@ render it. The timeline slider is inspection, not spoiler-free playback: all
 other panels remain full-game summaries. Live feeds and unrestricted historical
 analysis remain disabled on the published profile.
 
+Below each replay, Game overview & quick jumps summarizes the final margin,
+overtime and largest recorded leads. Period jumps select that period's first
+recorded event; turning-point jumps require a unique exact period/clock/play
+match and never guess a nearby play. Both controls update the timeline marker
+above. They do not hide full-game spoilers or recalculate any model output.
+
 Player Explorer links directly to the same player's Career profile, and Career
 can open any covered season directly in Player Explorer. Searchable player
 pickers include team labels. Career profiles summarize complete versus partial
