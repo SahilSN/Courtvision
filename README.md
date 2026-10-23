@@ -864,10 +864,14 @@ regular-season games, retains failed games for a later retry, and publishes the
 
 Open Season Intelligence → Players for current-season coverage and sample
 progress. The leaderboard appears once players reach three games; Player
-Explorer shows rating, cumulative Season Value, status, and reliability.
+Explorer is available even before leaderboard eligibility and shows rating,
+cumulative Season Value, status, and reliability. Its rating trend reconstructs
+the frozen v1 estimate after each processed appearance using only games up to
+that date. The game log includes matchup, minutes, game WPA, cumulative Season
+Value, rating, status, and reliability, with last-10, last-20, and full-log views.
 Historical player samples remain research datasets rather than full-season
-leaderboards. Further work includes broader historical coverage and richer
-player game logs and trends.
+leaderboards. Further work includes broader historical coverage and player
+comparisons.
 
 ### Later exploration
 

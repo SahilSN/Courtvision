@@ -170,6 +170,41 @@ def build_player_ratings(
     return result
 
 
+def build_player_rating_history(dataset, person_id):
+    """Reconstruct each post-game estimate using only appearances up to that game."""
+    if dataset["season"].nunique() != 1:
+        raise ValueError("Player history requires exactly one season.")
+
+    history = dataset.loc[dataset["personId"].eq(person_id)].copy()
+    history["gameDate"] = pd.to_datetime(history["gameDate"], errors="raise")
+    history["gameId"] = history["gameId"].astype(str).str.zfill(10)
+    history = history.sort_values(
+        ["gameDate", "gameId"], kind="mergesort"
+    ).reset_index(drop=True)
+    if history["gameId"].duplicated().any():
+        raise ValueError("Duplicate player appearances in rating history.")
+
+    history["games"] = np.arange(1, len(history) + 1)
+    history["cumulativeMinutes"] = history["minutes"].cumsum()
+    history["seasonNetWPA"] = history["netWPA"].cumsum()
+    history["ratingReliability"] = history["cumulativeMinutes"] / (
+        history["cumulativeMinutes"] + REFERENCE_PRIOR_MINUTES
+    )
+    posterior_per_36 = (
+        history["seasonNetWPA"]
+        + REFERENCE_PRIOR_MINUTES * REFERENCE_NET_WPA_PER_36 / 36.0
+    ) / (history["cumulativeMinutes"] + REFERENCE_PRIOR_MINUTES) * 36.0
+    history["courtvisionRating"] = (
+        100.0 + RATING_POINTS_PER_REFERENCE
+        * (posterior_per_36 / REFERENCE_NET_WPA_PER_36 - 1.0)
+    ).round(1)
+    history["ratingStatus"] = [
+        rating_status(games, reliability)
+        for games, reliability in zip(history["games"], history["ratingReliability"])
+    ]
+    return history
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description=(

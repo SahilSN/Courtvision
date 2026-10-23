@@ -4,6 +4,7 @@ import pandas as pd
 
 from player_rating import (
     build_player_ratings,
+    build_player_rating_history,
 )
 
 
@@ -106,6 +107,42 @@ class PlayerRatingTest(unittest.TestCase):
             "exactly one season",
         ):
             build_player_ratings(dataset)
+
+    def test_history_matches_every_prefix_of_frozen_rating(self):
+        dataset = self.dataset.copy()
+        dataset.loc[dataset["personId"].eq(2), "netWPA"] = [
+            0.5, -0.3, 0.1, 0.9, -0.8, 0.3, 0.2, -0.1, 0.4, 0.7
+        ]
+        history = build_player_rating_history(dataset.sample(frac=1, random_state=4), 2)
+        for row in history.itertuples():
+            prefix = dataset.loc[pd.to_datetime(dataset["gameDate"]).le(row.gameDate)]
+            expected = build_player_ratings(prefix).set_index("personId").loc[2]
+            self.assertEqual(row.courtvisionRating, expected["courtvisionRating"])
+            self.assertAlmostEqual(row.seasonNetWPA, expected["seasonNetWPA"])
+            self.assertAlmostEqual(row.ratingReliability, expected["ratingReliability"])
+            self.assertEqual(row.ratingStatus, expected["ratingStatus"])
+        self.assertEqual(history["ratingStatus"].iloc[0], "Limited")
+        self.assertEqual(history["ratingStatus"].iloc[2], "Provisional")
+        self.assertEqual(history["ratingStatus"].iloc[-1], "Qualified")
+
+    def test_history_preserves_team_changes_and_missing_player(self):
+        dataset = self.dataset.copy()
+        dataset.loc[dataset["gameDate"].ge("2025-11-05"), "teamTricode"] = "CCC"
+        history = build_player_rating_history(dataset, 1)
+        self.assertEqual(history["teamTricode"].iloc[0], "AAA")
+        self.assertEqual(history["teamTricode"].iloc[-1], "CCC")
+        self.assertEqual(history["games"].iloc[-1], 10)
+        self.assertTrue(build_player_rating_history(dataset, 9999).empty)
+
+    def test_history_rejects_duplicates_and_mixed_seasons(self):
+        with self.assertRaisesRegex(ValueError, "Duplicate"):
+            build_player_rating_history(
+                pd.concat([self.dataset, self.dataset.iloc[[0]]]), 1
+            )
+        dataset = self.dataset.copy()
+        dataset.loc[0, "season"] = "2024-25"
+        with self.assertRaisesRegex(ValueError, "exactly one season"):
+            build_player_rating_history(dataset, 1)
 
 
 if __name__ == "__main__":

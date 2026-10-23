@@ -112,6 +112,8 @@ from season_config import (
 
 )
 
+from player_rating import build_player_rating_history
+
 
 
 from live_analysis import (
@@ -12090,6 +12092,7 @@ def render_player_intelligence(
             "not ranked. This page will update automatically "
             "as completed games are published."
         )
+        render_player_explorer(ratings, games, season)
         return
 
     leaderboard_tab, explorer_tab = st.tabs(
@@ -12191,6 +12194,11 @@ def render_player_intelligence(
         )
 
     with explorer_tab:
+        render_player_explorer(ratings, games, season)
+
+
+def render_player_explorer(ratings, games, season):
+    with st.container():
         player_options = (
             ratings
             .sort_values(
@@ -12207,21 +12215,26 @@ def render_player_intelligence(
                 na_position="last",
             )
             [
-                "playerName"
+                "personId"
             ]
             .tolist()
         )
 
+        players_by_id = ratings.set_index("personId")
         selected_player = st.selectbox(
             "Player",
             player_options,
-            key="courtvision_player_intelligence_player",
+            format_func=lambda person_id: (
+                players_by_id.loc[person_id, "playerName"]
+                + " · " + players_by_id.loc[person_id, "currentTeam"]
+            ),
+            key=f"courtvision_player_intelligence_player_{season}",
         )
 
         player = (
             ratings.loc[
                 ratings[
-                    "playerName"
+                    "personId"
                 ]
                 == selected_player
             ]
@@ -12276,6 +12289,60 @@ def render_player_intelligence(
                 "games and is intentionally excluded from the "
                 "leaderboard."
             )
+
+        history = build_player_rating_history(games, selected_player)
+        if history.empty:
+            st.info("No processed game log is available for this player yet.")
+            return
+
+        st.markdown("#### Rating Trend")
+        if len(history) == 1:
+            st.caption("One completed appearance: a trend will develop after more games.")
+        st.caption(
+            "Each point uses only games processed up to that date. "
+            "Missing games may be filled by a later update. Reliability measures "
+            "sample weight, not the probability that a rating is correct."
+        )
+        chart = go.Figure(go.Scatter(
+            x=history["gameDate"],
+            y=history["courtvisionRating"],
+            mode="lines+markers",
+            name="Courtvision Rating",
+            customdata=history[["opponentTricode", "ratingStatus", "seasonNetWPA"]],
+            hovertemplate=(
+                "%{x|%b %d, %Y}<br>Rating: %{y:.1f}"
+                "<br>Opponent: %{customdata[0]}<br>Status: %{customdata[1]}"
+                "<br>Season Value: %{customdata[2]:+.2f}<extra></extra>"
+            ),
+        ))
+        chart.add_hline(y=100, line_dash="dash", opacity=0.45,
+                        annotation_text="Historical reference")
+        chart.update_layout(height=350, xaxis_title=None, yaxis_title="Rating",
+                            margin=dict(l=20, r=20, t=30, b=20))
+        st.plotly_chart(chart, width="stretch")
+
+        st.markdown("#### Game Log")
+        scope = st.selectbox("Games shown", ["Last 10", "Last 20", "All Games"],
+                             key=f"courtvision_player_log_scope_{season}")
+        log = history if scope == "All Games" else history.tail(int(scope.split()[1]))
+        log = log.iloc[::-1].copy()
+        log["Date"] = log["gameDate"].dt.strftime("%b %d, %Y")
+        log["Matchup"] = np.where(log["isHome"].eq(1), "vs ", "@ ") + log["opponentTricode"]
+        log["Result"] = np.where(log["teamWin"].eq(1), "W", "L")
+        log = log.rename(columns={
+            "teamTricode": "Team", "minutes": "Minutes", "netWPA": "Game WPA",
+            "seasonNetWPA": "Season Value", "courtvisionRating": "Rating After",
+            "ratingStatus": "Status", "ratingReliability": "Reliability",
+        })
+        for column in ["Game WPA", "Season Value"]:
+            log[column] = log[column].map(lambda value: f"{value:+.2f}")
+        for column in ["Minutes", "Rating After"]:
+            log[column] = log[column].map(lambda value: f"{value:.1f}")
+        log["Reliability"] = log["Reliability"].map(lambda value: f"{value:.0%}")
+        st.dataframe(log[["Date", "Team", "Matchup", "Result", "Minutes", "Game WPA",
+                          "Season Value", "Rating After", "Status", "Reliability"]],
+                     hide_index=True, width="stretch")
+        st.caption("Game WPA and Season Value are attributed win-probability impact, not wins added.")
 
 
 
