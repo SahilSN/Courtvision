@@ -1,29 +1,29 @@
 {
   "season": "2026-27",
-  "checkedAt": "2026-10-23T06:02:15.529126+00:00",
-  "sourceError": null,
+  "checkedAt": "2026-10-23T06:04:03.480852+00:00",
+  "sourceError": "HTTPSConnectionPool(host='stats.nba.com', port=443): Read timed out. (read timeout=30)",
   "pipelines": {
     "teams": {
-      "status": "success",
-      "checkedAt": "2026-10-23T06:02:15.529126+00:00",
+      "status": "failed",
+      "checkedAt": "2026-10-23T06:04:03.480852+00:00",
       "lastSuccessfulCheckAt": "2026-10-23T06:02:15.529126+00:00",
       "gamesThrough": "2026-10-22",
       "processedGames": 16,
-      "completedGames": 16,
-      "pendingGameIds": [],
+      "completedGames": null,
+      "pendingGameIds": null,
       "failures": [],
-      "error": null
+      "error": "HTTPSConnectionPool(host='stats.nba.com', port=443): Read timed out. (read timeout=30)"
     },
     "players": {
-      "status": "success",
-      "checkedAt": "2026-10-23T06:02:15.529126+00:00",
+      "status": "failed",
+      "checkedAt": "2026-10-23T06:04:03.480852+00:00",
       "lastSuccessfulCheckAt": "2026-10-23T06:02:15.529126+00:00",
       "gamesThrough": "2026-10-22",
       "processedGames": 16,
-      "completedGames": 16,
-      "pendingGameIds": [],
+      "completedGames": null,
+      "pendingGameIds": null,
       "failures": [],
-      "error": null
+      "error": "HTTPSConnectionPool(host='stats.nba.com', port=443): Read timed out. (read timeout=30)"
     }
   }
 }
