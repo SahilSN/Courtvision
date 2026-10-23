@@ -116,6 +116,7 @@ from player_rating import build_player_rating_history
 from player_career import build_player_career, load_published_player_data, season_coverage
 from update_intelligence import load_update_status
 from deployment_config import get_deployment_profile, navigation_modes
+from intelligence_health import backfill_health
 
 DEPLOYMENT_PROFILE = get_deployment_profile()
 
@@ -11947,6 +11948,13 @@ def render_season_intelligence(
 
 def render_intelligence_freshness(season, pipeline):
     if season != CURRENT_SEASON:
+        if pipeline == "players":
+            if DEPLOYMENT_PROFILE == "published":
+                st.caption("Published archive · coverage below reflects this deployment. "
+                           "New checkpoints appear at backfill milestones and season completion; "
+                           "Mac worker status is available only in the local app.")
+            else:
+                st.caption(backfill_health(ROOT_DIR))
         return
     status_path = (
         ROOT_DIR / "results" / "season_intelligence" / f"{season}_update_status_v1.json"

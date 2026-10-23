@@ -985,6 +985,30 @@ data is not reported fully complete while its final upload is pending. The
 nightly current-season schedule and all rating/model formulas are unchanged.
 This is a Mac worker, not a new cloud or ChatGPT schedule.
 
+For historical backfill recovery after login/reboot or a failed worker, install
+the separate finite-task LaunchAgent after stopping any manually started worker:
+
+```bash
+.venv/bin/python src/install_macos_backfill.py
+```
+
+It starts at login, resumes saved checkpoints, restarts unsuccessful exits with
+a five-minute throttle, and stops after successful completion. It does not run
+while the Mac is asleep, powered off, or logged out, and does not change the
+once-nightly current-season updater. Logs rotate at 2 MB (three backups) in
+`results/player_intelligence/.runtime/backfill.log`. Runner locks prevent overlap.
+To stop and disable this finite task:
+
+```bash
+launchctl bootout gui/$(id -u)/com.courtvision.historical-backfill
+launchctl disable gui/$(id -u)/com.courtvision.historical-backfill
+```
+
+The local historical Player Intelligence page distinguishes running, waiting for
+source retries, pending uploads, stopped, and completed states. The hosted beta
+shows published coverage, not guessed Mac liveness. Current-season freshness
+and stale/failed-refresh warnings remain available in both profiles.
+
 ```bash
 PYTHONPATH=src python src/backfill_player_intelligence.py \
   --seasons 2025-26 2024-25 2023-24 2022-23 2021-22 2020-21 2019-20
