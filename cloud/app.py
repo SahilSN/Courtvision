@@ -25,11 +25,15 @@ root = Path(__file__).resolve().parents[1]
 if os.environ.get("COURTVISION_DISABLE_OPERATOR_PROBES") != "1":
     if str(root / "src") not in sys.path:
         sys.path.append(str(root / "src"))
-    from host_live_diagnostic import run_requested_probe
     try:
-        run_requested_probe(root / "cloud/live_probe_request.json", root / "results/.runtime/host-probes")
-    except OSError:
-        print("COURTVISION_HOST_PROBE runtime_unavailable", flush=True)
+        import importlib
+        importlib.invalidate_caches()
+        diagnostic = runpy.run_path(str(root / "src/host_live_diagnostic.py"))
+        diagnostic["run_requested_probe"](root / "cloud/live_probe_request.json", root / "results/.runtime/host-probes")
+    except Exception as error:
+        # Diagnostics are optional and must never block the published dashboard,
+        # including during a hot deployment's transient source-file updates.
+        print("COURTVISION_HOST_PROBE unavailable " + type(error).__name__, flush=True)
 
 runpy.run_path(
     str(Path(__file__).resolve().parents[1] / "dashboard" / "app.py"),

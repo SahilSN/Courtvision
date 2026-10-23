@@ -13,8 +13,8 @@ def run_requested_probe(request_path, runtime, now=None, runner=probe):
     try:
         request = json.loads(Path(request_path).read_text())
         request_id = request["requestId"]
-        issued = datetime.fromisoformat(request["issuedAt"])
-        expires = datetime.fromisoformat(request["expiresAt"])
+        issued = datetime.fromisoformat(request["issuedAt"].replace("Z", "+00:00"))
+        expires = datetime.fromisoformat(request["expiresAt"].replace("Z", "+00:00"))
         day = date.fromisoformat(request["date"]).isoformat()
         if (not re.fullmatch(r"[a-z0-9-]{1,64}", request_id) or issued.tzinfo is None or expires.tzinfo is None
                 or not 0 < (expires - issued).total_seconds() <= 900 or not issued <= now < expires):
