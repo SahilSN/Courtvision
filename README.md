@@ -721,6 +721,27 @@ python -m compileall -q src dashboard
 
 ## Live Season Updates
 
+### Resilient local historical backfill
+
+Run separately from the once-nightly current-season job:
+
+```bash
+PYTHONPATH=src .venv/bin/python -u src/run_historical_backfill.py --seasons 2025-26 2024-25 2023-24 2022-23 2021-22 2020-21 2019-20
+```
+
+The runner checkpoints bounded batches, stops a batch after three consecutive
+failures, and waits 60 seconds between failed rounds, doubling to at most 15
+minutes. Successful rounds reset the delay. Saved games are skipped on resume.
+Ctrl+C checkpoints completed appearances; force-killing or power loss can still
+lose the current uncheckpointed batch, which is reconstructed from caches on
+resume. Separate runner/writer locks prevent overlapping new processes.
+
+Local health is `results/player_intelligence/.runtime/status.json`: coverage,
+last progress, recent failures, and next retry time. `waiting` is not completion.
+Use `--max-rounds 1` for a bounded run. This runner has no scheduler and does not
+publish to GitHub. Validated historical checkpoint publication is still a
+separate step; the hosted beta does not automatically consume local CSV changes.
+
 The live-season updater supports both regular-season production use and isolated preseason testing.
 
 Production updates run once nightly at 1:00 a.m. in the Mac's local timezone,

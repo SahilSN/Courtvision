@@ -54,6 +54,7 @@ data/runtime/
 
 # Runtime state
 results/.runtime/
+results/player_intelligence/.runtime/
 
 # Generated validation/debug outputs
 results/*_validation_failures.csv

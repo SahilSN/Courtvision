@@ -3,6 +3,8 @@
 import argparse
 import contextlib
 import io
+import fcntl
+from pathlib import Path
 
 import pandas as pd
 
@@ -20,7 +22,18 @@ from update_player_intelligence import load_existing_player_games, player_game_p
 
 
 def backfill_season(season, max_new_games=None, cached_only=False,
-                    output_dir=PLAYER_INTELLIGENCE_DIR):
+                    output_dir=PLAYER_INTELLIGENCE_DIR, failure_limit=5):
+    """Serialize writers and always flush successful appearances on interruption."""
+    if failure_limit < 1:
+        raise ValueError("failure_limit must be positive")
+    runtime = Path(output_dir) / ".runtime"
+    runtime.mkdir(parents=True, exist_ok=True)
+    with (runtime / "checkpoint.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return _backfill_season(season, max_new_games, cached_only, output_dir, failure_limit)
+
+
+def _backfill_season(season, max_new_games, cached_only, output_dir, failure_limit):
     team_games = load_game_catalog(season)
     all_games = load_training_games(season)
     expected = set(team_games["gameId"])
@@ -28,6 +41,8 @@ def backfill_season(season, max_new_games=None, cached_only=False,
         raise ValueError(f"Training coverage does not match the full {season} catalog.")
     existing = load_existing_player_games(season, output_dir=output_dir)
     done = set(existing["gameId"])
+    if not done.issubset(expected):
+        raise ValueError("Saved games are outside the regular-season catalog.")
     pending = all_games.loc[~all_games["gameId"].isin(done)]
     if cached_only:
         pending = pending.loc[pending["gameId"].map(
@@ -46,34 +61,44 @@ def backfill_season(season, max_new_games=None, cached_only=False,
             ["gameDate", "gameId", "personId"], kind="mergesort"
         )
         validate_player_game_dataset(dataset)
+        ratings = build_player_ratings(dataset)
         atomic_write_csv(dataset, player_game_path(season, output_dir=output_dir))
-        atomic_write_csv(build_player_ratings(dataset), player_rating_path(season, output_dir=output_dir))
+        atomic_write_csv(ratings, player_rating_path(season, output_dir=output_dir))
 
     print(f"{season}: {len(done)}/{len(expected)} published; {len(pending)} selected", flush=True)
-    for index, game in enumerate(pending.itertuples(index=False), 1):
-        try:
-            if not wpa_is_complete(game.gameId):
-                if season_df is None:
-                    season_df, artifacts = load_season_data(season), load_model()
-                with contextlib.redirect_stdout(io.StringIO()):
-                    analyze_player_impact(game.gameId, season, season_df=season_df,
-                                         model=artifacts[0], scaler=artifacts[1], device=artifacts[2])
-            if not box_cache_path(game.gameId).exists():
-                fetch_and_cache_box_score(game.gameId, retries=1)
-            rows = build_player_game_rows(
-                season, game.gameId, team_games,
-                load_cached_box_players(game.gameId), load_wpa_summary(game.gameId),
-            )
-            validate_player_game_dataset(rows)
-            frames.append(rows)
-            done.add(game.gameId)
-            print(f"{season} [{index}/{len(pending)}] {game.gameId}: OK ({len(done)}/{len(expected)})", flush=True)
-        except Exception as error:
-            failures.append({"gameId": game.gameId, "error": str(error)})
-            print(f"{season} {game.gameId}: retained for retry: {error}", flush=True)
-        if index % 10 == 0:
-            publish()
-    publish()
+    consecutive_failures = 0
+    try:
+        for index, game in enumerate(pending.itertuples(index=False), 1):
+            try:
+                if not wpa_is_complete(game.gameId):
+                    if season_df is None:
+                        season_df, artifacts = load_season_data(season), load_model()
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        analyze_player_impact(game.gameId, season, season_df=season_df,
+                                             model=artifacts[0], scaler=artifacts[1], device=artifacts[2])
+                if not box_cache_path(game.gameId).exists():
+                    fetch_and_cache_box_score(game.gameId, retries=1)
+                rows = build_player_game_rows(
+                    season, game.gameId, team_games,
+                    load_cached_box_players(game.gameId), load_wpa_summary(game.gameId),
+                )
+                validate_player_game_dataset(rows)
+                frames.append(rows)
+                done.add(game.gameId)
+                consecutive_failures = 0
+                print(f"{season} [{index}/{len(pending)}] {game.gameId}: OK ({len(done)}/{len(expected)})", flush=True)
+            except Exception as error:
+                failures.append({"gameId": game.gameId, "error": str(error)})
+                consecutive_failures += 1
+                print(f"{season} {game.gameId}: retained for retry: {error}", flush=True)
+                if consecutive_failures >= failure_limit:
+                    print(f"{season}: circuit open after {failure_limit} consecutive failures", flush=True)
+                    break
+            if index % 10 == 0:
+                publish()
+    finally:
+        # Includes KeyboardInterrupt; completed work must not wait for ten games.
+        publish()
     print(f"{season}: published {len(done)}/{len(expected)} games; {len(failures)} failures", flush=True)
     return failures
 
