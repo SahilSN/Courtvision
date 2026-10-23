@@ -279,11 +279,13 @@ Final/OT
 Final/OT2
 ```
 
-## Preseason Live Validation
+## 2026-27 Regular-Season Live Operation
 
-The 2026-27 live pipeline is currently configured for preseason system validation.
+Courtvision's canonical current-season configuration is `2026-27` + `Regular Season`. True-live game discovery, pregame records, model context, and the live-season updater all use that shared context. Pregame records therefore exclude preseason games.
 
-Preseason support includes:
+During the opening weeks, true-live model inputs apply a neutral 1-1 prior to each team's current record. The dashboard still displays the real W-L record, while the model receives a less volatile early-season percentage (for example, 1-0 becomes 66.7% rather than 100%). Season Intelligence includes teams that have not played yet as 0-0 at the neutral 1500 rating.
+
+The preseason path remains available for isolated replay and validation work:
 
 - ScoreboardV3 scheduled-game discovery
 - `Pre Season` propagation through live analysis
@@ -302,9 +304,7 @@ Game ID: 0012600009
 
 has been successfully discovered through the ScoreboardV3 live-game path.
 
-The remaining preseason milestone is real end-to-end validation while the game is active.
-
-Preseason is being used to validate the **live system**, not to re-evaluate or tune frozen V7 model quality.
+Preseason validation remains separate from regular-season production and does not re-evaluate or tune frozen V7 model quality.
 
 ## Turning Points
 
@@ -722,8 +722,7 @@ Regular-season production is the default:
 
 ```bash
 PYTHONPATH=src python3 \
-    src/update_live_season.py \
-    --season 2026-27
+    src/update_live_season.py
 ```
 
 Preseason rating experiments must use an isolated runtime and must not publish into the production Season Intelligence directory unless an explicitly separate publish directory is provided.

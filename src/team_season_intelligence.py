@@ -374,13 +374,19 @@ def build_team_summary(
         )
     )
 
-    for team, games in (
-        team_history
-        .groupby(
-            "team",
-            sort=True,
-        )
+    for team in sorted(
+        ratings_by_team.index
     ):
+        games = (
+            team_history.loc[
+                team_history[
+                    "team"
+                ]
+                == team
+            ]
+            .copy()
+        )
+
         games = (
             games
             .sort_values(
@@ -545,11 +551,15 @@ def build_team_summary(
                     ),
 
                 "lastGameDate":
-                    games[
-                        "gameDate"
-                    ].iloc[
-                        -1
-                    ],
+                    (
+                        games[
+                            "gameDate"
+                        ].iloc[
+                            -1
+                        ]
+                        if not games.empty
+                        else pd.NaT
+                    ),
             }
         )
 
@@ -746,6 +756,7 @@ def validate_team_summary(
         summary[
             [
                 "team",
+                "gamesPlayed",
                 "currentRating",
             ]
         ]
@@ -757,11 +768,33 @@ def validate_team_summary(
         )
     )
 
-    if not np.allclose(
+    has_history = (
         check[
+            "historyFinalRating"
+        ]
+        .notna()
+    )
+
+    if not (
+        has_history
+        == (
+            check[
+                "gamesPlayed"
+            ]
+            > 0
+        )
+    ).all():
+        raise ValueError(
+            "Team history presence does not match games played."
+        )
+
+    if not np.allclose(
+        check.loc[
+            has_history,
             "currentRating"
         ],
-        check[
+        check.loc[
+            has_history,
             "historyFinalRating"
         ],
         atol=1e-8,
@@ -769,6 +802,19 @@ def validate_team_summary(
     ):
         raise ValueError(
             "Summary rating does not match final history state."
+        )
+
+    if not np.allclose(
+        check.loc[
+            ~has_history,
+            "currentRating",
+        ],
+        INITIAL_RATING,
+        atol=1e-8,
+        rtol=0.0,
+    ):
+        raise ValueError(
+            "Teams without games must retain the initial rating."
         )
 
     print(

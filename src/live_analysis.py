@@ -25,6 +25,11 @@ from preprocess import (
     preprocess_live_game,
 )
 
+from season_config import (
+    CURRENT_SEASON,
+    CURRENT_SEASON_TYPE,
+)
+
 from espn_live import (
     ESPNLiveFeedError,
     fetch_espn_live_play_by_play,
@@ -52,6 +57,96 @@ SCALER_PATH = (
     / "models"
     / "win_probability_scaler_v7.pkl"
 )
+
+
+PREGAME_PRIOR_WINS = 1.0
+PREGAME_PRIOR_LOSSES = 1.0
+
+
+def smoothed_pregame_win_pct(
+    wins,
+    losses,
+):
+    """
+    Stabilize early-season records with a neutral 1-1 prior.
+
+    The displayed record remains the real W-L record. Only the
+    model input is smoothed, so 1-0 becomes 2/3 rather than 1.0.
+    """
+
+    wins = float(
+        wins
+    )
+
+    losses = float(
+        losses
+    )
+
+    if wins < 0 or losses < 0:
+        raise ValueError(
+            "Pregame wins and losses must be non-negative."
+        )
+
+    return (
+        wins
+        + PREGAME_PRIOR_WINS
+    ) / (
+        wins
+        + losses
+        + PREGAME_PRIOR_WINS
+        + PREGAME_PRIOR_LOSSES
+    )
+
+
+def apply_current_season_pregame_smoothing(
+    context,
+    season,
+    season_type,
+):
+    """Apply early-season smoothing only to current live context."""
+
+    if (
+        season != CURRENT_SEASON
+        or season_type != CURRENT_SEASON_TYPE
+    ):
+        return context
+
+    smoothed = context.copy()
+
+    home_pct = smoothed_pregame_win_pct(
+        smoothed[
+            "homePreGameWins"
+        ],
+        smoothed[
+            "homePreGameLosses"
+        ],
+    )
+
+    away_pct = smoothed_pregame_win_pct(
+        smoothed[
+            "awayPreGameWins"
+        ],
+        smoothed[
+            "awayPreGameLosses"
+        ],
+    )
+
+    smoothed[
+        "homePreGameWinPct"
+    ] = home_pct
+
+    smoothed[
+        "awayPreGameWinPct"
+    ] = away_pct
+
+    smoothed[
+        "strengthDifference"
+    ] = (
+        home_pct
+        - away_pct
+    )
+
+    return smoothed
 
 
 @lru_cache(maxsize=1)
@@ -400,7 +495,11 @@ def build_pregame_context(
         local_context
         is not None
     ):
-        return local_context
+        return apply_current_season_pregame_smoothing(
+            context=local_context,
+            season=season,
+            season_type=season_type,
+        )
 
     home_record = (
         fetch_team_record_before_game(
@@ -444,7 +543,7 @@ def build_pregame_context(
         ]
     )
 
-    return {
+    context = {
         "homeTeamId":
             int(
                 home_team_id
@@ -487,6 +586,12 @@ def build_pregame_context(
                 - away_pct
             ),
     }
+
+    return apply_current_season_pregame_smoothing(
+        context=context,
+        season=season,
+        season_type=season_type,
+    )
 
 
 def predict_live_probabilities(

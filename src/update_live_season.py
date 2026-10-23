@@ -14,11 +14,21 @@ from incremental_team_rating import (
     run_incremental_update,
 )
 
+from season_config import (
+    CURRENT_SEASON,
+    CURRENT_SEASON_TYPE,
+)
+
 from team_season_intelligence import (
+    INITIAL_RATING,
     SEASON_INTELLIGENCE_DIR,
     build_team_game_history,
     build_team_summary,
     validate_team_summary,
+)
+
+from team_metadata import (
+    TEAM_METADATA,
 )
 
 
@@ -71,7 +81,7 @@ def atomic_write_csv(
 
 def fetch_completed_season_games(
     season,
-    season_type="Regular Season",
+    season_type=CURRENT_SEASON_TYPE,
     timeout=60,
 ):
     """
@@ -525,6 +535,103 @@ def load_processed_game_ids(
 # Dashboard publishing
 # ============================================================
 
+def include_idle_teams_in_ratings(
+    ratings,
+):
+    """Add active teams that have not completed a game yet."""
+
+    active_teams = sorted(
+        metadata[
+            "tricode"
+        ]
+        for metadata in TEAM_METADATA.values()
+    )
+
+    rating_teams = set(
+        ratings[
+            "team"
+        ]
+        .astype(str)
+    )
+
+    unexpected = (
+        rating_teams
+        - set(
+            active_teams
+        )
+    )
+
+    if unexpected:
+        raise ValueError(
+            "Ratings contain unknown active teams: "
+            f"{sorted(unexpected)}"
+        )
+
+    missing = [
+        team
+        for team in active_teams
+        if team not in rating_teams
+    ]
+
+    completed = ratings.drop(
+        columns=[
+            "ratingRank",
+        ],
+        errors="ignore",
+    ).copy()
+
+    if missing:
+        idle = pd.DataFrame(
+            [
+                {
+                    "team": team,
+                    "wins": 0,
+                    "losses": 0,
+                    "currentRating": INITIAL_RATING,
+                    "peakRating": INITIAL_RATING,
+                    "lowestRating": INITIAL_RATING,
+                }
+                for team in missing
+            ]
+        )
+
+        completed = pd.concat(
+            [
+                completed,
+                idle,
+            ],
+            ignore_index=True,
+        )
+
+    completed = (
+        completed
+        .sort_values(
+            [
+                "currentRating",
+                "team",
+            ],
+            ascending=[
+                False,
+                True,
+            ],
+            kind="mergesort",
+        )
+        .reset_index(
+            drop=True
+        )
+    )
+
+    completed.insert(
+        0,
+        "ratingRank",
+        range(
+            1,
+            len(completed) + 1,
+        ),
+    )
+
+    return completed
+
 def publish_season_intelligence(
     season,
     history,
@@ -536,6 +643,10 @@ def publish_season_intelligence(
             "Cannot publish Season Intelligence "
             "without completed games."
         )
+
+    ratings = include_idle_teams_in_ratings(
+        ratings
+    )
 
     team_history = (
         build_team_game_history(
@@ -598,13 +709,13 @@ def publish_season_intelligence(
 # ============================================================
 
 def update_live_season(
-    season,
+    season=CURRENT_SEASON,
     runtime_root=DEFAULT_RUNTIME_ROOT,
     timeout=60,
     dry_run=False,
     publish=True,
     publish_dir=SEASON_INTELLIGENCE_DIR,
-    season_type="Regular Season",
+    season_type=CURRENT_SEASON_TYPE,
 ):
     runtime_root = Path(
         runtime_root
@@ -865,9 +976,10 @@ def parse_args():
 
     parser.add_argument(
         "--season",
-        required=True,
+        default=CURRENT_SEASON,
         help=(
-            "NBA season, for example 2026-27."
+            "NBA season. Defaults to Courtvision's "
+            f"current season ({CURRENT_SEASON})."
         ),
     )
 
@@ -890,7 +1002,7 @@ def parse_args():
             "Regular Season",
             "Pre Season",
         ],
-        default="Regular Season",
+        default=CURRENT_SEASON_TYPE,
         help=(
             "NBA season type to discover. "
             "Regular Season is the production default."

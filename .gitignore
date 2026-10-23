@@ -49,6 +49,7 @@ dashboard/*.before_*
 
 # Runtime caches
 data/cache/
+data/runtime/
 
 # Runtime state
 results/.runtime/

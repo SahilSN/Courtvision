@@ -102,6 +102,17 @@ from game_catalog import (
 )
 
 
+from season_config import (
+
+    CURRENT_SEASON,
+
+    CURRENT_SEASON_TYPE,
+
+    current_season_label,
+
+)
+
+
 
 from live_analysis import (
 
@@ -175,7 +186,11 @@ st.set_page_config(
 
 EARLIEST_SEASON_START = 2019
 
-LATEST_SEASON_START = 2026
+LATEST_SEASON_START = int(
+
+    CURRENT_SEASON.split("-")[0]
+
+)
 
 
 
@@ -223,7 +238,7 @@ def default_date_for_season(
 
 
 
-    if season == "2026-27":
+    if season == CURRENT_SEASON:
 
         return date.today()
 
@@ -764,6 +779,13 @@ st.sidebar.header(
 )
 
 
+st.sidebar.caption(
+
+    current_season_label()
+
+)
+
+
 
 
 
@@ -772,12 +794,11 @@ mode = st.sidebar.radio(
     "Mode",
 
     [
-
-        "Historical",
-
         "Live",
 
         "Season Intelligence",
+
+        "Historical",
 
     ],
 
@@ -1091,12 +1112,9 @@ elif mode == "Live":
 
 
 
-    season = "2026-27"
+    season = CURRENT_SEASON
 
-    # Preseason live-validation window.
-    # Switch to "Regular Season" when the
-    # 2026-27 regular season begins.
-    season_type = "Pre Season"
+    season_type = CURRENT_SEASON_TYPE
 
 
 
@@ -1563,7 +1581,7 @@ else:
         / "season_intelligence"
     )
 
-    SEASON_INTELLIGENCE_SEASONS = sorted(
+    completed_season_intelligence_seasons = sorted(
         [
             path.name.replace(
                 "_team_summary_v1.csv",
@@ -1585,10 +1603,16 @@ else:
         reverse=True,
     )
 
-    if not SEASON_INTELLIGENCE_SEASONS:
-        raise RuntimeError(
-            "No completed Season Intelligence seasons found."
-        )
+    SEASON_INTELLIGENCE_SEASONS = [
+        CURRENT_SEASON,
+        *[
+            completed_season
+            for completed_season in (
+                completed_season_intelligence_seasons
+            )
+            if completed_season != CURRENT_SEASON
+        ],
+    ]
 
 
 
@@ -1608,7 +1632,11 @@ else:
 
     st.sidebar.caption(
 
-        "Frozen Team Courtvision Rating v1"
+        (
+            "Current regular-season context"
+            if season == CURRENT_SEASON
+            else "Historical · Frozen Team Courtvision Rating v1"
+        )
 
     )
 
@@ -8691,7 +8719,7 @@ def render_game(
 
                 "class='courtvision-record'>"
 
-                f"Pregame: {away_record}"
+                f"Record: {away_record}"
 
                 "</div>"
 
@@ -8811,7 +8839,7 @@ def render_game(
 
                 "class='courtvision-record'>"
 
-                f"Pregame: {home_record}"
+                f"Record: {home_record}"
 
                 "</div>"
 
@@ -9068,7 +9096,9 @@ def render_game(
         st.caption(
             "Current Win Probability is Courtvision's "
             "model estimate for each team's chance of "
-            "winning at the latest available game state."
+            "winning at the latest available game state. "
+            "Early-season records are adjusted toward 50% "
+            "to reduce small-sample volatility."
         )
 
     else:
@@ -10512,6 +10542,58 @@ def format_signed_rating(
 def render_season_intelligence(
     season,
 ):
+    if season == CURRENT_SEASON:
+        summary_path = (
+            ROOT_DIR
+            / "results"
+            / "season_intelligence"
+            / f"{season}_team_summary_v1.csv"
+        )
+
+        history_path = (
+            ROOT_DIR
+            / "results"
+            / "season_intelligence"
+            / f"{season}_team_rating_games_v1.csv"
+        )
+
+        if (
+            not summary_path.exists()
+            or not history_path.exists()
+        ):
+            st.subheader(
+                "Season Intelligence"
+            )
+
+            st.caption(
+                (
+                    f"{current_season_label()} · "
+                    "current season"
+                )
+            )
+
+            st.info(
+                f"Not enough {CURRENT_SEASON} regular-season data "
+                "has been published for Team Courtvision "
+                "Rating yet."
+            )
+
+            st.markdown(
+                "### The current season is just getting started"
+            )
+
+            st.write(
+                "Ratings and trends will appear here as "
+                "completed regular-season games are processed. "
+                "Early-season metrics may be volatile."
+            )
+
+            st.caption(
+                "Use the Season selector to view a completed "
+                "historical season."
+            )
+            return
+
     try:
         summary, history = (
             cached_team_season_intelligence(
@@ -11035,7 +11117,12 @@ def render_season_intelligence(
         # --------------------------------------------------------
 
         team_options = (
-            summary
+            summary.loc[
+                summary[
+                    "gamesPlayed"
+                ]
+                > 0
+            ]
             .sort_values(
                 "ratingRank"
             )[
