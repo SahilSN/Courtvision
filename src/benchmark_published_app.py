@@ -36,7 +36,8 @@ def benchmark(repeats=3):
             raise RuntimeError(f"App failed during benchmark: {app.exception or app.error}")
         return round(time.perf_counter() - tick, 4)
 
-    with patch.dict(os.environ, {"COURTVISION_CLOUD_READY": "1", "COURTVISION_DEPLOYMENT_PROFILE": "published"}), \
+    with patch.dict(os.environ, {"COURTVISION_CLOUD_READY": "1", "COURTVISION_DEPLOYMENT_PROFILE": "published",
+                                "COURTVISION_DISABLE_OPERATOR_PROBES": "1"}), \
          patch("requests.sessions.Session.request", side_effect=AssertionError("Unexpected feed request")) as network, \
          patch("subprocess.Popen", side_effect=AssertionError("Unexpected background process")) as workers:
         app = AppTest.from_file(str(ROOT / "cloud/app.py"), default_timeout=90)

@@ -67,6 +67,7 @@ def validate_published_app(entrypoint="dashboard/app.py"):
              # The cloud wrapper must override even an incorrectly configured full profile.
              "COURTVISION_DEPLOYMENT_PROFILE": "full" if is_cloud_entrypoint else "published",
              "COURTVISION_CLOUD_READY": "1",
+             "COURTVISION_DISABLE_OPERATOR_PROBES": "1",
          }), \
          patch("requests.sessions.Session.request", side_effect=AssertionError(
              "Published deployment attempted a network request")) as network, \
