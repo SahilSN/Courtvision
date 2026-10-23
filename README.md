@@ -690,6 +690,11 @@ Generated prediction outputs may be excluded from Git because of their size.
 
 ## Validation Commands
 
+For the intelligence-only hosting profile, clean-install checks, and nightly
+publication-to-host setup, see [Deployment](docs/deployment.md). New deployments
+use Python 3.12 and `requirements-deployment.txt`; the existing local environment
+and Mac scheduler do not need to be replaced.
+
 Replay box-score regression:
 
 ```bash
@@ -718,7 +723,12 @@ python -m compileall -q src dashboard
 
 The live-season updater supports both regular-season production use and isolated preseason testing.
 
-The repository runs the production updater automatically through GitHub Actions. In `America/Los_Angeles` time it runs hourly from 4:00 PM through 11:00 PM, plus a 1:00 AM nightly catch-up. The workflow rebuilds the current-season state, validates the output, and commits the two dashboard Season Intelligence artifacts only when completed games changed them. It can also be run manually from the Actions tab.
+Production updates run once nightly at 1:00 a.m. in the Mac's local timezone,
+currently Pacific, through the installed Mac LaunchAgent. There are no hourly
+updates. Both Team and Player Intelligence and their health report are published.
+GitHub Actions is manual diagnostic-only because hosted NBA access failed
+verification. See the Mac scheduling instructions below; the dashboard does not
+start or replace the updater.
 
 Regular-season production is the default:
 

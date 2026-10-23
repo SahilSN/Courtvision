@@ -115,6 +115,9 @@ from season_config import (
 from player_rating import build_player_rating_history
 from player_career import build_player_career, load_published_player_data, season_coverage
 from update_intelligence import load_update_status
+from deployment_config import get_deployment_profile, navigation_modes
+
+DEPLOYMENT_PROFILE = get_deployment_profile()
 
 
 
@@ -793,22 +796,26 @@ st.sidebar.caption(
 
 
 
+available_modes = navigation_modes(DEPLOYMENT_PROFILE)
+if st.session_state.get("courtvision_mode") not in available_modes:
+    st.session_state["courtvision_mode"] = available_modes[0]
+
 mode = st.sidebar.radio(
 
     "Mode",
 
-    [
-        "Live",
-
-        "Season Intelligence",
-
-        "Historical",
-
-    ],
+    available_modes,
 
     key="courtvision_mode",
 
 )
+
+if DEPLOYMENT_PROFILE == "published":
+    st.sidebar.info(
+        "Published Intelligence beta · Team and Player Intelligence only. "
+        "Live games and game replay are not enabled on this deployment. "
+        "Historical player coverage may be partial."
+    )
 
 
 
@@ -4042,8 +4049,9 @@ def warm_player_impact_service():
         return None
 
 
-# Proactively warm the persistent WPA backend.
-warm_player_impact_service()
+# Published intelligence uses CSVs and must not launch game-analysis workers.
+if DEPLOYMENT_PROFILE == "full":
+    warm_player_impact_service()
 
 
 def launch_player_impact_background(
