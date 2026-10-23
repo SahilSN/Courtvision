@@ -139,11 +139,37 @@ def validate_published_app(entrypoint="dashboard/app.py"):
             app.button(key=f"replay_jump_swing_{game_id}").click().run()
             check_render(app)
             require(app.slider[0].value == swings[0][1], "Turning-point jump missed its exact event")
+            card = next(button for button in app.button if str(button.key).startswith(f"replay_card_{game_id}_"))
+            card.click().run()
+            check_render(app)
+            require(app.slider[0].value == swings[0][1], "Turning-point card missed its exact event")
         require(any("full-game" in caption.value.lower() for caption in app.caption),
                 "Replay must disclose full-game precomputation")
         app.sidebar.radio(key="courtvision_season_intelligence_view").set_value("Player Career").run()
         check_render(app)
         print("PASS: all four offline replays, first/final event inspection, and return to career")
+
+        app.sidebar.radio(key="courtvision_season_intelligence_view").set_value("Replay Pilot").run()
+        with patch("replay_view.load_collection", side_effect=FileNotFoundError("missing artifact")):
+            app.run()
+            require(not app.exception and bool(app.error), "Missing replay must show a recoverable error")
+        app.sidebar.radio(key="courtvision_season_intelligence_view").set_value("Teams").run()
+        app.sidebar.selectbox(key="courtvision_season_intelligence_season").select(CURRENT_SEASON).run()
+        with patch("update_intelligence.load_update_status", return_value={"pipelines": {"teams": {
+                "checkedAt": "2020-01-01T00:00:00+00:00", "status": "failed", "gamesThrough": None}}}):
+            app.run()
+            check_render(app)
+            require(any("failed" in warning.value.lower() for warning in app.warning),
+                    "Failed refresh must warn without hiding published data")
+        with patch("update_intelligence.load_update_status", return_value={"pipelines": {"teams": {
+                "checkedAt": "2020-01-01T00:00:00+00:00", "status": "success", "gamesThrough": None}}}):
+            app.run()
+            check_render(app)
+            require(any("over a day old" in warning.value for warning in app.warning),
+                    "Stale successful refresh must warn")
+        app.sidebar.radio(key="courtvision_season_intelligence_view").set_value("Player Career").run()
+        check_render(app)
+        print("PASS: unavailable replay recovery and failed-refresh warning with published data retained")
 
         second = AppTest.from_file(str(entrypoint_path), default_timeout=90).run()
         check_render(second)
