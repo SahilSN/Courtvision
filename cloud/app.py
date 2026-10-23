@@ -22,7 +22,7 @@ if os.environ.get("COURTVISION_CLOUD_READY") != "1":
 # Only a reviewed, short-lived deployment request can activate diagnostics.
 # No viewer control, no recurring schedule, and no results in the app UI.
 root = Path(__file__).resolve().parents[1]
-if os.environ.get("COURTVISION_DISABLE_OPERATOR_PROBES") != "1":
+if (root / "cloud/live_probe_request.json").exists() and os.environ.get("COURTVISION_DISABLE_OPERATOR_PROBES") != "1":
     if str(root / "src") not in sys.path:
         sys.path.append(str(root / "src"))
     try:
