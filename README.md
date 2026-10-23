@@ -739,8 +739,24 @@ resume. Separate runner/writer locks prevent overlapping new processes.
 Local health is `results/player_intelligence/.runtime/status.json`: coverage,
 last progress, recent failures, and next retry time. `waiting` is not completion.
 Use `--max-rounds 1` for a bounded run. This runner has no scheduler and does not
-publish to GitHub. Validated historical checkpoint publication is still a
-separate step; the hosted beta does not automatically consume local CSV changes.
+publish to GitHub. Historical publication is a separate, validated operation:
+
+```bash
+PYTHONPATH=src .venv/bin/python src/publish_historical_checkpoint.py --seasons 2025-26
+```
+
+The publisher snapshots both CSVs under the writer lock, rebuilds ratings to
+verify the pair, checks the remote regular-season catalog, and refuses missing
+or changed previously published appearances. Only selected historical player
+CSV pairs are pushed through an isolated clone; the local index and code are
+untouched. Current/future seasons are refused. A busy writer, mismatched pair,
+or concurrent remote push fails safely: retry from a fresh snapshot. No force
+push is used. Publication is manual for now, not a new scheduled job.
+
+Isolated publication does not advance the working checkout's HEAD. Before later
+code pushes, inspect remote divergence and preserve the active backfill outputs;
+do not force-push or discard local CSV changes to synchronize. The hosted beta
+only sees successfully pushed snapshots, not arbitrary local file changes.
 
 The live-season updater supports both regular-season production use and isolated preseason testing.
 
