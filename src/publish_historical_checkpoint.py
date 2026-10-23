@@ -5,6 +5,7 @@ import fcntl
 from pathlib import Path
 import re
 import shutil
+import subprocess
 import tempfile
 
 import pandas as pd
@@ -92,7 +93,9 @@ def publish_historical(seasons, root=ROOT_DIR):
                 "-c", "user.email=courtvision-updater@users.noreply.github.com",
                 "commit", "-m", "publish validated player checkpoints: " + ", ".join(seasons))
             # No force-push/rebase: concurrent main updates require a fresh retry.
-            git(checkout, "push", "origin", "HEAD:main")
+            # Command-local buffering avoids chunked-transfer failures seen on
+            # this Mac's larger CSV uploads. No global config or TLS changes.
+            git(checkout, "-c", "http.postBuffer=16777216", "push", "origin", "HEAD:main")
             return git(checkout, "rev-parse", "HEAD").stdout.strip()
 
 
@@ -100,4 +103,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seasons", nargs="+", required=True)
     args = parser.parse_args()
-    print(publish_historical(args.seasons))
+    try:
+        print(publish_historical(args.seasons))
+    except subprocess.CalledProcessError as error:
+        parser.exit(1, "Checkpoint Git operation failed; no force-push was attempted.\n"
+                    + (error.stderr or str(error))[-2000:] + "\n")
