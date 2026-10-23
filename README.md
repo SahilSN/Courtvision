@@ -857,12 +857,12 @@ python src/player_rating.py --season 2025-26
 The v1 quality index is centered at a fixed historical reference of 100 and is
 shown alongside cumulative Season Value, sample status, and reliability.
 
-The existing hourly/nightly Season Intelligence workflow also runs
-`src/update_player_intelligence.py`. It processes only newly completed
-regular-season games, retains failed games for a later retry, and publishes the
-2026-27 player-game and rating artifacts used by the dashboard.
+The Mac nightly job runs both Team and Player Intelligence once at 1 a.m.
+in the Mac's local timezone (currently Pacific). Player Intelligence processes
+only newly completed regular-season games, retains failed games for a later
+retry, and publishes the 2026-27 player-game and rating artifacts.
 
-The hosted entry point is `src/update_intelligence.py`: it discovers completed
+The shared refresh entry point is `src/update_intelligence.py`: it discovers completed
 games once, attempts team and player updates independently, and publishes
 `2026-27_update_status_v1.json` with per-pipeline freshness, coverage, pending
 games, and errors. Valid results are published even when the other pipeline
@@ -870,7 +870,29 @@ fails. An incomplete refresh makes the workflow fail visibly and pending player
 games remain eligible for retry. Regressed discovery cannot replace already
 published games with an incomplete catalog. The dashboard shows the latest
 check and game date, flags failed or stale updates, and keeps diagnostics in
-an expander. This schedule does not run the historical backfill.
+an expander. This schedule does not run the historical backfill. GitHub-hosted
+NBA access failed verification, so the GitHub workflow is retained for manual
+diagnostics rather than scheduled production updates.
+
+Install or refresh the Mac schedule with:
+
+```bash
+.venv/bin/python src/install_macos_updates.py --run-now
+```
+
+The LaunchAgent is `com.courtvision.nightly-intelligence`. It also checks for a
+missed nightly update when loaded at login, and skips a nightly window that
+already succeeded. macOS catches calendar jobs missed during sleep on wake.
+The Mac must be on, logged into this user account, and online for updates to run.
+No app or terminal needs to remain open. There are no hourly updates.
+
+The wrapper uses an exclusive lock, rotates `results/.runtime/nightly/updates.log`,
+and saves job/publication health to `results/.runtime/nightly/status.json`.
+It publishes only current-season generated artifacts through a temporary clone,
+preserving the working checkout, staged code, and in-progress historical backfill.
+Existing GitHub authentication must remain available to background Git commands.
+To run manually, use `.venv/bin/python src/run_nightly_intelligence.py`.
+To disable the schedule, run `launchctl disable gui/$(id -u)/com.courtvision.nightly-intelligence`.
 
 Open Season Intelligence → Players for current-season coverage and sample
 progress. The leaderboard appears once players reach three games; Player
