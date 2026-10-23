@@ -114,6 +114,7 @@ from season_config import (
 
 from player_rating import build_player_rating_history
 from player_career import build_player_career, load_published_player_data, season_coverage
+from update_intelligence import load_update_status
 
 
 
@@ -10624,6 +10625,7 @@ def format_signed_rating(
 def render_season_intelligence(
     season,
 ):
+    render_intelligence_freshness(season, "teams")
     if season == CURRENT_SEASON:
         summary_path = (
             ROOT_DIR
@@ -11935,6 +11937,40 @@ def render_season_intelligence(
 
 
 
+def render_intelligence_freshness(season, pipeline):
+    if season != CURRENT_SEASON:
+        return
+    status_path = (
+        ROOT_DIR / "results" / "season_intelligence" / f"{season}_update_status_v1.json"
+    )
+    try:
+        entry = load_update_status(status_path).get("pipelines", {}).get(pipeline)
+        if not entry:
+            st.caption("Automatic updates · awaiting first verified refresh")
+            return
+        checked = pd.Timestamp(entry["checkedAt"])
+        local = checked.tz_convert("America/Los_Angeles").strftime("%b %d, %I:%M %p PT")
+        through = entry.get("gamesThrough") or "No completed games yet"
+        st.caption(f"Checked {local} · Games through {through}")
+        if entry["status"] == "failed":
+            st.warning("The latest refresh failed. Showing the last published data.")
+        elif entry["status"] == "partial":
+            st.warning("Some completed games are awaiting processing and will be retried on the next update.")
+        elif pd.Timestamp.now(tz="UTC") - checked > pd.Timedelta(hours=26):
+            st.warning("The last refresh is over a day old. New completed games may be missing.")
+        if entry["status"] != "success":
+            with st.expander("Update details"):
+                st.write({
+                    "Processed games": entry.get("processedGames"),
+                    "Completed games discovered": entry.get("completedGames"),
+                    "Last successful check": entry.get("lastSuccessfulCheckAt"),
+                    "Pending games": entry.get("pendingGameIds"),
+                    "Error": entry.get("error"),
+                })
+    except (ValueError, KeyError, OSError):
+        st.caption("Update status is temporarily unavailable; showing published data.")
+
+
 def player_visual_theme(team):
     metadata = get_team_metadata_by_tricode(team)
     return metadata, metadata.get("chart_color", "#58A6FF")
@@ -12033,6 +12069,7 @@ def render_player_intelligence(
     season,
 ):
     render_player_design()
+    render_intelligence_freshness(season, "players")
     st.subheader(
         "Player Intelligence"
     )
@@ -12531,6 +12568,7 @@ def cached_player_career_data():
 
 def render_player_career():
     render_player_design()
+    render_intelligence_freshness(CURRENT_SEASON, "players")
     st.subheader("Player Career")
     st.caption("Regular-season Player Intelligence across published seasons")
     try:

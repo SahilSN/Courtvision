@@ -716,6 +716,7 @@ def update_live_season(
     publish=True,
     publish_dir=SEASON_INTELLIGENCE_DIR,
     season_type=CURRENT_SEASON_TYPE,
+    completed_games=None,
 ):
     runtime_root = Path(
         runtime_root
@@ -753,7 +754,7 @@ def update_live_season(
             "--publish-dir for preseason testing."
         )
 
-    games = (
+    games = completed_games.copy() if completed_games is not None else (
         fetch_completed_season_games(
             season=season,
             season_type=season_type,

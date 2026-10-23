@@ -862,6 +862,16 @@ The existing hourly/nightly Season Intelligence workflow also runs
 regular-season games, retains failed games for a later retry, and publishes the
 2026-27 player-game and rating artifacts used by the dashboard.
 
+The hosted entry point is `src/update_intelligence.py`: it discovers completed
+games once, attempts team and player updates independently, and publishes
+`2026-27_update_status_v1.json` with per-pipeline freshness, coverage, pending
+games, and errors. Valid results are published even when the other pipeline
+fails. An incomplete refresh makes the workflow fail visibly and pending player
+games remain eligible for retry. Regressed discovery cannot replace already
+published games with an incomplete catalog. The dashboard shows the latest
+check and game date, flags failed or stale updates, and keeps diagnostics in
+an expander. This schedule does not run the historical backfill.
+
 Open Season Intelligence → Players for current-season coverage and sample
 progress. The leaderboard appears once players reach three games; Player
 Explorer is available even before leaderboard eligibility and shows rating,
