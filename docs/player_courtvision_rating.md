@@ -124,3 +124,8 @@ The diagnostics report each candidate's association with playing time and
 games, the number of one-game players among its leaders, and how much of those
 leaders' total absolute impact came from their largest game. These checks make
 volume dominance and small-sample outliers visible before a formula is frozen.
+
+The comparison also uses a global chronological cutoff. Candidate values are
+calculated only from games before that cutoff, then compared with per-36 WPA in
+later games for players represented on both sides. This prevents future games
+from influencing the prior, normalization, or player values being evaluated.

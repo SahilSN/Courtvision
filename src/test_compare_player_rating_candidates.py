@@ -5,6 +5,7 @@ import pandas as pd
 from compare_player_rating_candidates import (
     build_candidate_diagnostics,
     build_candidate_table,
+    build_chronological_holdout_diagnostics,
 )
 
 
@@ -147,6 +148,60 @@ class PlayerRatingCandidateComparisonTest(unittest.TestCase):
             "requires positive possessions",
         ):
             build_candidate_table(dataset)
+
+    def test_holdout_uses_only_later_games(self):
+        rows = []
+
+        for game_number in range(1, 9):
+            for person_id, name, wpa in (
+                (1, "Consistent", 0.30),
+                (2, "Quiet", 0.05),
+            ):
+                rows.append(
+                    make_row(
+                        person_id,
+                        name,
+                        f"00225000{game_number:02d}",
+                        f"2025-10-{20 + game_number:02d}",
+                        30.0,
+                        60.0,
+                        wpa,
+                    )
+                )
+
+        diagnostics = build_chronological_holdout_diagnostics(
+            pd.DataFrame(rows),
+            holdout_fraction=0.25,
+            min_training_games=2,
+        )
+
+        self.assertEqual(diagnostics.attrs["trainingGames"], 6)
+        self.assertEqual(diagnostics.attrs["holdoutGames"], 2)
+        self.assertEqual(diagnostics.attrs["cutoffDate"], "2025-10-27")
+        self.assertEqual(diagnostics.attrs["eligiblePlayers"], 2)
+        for correlation in diagnostics[
+            "futureRankCorrelation"
+        ]:
+            self.assertAlmostEqual(correlation, 1.0)
+
+    def test_holdout_arguments_are_validated(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "holdout_fraction must be between",
+        ):
+            build_chronological_holdout_diagnostics(
+                self.dataset,
+                holdout_fraction=1.0,
+            )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "min_training_games must be positive",
+        ):
+            build_chronological_holdout_diagnostics(
+                self.dataset,
+                min_training_games=0,
+            )
 
 
 if __name__ == "__main__":

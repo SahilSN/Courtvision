@@ -270,6 +270,167 @@ def build_candidate_diagnostics(
     return pd.DataFrame(rows)
 
 
+def weighted_wpa_per_36(
+    frame,
+    wpa_column="holdoutNetWPA",
+    minutes_column="holdoutMinutes",
+):
+    minutes = float(frame[minutes_column].sum())
+
+    if minutes <= 0:
+        return np.nan
+
+    return float(frame[wpa_column].sum()) / minutes * 36.0
+
+
+def build_chronological_holdout_diagnostics(
+    dataset,
+    prior_games=5.0,
+    holdout_fraction=0.25,
+    min_training_games=2,
+):
+    if not 0.0 < holdout_fraction < 1.0:
+        raise ValueError(
+            "holdout_fraction must be between zero and one."
+        )
+
+    if min_training_games <= 0:
+        raise ValueError(
+            "min_training_games must be positive."
+        )
+
+    validate_source(dataset)
+    source = dataset.copy()
+    source["gameDate"] = pd.to_datetime(
+        source["gameDate"],
+        errors="raise",
+    )
+    games = (
+        source[
+            [
+                "gameId",
+                "gameDate",
+            ]
+        ]
+        .drop_duplicates(subset=["gameId"])
+        .sort_values(
+            [
+                "gameDate",
+                "gameId",
+            ],
+            kind="mergesort",
+        )
+        .reset_index(drop=True)
+    )
+
+    if len(games) < 2:
+        raise ValueError(
+            "Chronological holdout requires at least two games."
+        )
+
+    training_game_count = int(
+        np.floor(
+            len(games)
+            * (1.0 - holdout_fraction)
+        )
+    )
+    training_game_count = min(
+        max(training_game_count, 1),
+        len(games) - 1,
+    )
+    training_ids = set(
+        games.iloc[:training_game_count]["gameId"]
+    )
+    training = source.loc[
+        source["gameId"].isin(training_ids)
+    ].copy()
+    holdout = source.loc[
+        ~source["gameId"].isin(training_ids)
+    ].copy()
+
+    candidates = build_candidate_table(
+        training,
+        prior_games=prior_games,
+    )
+    holdout_players = holdout.groupby(
+        "personId",
+        sort=True,
+    ).agg(
+        holdoutGames=("gameId", "nunique"),
+        holdoutMinutes=("minutes", "sum"),
+        holdoutPossessions=("possessions", "sum"),
+        holdoutNetWPA=("netWPA", "sum"),
+    ).reset_index()
+    holdout_players["holdoutNetWPAper36"] = safe_divide(
+        holdout_players["holdoutNetWPA"] * 36.0,
+        holdout_players["holdoutMinutes"],
+    )
+
+    evaluation = candidates.merge(
+        holdout_players,
+        on="personId",
+        how="inner",
+        validate="one_to_one",
+    )
+    evaluation = evaluation.loc[
+        evaluation["games"] >= min_training_games
+    ].copy()
+
+    rows = []
+    population_holdout = weighted_wpa_per_36(
+        evaluation
+    )
+    top_count = max(
+        1,
+        int(np.ceil(len(evaluation) * 0.25)),
+    )
+
+    for candidate in CANDIDATE_COLUMNS:
+        ranked = evaluation.sort_values(
+            [
+                candidate,
+                "personId",
+            ],
+            ascending=[
+                False,
+                True,
+            ],
+            kind="mergesort",
+        )
+        leaders = ranked.head(top_count)
+        leader_holdout = weighted_wpa_per_36(
+            leaders
+        )
+        rows.append(
+            {
+                "candidate": candidate,
+                "eligiblePlayers": len(evaluation),
+                "futureRankCorrelation": spearman_correlation(
+                    evaluation[candidate],
+                    evaluation["holdoutNetWPAper36"],
+                ),
+                "topQuartilePlayers": len(leaders),
+                "topQuartileHoldoutNetWPAper36": leader_holdout,
+                "populationHoldoutNetWPAper36": population_holdout,
+                "topQuartileHoldoutLift": (
+                    leader_holdout - population_holdout
+                ),
+            }
+        )
+
+    diagnostics = pd.DataFrame(rows)
+    diagnostics.attrs["cutoffDate"] = (
+        holdout["gameDate"].min().strftime("%Y-%m-%d")
+    )
+    diagnostics.attrs["trainingGames"] = training_game_count
+    diagnostics.attrs["holdoutGames"] = (
+        len(games) - training_game_count
+    )
+    diagnostics.attrs["eligiblePlayers"] = len(evaluation)
+
+    return diagnostics
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description=(
@@ -294,6 +455,16 @@ def parse_args():
         "--top-n",
         type=int,
         default=10,
+    )
+    parser.add_argument(
+        "--holdout-fraction",
+        type=float,
+        default=0.25,
+    )
+    parser.add_argument(
+        "--min-training-games",
+        type=int,
+        default=2,
     )
     return parser.parse_args()
 
@@ -321,6 +492,14 @@ def main():
         players,
         top_n=args.top_n,
     )
+    holdout_diagnostics = (
+        build_chronological_holdout_diagnostics(
+            dataset,
+            prior_games=args.prior_games,
+            holdout_fraction=args.holdout_fraction,
+            min_training_games=args.min_training_games,
+        )
+    )
 
     player_output = (
         PLAYER_INTELLIGENCE_DIR
@@ -329,6 +508,10 @@ def main():
     diagnostics_output = (
         PLAYER_INTELLIGENCE_DIR
         / f"{args.season}_rating_candidate_diagnostics_v1.csv"
+    )
+    holdout_output = (
+        PLAYER_INTELLIGENCE_DIR
+        / f"{args.season}_rating_holdout_diagnostics_v1.csv"
     )
     player_output.parent.mkdir(
         parents=True,
@@ -342,6 +525,10 @@ def main():
         diagnostics_output,
         index=False,
     )
+    holdout_diagnostics.to_csv(
+        holdout_output,
+        index=False,
+    )
 
     print("Player Courtvision Rating candidate comparison")
     print(f"season: {args.season}")
@@ -353,6 +540,15 @@ def main():
         f"{players.attrs['populationNetWPAper36']:.4f}"
     )
     print(diagnostics.to_string(index=False))
+    print("chronological holdout")
+    print(
+        "cutoff: "
+        f"{holdout_diagnostics.attrs['cutoffDate']} | "
+        f"training games: {holdout_diagnostics.attrs['trainingGames']} | "
+        f"holdout games: {holdout_diagnostics.attrs['holdoutGames']} | "
+        f"eligible players: {holdout_diagnostics.attrs['eligiblePlayers']}"
+    )
+    print(holdout_diagnostics.to_string(index=False))
     print("shrunk per-36 leaders")
     print(
         players[
@@ -372,6 +568,7 @@ def main():
     )
     print(f"saved: {player_output}")
     print(f"saved: {diagnostics_output}")
+    print(f"saved: {holdout_output}")
 
 
 if __name__ == "__main__":
