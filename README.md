@@ -967,6 +967,24 @@ participation statistics, rather than traditional points/rebounds/assists totals
 
 Full historical publication is resumable:
 
+The single-owner runner can optionally publish validated historical pairs after
+500 additional games in a season and at each season's completion:
+
+```bash
+PYTHONPATH=src python src/run_historical_backfill.py \
+  --seasons 2025-26 2024-25 2023-24 2022-23 2021-22 2020-21 2019-20 \
+  --publish-every-games 500
+```
+
+Publication is disabled without this flag. The first enabled run publishes any
+season already at the threshold; subsequent milestones use a durable local
+baseline in `results/player_intelligence/.runtime/publication.json`. Uploads use
+the isolated, validated publisher, never the working checkout's index. Failed
+uploads retry after 15 minutes while local ingestion continues. Completed local
+data is not reported fully complete while its final upload is pending. The
+nightly current-season schedule and all rating/model formulas are unchanged.
+This is a Mac worker, not a new cloud or ChatGPT schedule.
+
 ```bash
 PYTHONPATH=src python src/backfill_player_intelligence.py \
   --seasons 2025-26 2024-25 2023-24 2022-23 2021-22 2020-21 2019-20

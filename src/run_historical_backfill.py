@@ -1,6 +1,6 @@
 """Single-owner, resumable historical backfill with bounded outage backoff.
 
-No scheduler or Git publication: checkpoints remain local until validated/published.
+No scheduler. Git publication is opt-in and limited to validated milestones.
 """
 
 import argparse
@@ -13,6 +13,7 @@ import time
 from backfill_player_intelligence import backfill_season
 from player_rating_dataset import PLAYER_INTELLIGENCE_DIR, load_game_catalog
 from update_player_intelligence import load_existing_player_games
+from historical_publication import MilestonePublication
 
 
 def now():
@@ -32,9 +33,11 @@ def progress(seasons, output_dir):
 
 def run_backfill(seasons, output_dir=PLAYER_INTELLIGENCE_DIR, batch_size=25,
                  failure_limit=3, cooldown=60, max_cooldown=900, max_rounds=0,
-                 sleeper=time.sleep):
-    if not seasons or min(batch_size, failure_limit, cooldown) < 1 or max_cooldown < cooldown or max_rounds < 0:
+                 sleeper=time.sleep, publish_every_games=0):
+    if not seasons or min(batch_size, failure_limit, cooldown) < 1 or max_cooldown < cooldown or max_rounds < 0 or publish_every_games < 0:
         raise ValueError("Invalid batch, retry, or round settings")
+    if publish_every_games and Path(output_dir).resolve() != Path(PLAYER_INTELLIGENCE_DIR).resolve():
+        raise ValueError("Automatic publication requires the canonical repository output directory")
     runtime = Path(output_dir) / ".runtime"
     runtime.mkdir(parents=True, exist_ok=True)
     with (runtime / "runner.lock").open("a") as lock:
@@ -44,9 +47,17 @@ def run_backfill(seasons, output_dir=PLAYER_INTELLIGENCE_DIR, batch_size=25,
             print("Historical backfill already running; skipped.", flush=True)
             return 0
         path = runtime / "status.json"
+        publication = (MilestonePublication(runtime / "publication.json", publish_every_games)
+                       if publish_every_games else None)
         state = {"startedAt": now().isoformat(), "status": "running", "round": 0,
                  "lastProgressAt": None, "failureCount": 0, "recentFailures": [],
-                 "scope": "Local historical checkpoints; not hosted publication"}
+                 "scope": "Validated milestone publication" if publication else "Local historical checkpoints; not hosted publication"}
+
+        def publish():
+            ready = publication.update(state["coverage"]) if publication else True
+            if publication:
+                state["publication"] = publication.state
+            return ready
 
         def save(status, **fields):
             state.update(fields, status=status, updatedAt=now().isoformat())
@@ -58,8 +69,15 @@ def run_backfill(seasons, output_dir=PLAYER_INTELLIGENCE_DIR, batch_size=25,
         try:
             while True:
                 state["coverage"] = progress(seasons, output_dir)
+                publication_ready = publish()
                 pending = [s for s in seasons if state["coverage"][s]["processedGames"] < state["coverage"][s]["expectedGames"]]
                 if not pending:
+                    if not publication_ready:
+                        save("local_complete_publication_pending", nextRetryAt=None)
+                        if max_rounds:
+                            return 1
+                        sleeper(60)
+                        continue
                     save("complete", nextRetryAt=None)
                     return 0
                 if max_rounds and state["round"] >= max_rounds:
@@ -85,10 +103,13 @@ def run_backfill(seasons, output_dir=PLAYER_INTELLIGENCE_DIR, batch_size=25,
                 state["recentFailures"] = (state["recentFailures"] + [
                     {"season": season, "gameId": f["gameId"], "error": f["error"][:1000]}
                     for f in failures])[-20:]
+                publication_ready = publish()
                 if max_rounds and state["round"] >= max_rounds:
                     complete = all(c["processedGames"] == c["expectedGames"] for c in state["coverage"].values())
-                    save("complete" if complete else "incomplete", nextRetryAt=None)
-                    return 0 if complete else 1
+                    status = "complete" if complete and publication_ready else (
+                        "local_complete_publication_pending" if complete else "incomplete")
+                    save(status, nextRetryAt=None)
+                    return 0 if complete and publication_ready else 1
                 if failures or after == before:
                     save("waiting", retryDelaySeconds=delay,
                          nextRetryAt=(now() + timedelta(seconds=delay)).isoformat())
@@ -116,5 +137,7 @@ if __name__ == "__main__":
     parser.add_argument("--cooldown", type=int, default=60)
     parser.add_argument("--max-cooldown", type=int, default=900)
     parser.add_argument("--max-rounds", type=int, default=0)
+    parser.add_argument("--publish-every-games", type=int, default=0,
+                        help="Opt-in publication per season after N new games, or at season completion (0 disables)")
     args = parser.parse_args()
     raise SystemExit(run_backfill(**vars(args)))

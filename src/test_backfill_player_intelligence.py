@@ -85,10 +85,11 @@ class HistoricalPublisherTest(unittest.TestCase):
             self.assertEqual(len(published), 1)
 
     def test_incomplete_training_coverage_is_rejected(self):
-        with patch("backfill_player_intelligence.load_game_catalog", return_value=pd.DataFrame({"gameId": ["1", "2"]})), \
+        with tempfile.TemporaryDirectory() as directory, \
+             patch("backfill_player_intelligence.load_game_catalog", return_value=pd.DataFrame({"gameId": ["1", "2"]})), \
              patch("backfill_player_intelligence.load_training_games", return_value=pd.DataFrame({"gameId": ["1"]})):
             with self.assertRaisesRegex(ValueError, "coverage"):
-                backfill_season("2025-26")
+                backfill_season("2025-26", output_dir=directory)
 
 
 if __name__ == "__main__":
