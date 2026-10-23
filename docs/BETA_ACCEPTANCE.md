@@ -22,7 +22,8 @@ security, accessibility, cross-browser, or load-test certification. Simulated
 failure states are not changes to actual published health.
 
 Replay accessibility improvements: chart legend sits above the plot with reserved
-axis-title space; solid/dashed named lines supplement color; selected-event score,
+axis-title space; both team lines are solid per user preference, with named
+legend entries and text probabilities supplementing color; selected-event score,
 play and probabilities appear as text; slider help documents keyboard controls;
 turning-point buttons have distinct play-number/clock labels. Automated checks
 cover these semantics, chart placement and unchanged plotted values.

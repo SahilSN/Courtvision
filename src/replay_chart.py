@@ -8,7 +8,7 @@ def build_replay_chart(data, timeline, index):
     chart = go.Figure()
     for name, values, color, dash in [
         (home["tricode"], timeline.winProbability * 100, "#58A6FF", "solid"),
-        (away["tricode"], (1 - timeline.winProbability) * 100, "#F5B841", "dash"),
+        (away["tricode"], (1 - timeline.winProbability) * 100, "#F5B841", "solid"),
     ]:
         chart.add_trace(go.Scatter(x=timeline.elapsedGameTime / 60, y=values, name=name,
             line=dict(color=color, width=3, dash=dash),

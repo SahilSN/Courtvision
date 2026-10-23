@@ -51,9 +51,12 @@ def render_replay_view():
     st.write(str(row.description))
     st.write(f"Selected-event win probability: {home['tricode']} {float(row.winProbability):.1%}; "
              f"{away['tricode']} {1 - float(row.winProbability):.1%}.")
-    st.caption(f"Chart key: {home['tricode']} solid blue; {away['tricode']} dashed gold. "
+    st.caption(f"Chart key: {home['tricode']} blue; {away['tricode']} gold. Both lines are solid. "
                "The text above gives the selected score and probabilities without relying on chart color or hover.")
-    st.plotly_chart(build_replay_chart(data, timeline, index), width="stretch")
+    chart = build_replay_chart(data, timeline, index)
+    # Also apply the preference here for hosts retaining an older chart helper.
+    chart.update_traces(line_dash="solid")
+    st.plotly_chart(chart, width="stretch")
     turning, impact, box = st.tabs(["Turning Points", "Player Impact", "Box Score"])
     with turning:
         st.caption("Cached full-game swings. Signed changes are from the home team's perspective.")
