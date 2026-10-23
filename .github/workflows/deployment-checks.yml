@@ -33,7 +33,7 @@ jobs:
     env:
       PYTHONPATH: src
       MPLBACKEND: Agg
-      MPLCONFIGDIR: ${{ runner.temp }}/courtvision-matplotlib
+      MPLCONFIGDIR: /tmp/courtvision-matplotlib
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
