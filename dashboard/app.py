@@ -12263,7 +12263,7 @@ def render_player_intelligence(
             "Player Explorer",
         ],
         key=f"courtvision_player_tab_{season}",
-        default="Leaderboard",
+        default=st.session_state.get(f"courtvision_player_tab_{season}", "Leaderboard"),
     )
 
     with leaderboard_tab:
