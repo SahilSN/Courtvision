@@ -12027,6 +12027,22 @@ def render_player_intelligence(
             "cumulative impact."
         )
 
+    selected_team = st.selectbox(
+        "Leaderboard team",
+        ["All teams", *sorted(ratings["currentTeam"].dropna().unique())],
+        key=f"courtvision_player_leaderboard_team_{season}",
+    )
+    team_mask = (
+        pd.Series(True, index=ratings.index)
+        if selected_team == "All teams"
+        else ratings["currentTeam"].eq(selected_team)
+    )
+    st.caption(
+        "Team filters use the player's latest team in the processed games. "
+        "Ratings and ranks retain their full-season, NBA-wide meaning. "
+        "Player Explorer can compare players from any team."
+    )
+
     if not eligible.any():
         st.info(
             "The official player leaderboard opens after "
@@ -12039,7 +12055,7 @@ def render_player_intelligence(
         )
 
         progress = (
-            ratings[
+            ratings.loc[team_mask,
                 [
                     "playerName",
                     "currentTeam",
@@ -12109,7 +12125,7 @@ def render_player_intelligence(
 
         leaderboard = (
             ratings.loc[
-                eligible,
+                eligible & team_mask,
                 [
                     "courtvisionRank",
                     "playerName",
@@ -12127,7 +12143,7 @@ def render_player_intelligence(
             )
             .rename(
                 columns={
-                    "courtvisionRank": "Rank",
+                    "courtvisionRank": "NBA Rank",
                     "playerName": "Player",
                     "currentTeam": "Team",
                     "games": "Games",
@@ -12135,23 +12151,23 @@ def render_player_intelligence(
                     "ratingStatus": "Status",
                     "ratingReliability": "Reliability",
                     "seasonNetWPA": "Season Value",
-                    "seasonValueRank": "Value Rank",
+                    "seasonValueRank": "NBA Value Rank",
                 }
             )
         )
 
         leaderboard[
-            "Rank"
+            "NBA Rank"
         ] = leaderboard[
-            "Rank"
+            "NBA Rank"
         ].map(
             lambda value: f"#{int(value)}"
         )
 
         leaderboard[
-            "Value Rank"
+            "NBA Value Rank"
         ] = leaderboard[
-            "Value Rank"
+            "NBA Value Rank"
         ].map(
             lambda value: f"#{int(value)}"
         )
@@ -12180,6 +12196,8 @@ def render_player_intelligence(
             lambda value: f"{float(value):+.2f}"
         )
 
+        if leaderboard.empty:
+            st.info("No players on this team have reached three processed games yet.")
         st.dataframe(
             leaderboard,
             hide_index=True,
@@ -12343,6 +12361,75 @@ def render_player_explorer(ratings, games, season):
                           "Season Value", "Rating After", "Status", "Reliability"]],
                      hide_index=True, width="stretch")
         st.caption("Game WPA and Season Value are attributed win-probability impact, not wins added.")
+        render_player_comparison(ratings, games, season, selected_player)
+
+
+def render_player_comparison(ratings, games, season, selected_player):
+    st.markdown("#### Compare Players")
+    players_by_id = ratings.set_index("personId")
+    options = ratings.sort_values(["playerName", "personId"])["personId"].tolist()
+    comparison_id = st.selectbox(
+        "Compare with",
+        [None, *[person_id for person_id in options if person_id != selected_player]],
+        format_func=lambda person_id: (
+            "Choose a player" if person_id is None else
+            f"{players_by_id.loc[person_id, 'playerName']} · "
+            f"{players_by_id.loc[person_id, 'currentTeam']}"
+        ),
+        key=f"courtvision_player_comparison_{season}_{selected_player}",
+    )
+    if comparison_id is None:
+        return
+
+    selected = players_by_id.loc[[selected_player, comparison_id]]
+    comparison = selected[[
+        "playerName", "currentTeam", "games", "minutes", "courtvisionRating",
+        "seasonNetWPA", "ratingStatus", "ratingReliability", "courtvisionRank",
+    ]].copy()
+    comparison["courtvisionRank"] = comparison["courtvisionRank"].map(
+        lambda rank: "Not ranked" if pd.isna(rank) else f"#{int(rank)}"
+    )
+    comparison["ratingReliability"] = comparison["ratingReliability"].map(
+        lambda value: f"{value:.0%}"
+    )
+    for column in ["minutes", "courtvisionRating"]:
+        comparison[column] = comparison[column].map(lambda value: f"{value:.1f}")
+    comparison["seasonNetWPA"] = comparison["seasonNetWPA"].map(lambda value: f"{value:+.2f}")
+    comparison = comparison.rename(columns={
+        "playerName": "Player", "currentTeam": "Team", "games": "Games",
+        "minutes": "Minutes", "courtvisionRating": "Rating",
+        "seasonNetWPA": "Season Value", "ratingStatus": "Status",
+        "ratingReliability": "Reliability", "courtvisionRank": "NBA Rank",
+    })
+    st.dataframe(comparison, hide_index=True, width="stretch")
+    if selected["ratingStatus"].ne("Qualified").any():
+        st.info(
+            "At least one player has a limited or provisional sample. "
+            "Compare games, minutes, and reliability alongside the rating."
+        )
+    st.caption(
+        "Rating measures sample-adjusted impact per 36 minutes; Season Value "
+        "is cumulative and depends on playing opportunity. Each line shows "
+        "processed appearances on its actual game dates; schedules may differ."
+    )
+    chart = go.Figure()
+    for person_id, player in selected.iterrows():
+        history = build_player_rating_history(games, person_id)
+        chart.add_trace(go.Scatter(
+            x=history["gameDate"], y=history["courtvisionRating"],
+            mode="lines+markers", name=player["playerName"],
+            customdata=history[["games", "ratingStatus"]],
+            hovertemplate=(
+                "%{x|%b %d, %Y}<br>Rating: %{y:.1f}"
+                "<br>Games: %{customdata[0]}<br>Status: %{customdata[1]}"
+                "<extra>%{fullData.name}</extra>"
+            ),
+        ))
+    chart.add_hline(y=100, line_dash="dash", opacity=0.45,
+                    annotation_text="Historical reference")
+    chart.update_layout(height=350, xaxis_title=None, yaxis_title="Rating",
+                        margin=dict(l=20, r=20, t=30, b=20))
+    st.plotly_chart(chart, width="stretch")
 
 
 

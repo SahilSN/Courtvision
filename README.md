@@ -869,9 +869,12 @@ cumulative Season Value, status, and reliability. Its rating trend reconstructs
 the frozen v1 estimate after each processed appearance using only games up to
 that date. The game log includes matchup, minutes, game WPA, cumulative Season
 Value, rating, status, and reliability, with last-10, last-20, and full-log views.
+The leaderboard and sample-progress list can be filtered by latest processed
+team while preserving NBA-wide ranks and full-season ratings. Player Explorer
+also offers a comparison table and overlaid rating histories for any two players,
+with sample-status context even before leaderboard eligibility.
 Historical player samples remain research datasets rather than full-season
-leaderboards. Further work includes broader historical coverage and player
-comparisons.
+leaderboards. Further work includes broader historical coverage.
 
 ### Later exploration
 
