@@ -837,6 +837,17 @@ The command skips complete games, regenerates only missing WPA or box-score
 artifacts, and rebuilds the ignored player-game research dataset after each run.
 Use `--dry-run` to inspect the selected games without changing local data.
 
+Candidate normalization diagnostics can then be generated with:
+
+```bash
+python src/compare_player_rating_candidates.py \
+    --season 2025-26 \
+    --prior-games 5
+```
+
+This compares cumulative, per-minute, per-possession, and empirically shrunk
+WPA. The output is a research comparison, not a frozen production rating.
+
 Planned work includes:
 
 - define the player-rating objective

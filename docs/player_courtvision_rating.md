@@ -112,3 +112,15 @@ python src/backfill_player_rating_sample.py \
 
 Generated player-game datasets remain local research artifacts. Expanding the
 sample does not change frozen V7 or freeze a player-rating formula.
+
+## Candidate comparison
+
+`src/compare_player_rating_candidates.py` compares cumulative WPA, raw
+per-minute and per-possession rates, and empirical-Bayes-style rates shrunk
+toward the observed player population. The prior strength is expressed in
+equivalent games and remains a research parameter.
+
+The diagnostics report each candidate's association with playing time and
+games, the number of one-game players among its leaders, and how much of those
+leaders' total absolute impact came from their largest game. These checks make
+volume dominance and small-sample outliers visible before a formula is frozen.

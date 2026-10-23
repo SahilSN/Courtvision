@@ -60,6 +60,8 @@ results/wpa_optimization_baseline/
 
 # Player Intelligence intermediate datasets
 results/player_intelligence/*_player_game_v1.csv
+results/player_intelligence/*_rating_candidates_v1.csv
+results/player_intelligence/*_rating_candidate_diagnostics_v1.csv
 
 # Season Intelligence intermediate artifacts
 results/season_intelligence/*_game_features_v1.csv
