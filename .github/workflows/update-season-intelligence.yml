@@ -34,33 +34,6 @@ jobs:
       - name: Install updater dependencies
         run: python -m pip install -r requirements-updater.txt
 
-      - name: Check official NBA CDN availability
-        run: |
-          python - <<'PY'
-          import requests
-          urls = {
-            'schedule': 'https://cdn.nba.com/static/json/staticData/scheduleLeagueV2_1.json',
-            'box': 'https://cdn.nba.com/static/json/liveData/boxscore/boxscore_0022600006.json',
-            'pbp': 'https://cdn.nba.com/static/json/liveData/playbyplay/playbyplay_0022600006.json',
-          }
-          for name, url in urls.items():
-              try:
-                  response = requests.get(url, timeout=10)
-                  print(name, response.status_code, flush=True)
-                  if response.ok:
-                      data = response.json()
-                      print('keys', list(data), flush=True)
-                      if name == 'schedule':
-                          schedule = data.get('leagueSchedule', {})
-                          print('season', schedule.get('seasonYear'), 'sample', str(schedule.get('gameDates', [])[:1])[:3000], flush=True)
-                      elif name == 'pbp':
-                          print('sample', data.get('game', {}).get('actions', [])[:1], flush=True)
-                      else:
-                          print('sample', str(data.get('game', {}).get('homeTeam', {}))[:3000], flush=True)
-              except Exception as error:
-                  print(name, type(error).__name__, str(error), flush=True)
-          PY
-
       - name: Refresh team and player intelligence independently
         id: refresh
         continue-on-error: true
