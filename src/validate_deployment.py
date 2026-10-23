@@ -119,6 +119,16 @@ def validate_published_app(entrypoint="dashboard/app.py"):
                 "Season-to-career navigation lost selected player")
         print("PASS: distinct-season comparison and player-preserving career/season round trip")
 
+        app.sidebar.radio(key="courtvision_season_intelligence_view").set_value("Replay Pilot").run()
+        check_render(app)
+        app.slider[0].set_value(0).run()
+        check_render(app)
+        require(any("full-game" in caption.value.lower() for caption in app.caption),
+                "Replay must disclose full-game precomputation")
+        app.sidebar.radio(key="courtvision_season_intelligence_view").set_value("Player Career").run()
+        check_render(app)
+        print("PASS: offline replay pilot, first-event inspection, and return to career")
+
         second = AppTest.from_file(str(entrypoint_path), default_timeout=90).run()
         check_render(second)
         require(second.sidebar.selectbox(

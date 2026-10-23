@@ -813,8 +813,8 @@ mode = st.sidebar.radio(
 
 if DEPLOYMENT_PROFILE == "published":
     st.sidebar.info(
-        "Published Intelligence beta · Team and Player Intelligence only. "
-        "Live games and game replay are not enabled on this deployment. "
+        "Published beta · Team and Player Intelligence plus one precomputed replay pilot. "
+        "Live games and unrestricted replay are not enabled. "
         "Historical player coverage may be partial."
     )
 
@@ -1664,7 +1664,7 @@ else:
                 "Players",
 
             ]
-            + ["Player Career"]
+            + ["Player Career", "Replay Pilot"]
         ),
 
         key="courtvision_season_intelligence_view",
@@ -12741,6 +12741,10 @@ def render_career_season_comparison(summaries, coverage, person_id, season_optio
 
 
 def run_season_intelligence():
+    if intelligence_view == "Replay Pilot":
+        from published_replay import render_replay
+        render_replay()
+        return
     if intelligence_view == "Player Career":
         render_player_career()
         return

@@ -1023,6 +1023,15 @@ the current season; the dashboard performs no historical backfill itself.
 
 ### Later exploration
 
+The private beta includes one read-only Replay Pilot: HOU at OKC, October21,
+2025 (125–124,2OT). Its checked-in JSON contains the existing frozen V7 timeline,
+turning points, full-game player WPA, and cached box score. Both box-score point
+totals reconcile to the final timeline. `src/export_replay_pilot.py` is a local,
+offline build step from trusted caches; hosted requests only parse JSON and
+render it. The timeline slider is inspection, not spoiler-free playback: all
+other panels remain full-game summaries. Live feeds and unrestricted historical
+analysis remain disabled on the published profile.
+
 Player Explorer links directly to the same player's Career profile, and Career
 can open any covered season directly in Player Explorer. Searchable player
 pickers include team labels. Career profiles summarize complete versus partial
