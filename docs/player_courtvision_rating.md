@@ -88,4 +88,3 @@ rating formula must not quietly become a conventional box-score rating.
 5. Backfill completed historical seasons.
 6. Add incremental current-season updates.
 7. Build the player leaderboard and player profile UI.
-
