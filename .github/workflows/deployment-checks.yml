@@ -6,6 +6,7 @@ on:
     paths:
       - 'src/**'
       - 'dashboard/**'
+      - 'cloud/**'
       - 'models/**'
       - 'results/player_intelligence/**'
       - 'results/season_intelligence/**'
@@ -43,6 +44,7 @@ jobs:
           cache-dependency-path: |
             requirements.txt
             requirements-deployment.txt
+            cloud/requirements.txt
       - name: Install pinned runtime dependencies
         shell: bash
         run: |
@@ -50,14 +52,16 @@ jobs:
           if [ "$RUNNER_OS" = "Linux" ]; then
             python -m pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cpu
           fi
-          python -m pip install -r requirements-deployment.txt
+          python -m pip install -r cloud/requirements.txt
           python -m pip check
       - name: Unit regressions
         run: python -m unittest discover -s src -p 'test_*.py'
       - name: Frozen model and offline published UI
-        run: python src/validate_deployment.py
+        run: |
+          python src/validate_deployment.py
+          python src/validate_deployment.py --entrypoint cloud/app.py
       - name: Compile and inspect changes
         run: |
-          python -m compileall -q src dashboard
+          python -m compileall -q src dashboard cloud
           git diff --check
           git diff --exit-code

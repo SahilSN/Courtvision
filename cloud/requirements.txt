@@ -1,0 +1,5 @@
+# Community Cloud discovers requirements alongside its entry point.
+--extra-index-url https://download.pytorch.org/whl/cpu
+-r ../requirements-deployment.txt
+# Avoid installing the large CUDA runtime on Community Cloud's Linux CPU host.
+torch==2.11.0+cpu ; sys_platform == 'linux'

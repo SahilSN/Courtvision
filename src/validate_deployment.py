@@ -4,6 +4,7 @@ Uses bundled artifacts only. No NBA calls, workers, or publication are allowed.
 This checks app execution, not visual layout, browser assets, or load capacity.
 """
 
+import argparse
 import os
 from pathlib import Path
 from unittest.mock import patch
@@ -53,19 +54,25 @@ def validate_model():
     print("PASS: frozen V7/scaler load and CPU inference")
 
 
-def validate_published_app():
+def validate_published_app(entrypoint="dashboard/app.py"):
+    entrypoint_path = (ROOT / entrypoint).resolve()
+    is_cloud_entrypoint = entrypoint_path == ROOT / "cloud" / "app.py"
     summaries, games, coverage = load_published_player_data()
     require(not summaries.empty and not games.empty, "Missing published player data")
     require(CURRENT_SEASON in set(coverage.season), "Current player season missing")
     for person_id in games.personId.unique():
         build_player_career(games, person_id)
 
-    with patch.dict(os.environ, {"COURTVISION_DEPLOYMENT_PROFILE": "published"}), \
+    with patch.dict(os.environ, {
+             # The cloud wrapper must override even an incorrectly configured full profile.
+             "COURTVISION_DEPLOYMENT_PROFILE": "full" if is_cloud_entrypoint else "published",
+             "COURTVISION_CLOUD_READY": "1",
+         }), \
          patch("requests.sessions.Session.request", side_effect=AssertionError(
              "Published deployment attempted a network request")) as network, \
          patch("subprocess.Popen", side_effect=AssertionError(
              "Published deployment attempted a subprocess")) as workers:
-        app = AppTest.from_file(str(ROOT / "dashboard/app.py"), default_timeout=90)
+        app = AppTest.from_file(str(entrypoint_path), default_timeout=90)
         # Old browser sessions must not retain a disabled mode after deployment.
         app.session_state["courtvision_mode"] = "Live"
         app.run()
@@ -89,7 +96,7 @@ def validate_published_app():
         check_render(app)
         print("PASS: career view and every published player's career aggregation")
 
-        second = AppTest.from_file(str(ROOT / "dashboard/app.py"), default_timeout=90).run()
+        second = AppTest.from_file(str(entrypoint_path), default_timeout=90).run()
         check_render(second)
         require(second.sidebar.selectbox(
             key="courtvision_season_intelligence_season").value == CURRENT_SEASON,
@@ -107,5 +114,8 @@ def validate_published_app():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--entrypoint", default="dashboard/app.py")
+    args = parser.parse_args()
     validate_model()
-    validate_published_app()
+    validate_published_app(args.entrypoint)

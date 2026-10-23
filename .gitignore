@@ -9,6 +9,7 @@ __pycache__/
 
 # Environment variables / secrets
 .env
+**/.streamlit/secrets.toml
 
 # Data
 data/raw/*

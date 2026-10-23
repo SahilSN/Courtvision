@@ -61,6 +61,42 @@ settings. Leave Streamlit's default request protections enabled. For local-only
 staging use `--server.address=127.0.0.1` instead. Nothing in this repository
 creates a hosting account or publishes a public URL.
 
+## Streamlit Community Cloud setup
+
+Use repository `SahilSN/Courtvision`, branch `main`, entry point `cloud/app.py`,
+and Python 3.12 in Advanced settings. Dependencies are discovered from
+`cloud/requirements.txt`, which includes the deployment requirements and pins
+the Linux CPU-only PyTorch build. The wrapper always selects published
+intelligence, regardless of a conflicting host profile setting.
+
+The cloud entry point initially displays only a setup notice, with no dashboard
+data or game-analysis imports. **Do not set `COURTVISION_CLOUD_READY` yet.** This
+is a deployment setup latch, not an authentication mechanism.
+
+Because this repository is public, verify the app's actual sharing settings
+before enabling data. Select **Only specific people can view this app** in
+Community Cloud's sharing settings and verify an unauthenticated browser cannot
+access it. If private sharing is unavailable, leave setup closed and choose a
+host/access-control solution with the user; do not assume a secret URL is private.
+See the official [sharing settings](https://docs.streamlit.io/deploy/streamlit-community-cloud/share-your-app).
+
+Only after privacy is verified, add this root-level string to the app's Secrets
+settings, which Community Cloud exposes as an environment variable:
+
+```toml
+COURTVISION_CLOUD_READY = "1"
+```
+
+Do not commit secrets files. Do not copy GitHub tokens or Mac scheduler credentials
+to this app; it reads committed artifacts and does not run the updater.
+The setup notice is expected until that readiness flag is explicitly enabled.
+
+Offline cloud-wrapper regression:
+
+```bash
+.venv/bin/python src/validate_deployment.py --entrypoint cloud/app.py
+```
+
 ## Nightly publication must reach the host
 
 1. The Mac LaunchAgent runs once at 1 a.m. local time, with wake/login catch-up.
