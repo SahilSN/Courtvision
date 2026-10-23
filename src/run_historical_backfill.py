@@ -68,9 +68,15 @@ def run_backfill(seasons, output_dir=PLAYER_INTELLIGENCE_DIR, batch_size=25,
                 season = pending[0]
                 before = state["coverage"][season]["processedGames"]
                 state["round"] += 1
-                save("running", season=season, nextRetryAt=None)
-                failures = backfill_season(season, max_new_games=batch_size,
-                    output_dir=output_dir, failure_limit=failure_limit)
+                save("running", season=season, nextRetryAt=None, waitReason=None)
+                try:
+                    failures = backfill_season(season, max_new_games=batch_size,
+                        output_dir=output_dir, failure_limit=failure_limit)
+                except BlockingIOError:
+                    save("waiting", waitReason="checkpoint_lock",
+                         nextRetryAt=(now() + timedelta(seconds=2)).isoformat())
+                    sleeper(2)
+                    continue
                 state["coverage"] = progress(seasons, output_dir)
                 after = state["coverage"][season]["processedGames"]
                 if after > before:

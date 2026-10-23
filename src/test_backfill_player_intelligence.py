@@ -22,9 +22,22 @@ class HistoricalPublisherTest(unittest.TestCase):
              patch("backfill_player_intelligence.box_cache_path", return_value=cached_box), \
              patch("backfill_player_intelligence.load_cached_box_players"), \
              patch("backfill_player_intelligence.load_wpa_summary"), \
+             patch("backfill_player_intelligence.fetch_and_cache_box_score"), \
              patch("backfill_player_intelligence.build_player_game_rows", side_effect=outcomes) as build:
             result = backfill_season("2025-26", output_dir=directory, failure_limit=failure_limit)
             return result, build.call_count
+
+    def test_missing_possessions_are_refreshed_then_skipped_without_poisoning_checkpoint(self):
+        rows = [pd.DataFrame([make_appearance(1, "Player", i, 0.3)]) for i in range(1, 5)]
+        bad = rows[0].copy()
+        bad["possessions"] = float("nan")
+        with tempfile.TemporaryDirectory() as directory:
+            failures, calls = self.exercise_batch(directory, [bad, bad, *rows[1:]])
+            self.assertEqual(len(failures), 1)
+            self.assertEqual(calls, 5)
+            saved = pd.read_csv(Path(directory) / "2025-26_player_game_v1.csv")
+            self.assertEqual(len(saved), 3)
+            self.assertFalse(saved.possessions.isna().any())
 
     def test_circuit_stops_after_consecutive_failures(self):
         with tempfile.TemporaryDirectory() as directory:

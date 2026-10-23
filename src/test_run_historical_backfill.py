@@ -9,6 +9,16 @@ from run_historical_backfill import run_backfill
 
 
 class BackfillRunnerTest(unittest.TestCase):
+    def test_snapshot_lock_contention_is_retried(self):
+        before = {"2025-26": {"processedGames": 0, "expectedGames": 1}}
+        after = {"2025-26": {"processedGames": 1, "expectedGames": 1}}
+        sleep = Mock()
+        with tempfile.TemporaryDirectory() as directory, \
+             patch("run_historical_backfill.progress", side_effect=[before, before, after]), \
+             patch("run_historical_backfill.backfill_season", side_effect=[BlockingIOError(), []]):
+            self.assertEqual(run_backfill(["2025-26"], directory, max_rounds=2, sleeper=sleep), 0)
+        sleep.assert_called_once_with(2)
+
     def test_outage_backoff_is_bounded_and_health_remains_incomplete(self):
         coverage = {"2025-26": {"processedGames": 0, "expectedGames": 10}}
         errors = [{"gameId": "0022500001", "error": "timeout"}]

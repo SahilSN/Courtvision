@@ -13,6 +13,7 @@ from backfill_player_rating_sample import (
 )
 from player_impact import analyze_player_impact, load_model, load_season_data
 from player_rating import build_player_ratings
+from compare_player_rating_candidates import validate_source
 from player_rating_dataset import (
     PLAYER_INTELLIGENCE_DIR, build_player_game_rows, load_cached_box_players,
     load_game_catalog, load_wpa_summary, validate_player_game_dataset,
@@ -76,13 +77,23 @@ def _backfill_season(season, max_new_games, cached_only, output_dir, failure_lim
                     with contextlib.redirect_stdout(io.StringIO()):
                         analyze_player_impact(game.gameId, season, season_df=season_df,
                                              model=artifacts[0], scaler=artifacts[1], device=artifacts[2])
-                if not box_cache_path(game.gameId).exists():
+                had_cached_box = box_cache_path(game.gameId).exists()
+                if not had_cached_box:
                     fetch_and_cache_box_score(game.gameId, retries=1)
                 rows = build_player_game_rows(
                     season, game.gameId, team_games,
                     load_cached_box_players(game.gameId), load_wpa_summary(game.gameId),
                 )
-                validate_player_game_dataset(rows)
+                if had_cached_box and rows["possessions"].isna().any():
+                    # Cached partial box data must not poison a checkpoint or
+                    # remain permanently unrepairable. Refresh once, then fail
+                    # visibly if the provider still omits required data.
+                    fetch_and_cache_box_score(game.gameId, retries=1)
+                    rows = build_player_game_rows(
+                        season, game.gameId, team_games,
+                        load_cached_box_players(game.gameId), load_wpa_summary(game.gameId),
+                    )
+                validate_source(rows)
                 frames.append(rows)
                 done.add(game.gameId)
                 consecutive_failures = 0
