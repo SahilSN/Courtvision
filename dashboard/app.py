@@ -113,6 +113,7 @@ from season_config import (
 )
 
 from player_rating import build_player_rating_history
+from player_career import build_player_career, load_published_player_data, season_coverage
 
 
 
@@ -1637,7 +1638,7 @@ else:
         (
             "Current regular-season context"
             if season == CURRENT_SEASON
-            else "Historical · Frozen Team Courtvision Rating v1"
+            else "Historical regular-season context"
         )
 
     )
@@ -1654,11 +1655,7 @@ else:
                 "Players",
 
             ]
-            if season == CURRENT_SEASON
-            else [
-                "Teams",
-
-            ]
+            + ["Player Career"]
         ),
 
         key="courtvision_season_intelligence_view",
@@ -11961,8 +11958,9 @@ def render_player_intelligence(
 
     except FileNotFoundError:
         st.info(
-            "Player ratings will appear after completed "
-            "regular-season games are processed."
+            f"Player Intelligence for {season} has not been published yet. "
+            "Completed regular-season games will appear as the historical "
+            "backfill or current-season publisher processes them."
         )
         return
 
@@ -11972,6 +11970,26 @@ def render_player_intelligence(
             f"{error}"
         )
         return
+
+    history_path = (
+        ROOT_DIR / "results" / "season_intelligence"
+        / f"{season}_team_rating_games_v1.csv"
+    )
+    team_history = pd.read_csv(history_path, dtype={"gameId": str}) if history_path.exists() else None
+    coverage = season_coverage(season, games, team_history)
+    if coverage["coverageStatus"] != "Complete":
+        expected = coverage["expectedGames"]
+        coverage_text = (
+            f"{coverage['processedGames']:,} of {expected:,} completed league games"
+            if expected else f"{coverage['processedGames']:,} processed league games"
+        )
+        st.warning(
+            f"{coverage['coverageStatus']} coverage: {coverage_text}. "
+            "Totals, trends, and ranks use processed games only. "
+            "Missing appearances are not zero-impact games."
+        )
+    else:
+        st.caption(f"Complete regular-season coverage: {coverage['processedGames']:,} games.")
 
     eligible = (
         ratings[
@@ -12039,7 +12057,7 @@ def render_player_intelligence(
     )
     st.caption(
         "Team filters use the player's latest team in the processed games. "
-        "Ratings and ranks retain their full-season, NBA-wide meaning. "
+        "Ratings and ranks retain their season-wide processed-game context. "
         "Player Explorer can compare players from any team."
     )
 
@@ -12199,7 +12217,9 @@ def render_player_intelligence(
         if leaderboard.empty:
             st.info("No players on this team have reached three processed games yet.")
         st.dataframe(
-            leaderboard,
+            leaderboard.rename(columns={
+                "NBA Rank": "Sample Rank", "NBA Value Rank": "Sample Value Rank",
+            }) if coverage["coverageStatus"] in ("Partial", "Unknown") else leaderboard,
             hide_index=True,
             width="stretch",
             height=560,
@@ -12434,7 +12454,102 @@ def render_player_comparison(ratings, games, season, selected_player):
 
 
 
+@st.cache_data(show_spinner=False, ttl=30)
+def cached_player_career_data():
+    return load_published_player_data()
+
+
+def render_player_career():
+    st.subheader("Player Career")
+    st.caption("Regular-season Player Intelligence across published seasons")
+    try:
+        summaries, games, coverage = cached_player_career_data()
+    except Exception as error:
+        st.error(f"Could not load career Player Intelligence: {error}")
+        return
+    if summaries.empty:
+        st.info("Career summaries will appear after player seasons are published.")
+        return
+    players = (
+        games.sort_values(["gameDate", "gameId"], kind="mergesort")
+        .drop_duplicates("personId", keep="last")
+        .set_index("personId")
+    )
+    person_id = st.selectbox(
+        "Player", players.sort_values(["playerName"]).index.tolist(),
+        format_func=lambda value: players.loc[value, "playerName"],
+        key="courtvision_player_career_person",
+    )
+    career = build_player_career(games, person_id)
+    st.markdown(f"### {players.loc[person_id, 'playerName']}")
+    st.warning(
+        "Covered seasons only — these are not complete NBA career totals. "
+        "Partial historical seasons and the current season may omit appearances. "
+        "Seasons before the published archive are not included."
+    )
+    columns = st.columns(4)
+    for column, label, value in zip(columns, [
+        "Seasons Covered", "Covered Games", "Covered Minutes", "Covered Season Value",
+    ], [f"{career['seasons']}", f"{career['games']:,}", f"{career['minutes']:,.1f}",
+        f"{career['seasonNetWPA']:+.2f}"]):
+        column.metric(label, value)
+    st.caption(
+        f"Covered-games rating: {career['coveredRating']:.1f} · "
+        f"Raw WPA per 36: {career['netWPAper36']:+.3f}. "
+        "The covered-games rating pools minutes and impact across appearances "
+        "with one historical prior; it is not an average of season ratings. "
+        "Season Value is attributed win-probability impact, not wins added."
+    )
+    seasons = summaries.loc[summaries["personId"].eq(person_id)].merge(
+        coverage, on="season", validate="one_to_one"
+    ).sort_values("season")
+    seasons["League Games Covered"] = seasons.apply(
+        lambda row: f"{int(row['processedGames']):,} / {int(row['expectedGames']):,}"
+        if pd.notna(row["expectedGames"]) else f"{int(row['processedGames']):,} / unknown",
+        axis=1,
+    )
+    st.markdown("#### Season by Season")
+    display = seasons[[
+        "season", "teams", "games", "minutes", "courtvisionRating", "seasonNetWPA",
+        "ratingStatus", "ratingReliability", "coverageStatus", "League Games Covered",
+    ]].rename(columns={
+        "season": "Season", "teams": "Teams", "games": "Covered Games",
+        "minutes": "Minutes", "courtvisionRating": "Rating", "seasonNetWPA": "Season Value",
+        "ratingStatus": "Sample Status", "ratingReliability": "Reliability",
+        "coverageStatus": "Season Coverage",
+    })
+    display["Reliability"] = display["Reliability"].map(lambda value: f"{value:.0%}")
+    for name in ["Minutes", "Rating"]:
+        display[name] = display[name].map(lambda value: f"{value:.1f}")
+    display["Season Value"] = display["Season Value"].map(lambda value: f"{value:+.2f}")
+    st.dataframe(display, hide_index=True, width="stretch")
+    st.caption(
+        "Sample status measures the amount of processed playing time; it does "
+        "not certify season completeness. An absent player-season means no "
+        "published appearances, not necessarily that the player did not play."
+    )
+    chart = go.Figure(go.Scatter(
+        x=seasons["season"], y=seasons["courtvisionRating"], mode="lines+markers",
+        customdata=seasons[["games", "coverageStatus", "League Games Covered"]],
+        hovertemplate=("%{x}<br>Rating: %{y:.1f}<br>Player games: %{customdata[0]}"
+                       "<br>Coverage: %{customdata[1]}<br>League games: %{customdata[2]}<extra></extra>"),
+    ))
+    chart.add_hline(y=100, line_dash="dash", opacity=0.45,
+                    annotation_text="Historical reference")
+    chart.update_layout(height=350, xaxis_title="Season", yaxis_title="Season Rating")
+    chart.update_xaxes(type="category")
+    st.plotly_chart(chart, width="stretch")
+    st.markdown("#### Archive Coverage")
+    st.dataframe(coverage.rename(columns={
+        "season": "Season", "processedGames": "Processed Games",
+        "expectedGames": "Completed League Games", "coverageStatus": "Coverage",
+    }), hide_index=True, width="stretch")
+
+
 def run_season_intelligence():
+    if intelligence_view == "Player Career":
+        render_player_career()
+        return
     if intelligence_view == "Players":
         render_player_intelligence(
             season

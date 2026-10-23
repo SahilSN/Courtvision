@@ -874,7 +874,31 @@ team while preserving NBA-wide ranks and full-season ratings. Player Explorer
 also offers a comparison table and overlaid rating histories for any two players,
 with sample-status context even before leaderboard eligibility.
 Historical player samples remain research datasets rather than full-season
-leaderboards. Further work includes broader historical coverage.
+leaderboards until coverage is complete.
+
+Historical Player Intelligence is available in the Season selector for
+2019-20 onward. Each season reports its processed game count against the full
+regular-season catalog. Partial historical leaderboards show sample ranks.
+The Player Career view combines published player appearances by NBA person ID,
+including team changes, and shows a season-by-season table and rating chart.
+Its totals explicitly cover published games only, not a player's full NBA career.
+The covered-games rating pools minutes and WPA with one frozen historical prior;
+season ratings are not averaged. These are Courtvision impact metrics and
+participation statistics, rather than traditional points/rebounds/assists totals.
+
+Full historical publication is resumable:
+
+```bash
+PYTHONPATH=src python src/backfill_player_intelligence.py \
+  --seasons 2025-26 2024-25 2023-24 2022-23 2021-22 2020-21 2019-20
+```
+
+Use `--max-new-games 50` for bounded batches or `--cached-only` to publish only
+existing cached games. The command requires local season training datasets,
+processed games, and game catalogs. It reuses frozen V7/WPA v3, fetches missing
+box scores, checkpoints after every 10 attempted games, and retries unpublished
+failures on the next run. Published historical CSV pairs are versioned alongside
+the current season; the dashboard performs no historical backfill itself.
 
 ### Later exploration
 

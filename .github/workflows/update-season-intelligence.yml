@@ -52,6 +52,8 @@ jobs:
           src/test_early_season_intelligence.py
           src/test_player_rating.py
           src/test_update_player_intelligence.py
+          src/test_player_career.py
+          src/test_backfill_player_intelligence.py
 
       - name: Check generated diff
         run: git diff --check
