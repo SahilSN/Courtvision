@@ -96,6 +96,29 @@ def validate_published_app(entrypoint="dashboard/app.py"):
         check_render(app)
         print("PASS: career view and every published player's career aggregation")
 
+        person_id = app.selectbox(key="courtvision_player_career_person").value
+        target = app.selectbox(key=f"career_explore_season_{person_id}").value
+        first_key = f"career_compare_first_{person_id}"
+        if any(box.key == first_key for box in app.selectbox):
+            picker = app.selectbox(key=first_key)
+            picker.select(picker.options[-1]).run()
+            check_render(app)
+            require(app.selectbox(key=f"career_compare_second_{person_id}").value !=
+                    app.selectbox(key=first_key).value, "Comparison permits duplicate seasons")
+        app.button(key=f"career_open_season_{person_id}").click().run()
+        check_render(app)
+        require(app.sidebar.radio(key="courtvision_season_intelligence_view").value == "Players",
+                "Career-to-season navigation failed")
+        require(app.selectbox(key=f"courtvision_player_intelligence_player_{target}").value == person_id,
+                "Season navigation lost selected player")
+        require(app.session_state[f"courtvision_player_tab_{target}"] == "Player Explorer",
+                "Season navigation did not open explorer")
+        app.button(key=f"career_from_{target}").click().run()
+        check_render(app)
+        require(app.selectbox(key="courtvision_player_career_person").value == person_id,
+                "Season-to-career navigation lost selected player")
+        print("PASS: distinct-season comparison and player-preserving career/season round trip")
+
         second = AppTest.from_file(str(entrypoint_path), default_timeout=90).run()
         check_render(second)
         require(second.sidebar.selectbox(

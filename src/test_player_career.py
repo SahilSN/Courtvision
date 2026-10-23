@@ -4,12 +4,31 @@ from pathlib import Path
 
 import pandas as pd
 
-from player_career import build_player_career, load_published_player_data, season_coverage
+from player_career import build_player_career, load_published_player_data, season_coverage, player_season_comparison
 from player_rating import build_player_ratings
 from test_player_rating import make_appearance
 
 
 class PlayerCareerTest(unittest.TestCase):
+    def test_comparison_preserves_published_values_order_and_coverage(self):
+        summaries = pd.DataFrame([
+            {"personId": 1, "season": "2024-25", "courtvisionRating": 111.2},
+            {"personId": 1, "season": "2025-26", "courtvisionRating": 121.3},
+            {"personId": 2, "season": "2025-26", "courtvisionRating": 999.0},
+        ])
+        coverage = pd.DataFrame([
+            {"season": "2024-25", "coverageStatus": "Partial"},
+            {"season": "2025-26", "coverageStatus": "Complete"},
+        ])
+        original = summaries.copy(deep=True)
+        rows = player_season_comparison(summaries, coverage, 1, "2025-26", "2024-25")
+        self.assertEqual(rows.courtvisionRating.tolist(), [121.3, 111.2])
+        self.assertEqual(rows.coverageStatus.tolist(), ["Complete", "Partial"])
+        pd.testing.assert_frame_equal(summaries, original)
+        for pair in [("2025-26", "2025-26"), ("2025-26", "2023-24")]:
+            with self.assertRaises(ValueError):
+                player_season_comparison(summaries, coverage, 1, *pair)
+
     def setUp(self):
         first = make_appearance(1, "Same Player", 1, 0.5)
         second = make_appearance(1, "Same Player", 2, -0.2)

@@ -13,6 +13,18 @@ from player_rating_dataset import PLAYER_INTELLIGENCE_DIR, validate_player_game_
 from season_config import CURRENT_SEASON
 
 
+def player_season_comparison(summaries, coverage, person_id, first, second):
+    """Display-only comparison; retain published season ratings and coverage."""
+    if first == second:
+        raise ValueError("Choose two different seasons.")
+    rows = summaries.loc[summaries.personId.eq(person_id)].merge(
+        coverage, on="season", validate="one_to_one"
+    ).set_index("season")
+    if first not in rows.index or second not in rows.index:
+        raise ValueError("Both seasons need published appearances for this player.")
+    return rows.loc[[first, second]].reset_index()
+
+
 def season_coverage(season, games, team_history=None):
     processed = set(games["gameId"].astype(str).str.zfill(10))
     expected = (

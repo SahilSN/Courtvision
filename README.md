@@ -1023,6 +1023,14 @@ the current season; the dashboard performs no historical backfill itself.
 
 ### Later exploration
 
+Player Explorer links directly to the same player's Career profile, and Career
+can open any covered season directly in Player Explorer. Searchable player
+pickers include team labels. Career profiles summarize complete versus partial
+archive coverage and offer side-by-side published season ratings, games,
+minutes, Season Value, and reliability. Comparisons are descriptive, retain the
+existing frozen ratings, and warn on incomplete seasons or non-qualified samples;
+covered totals must not be interpreted as complete NBA career totals.
+
 Potential later additions include:
 
 - game-control season analytics

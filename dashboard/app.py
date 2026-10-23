@@ -113,7 +113,7 @@ from season_config import (
 )
 
 from player_rating import build_player_rating_history
-from player_career import build_player_career, load_published_player_data, season_coverage
+from player_career import build_player_career, load_published_player_data, season_coverage, player_season_comparison
 from update_intelligence import load_update_status
 from deployment_config import get_deployment_profile, navigation_modes
 from intelligence_health import backfill_health
@@ -12261,7 +12261,9 @@ def render_player_intelligence(
         [
             "Leaderboard",
             "Player Explorer",
-        ]
+        ],
+        key=f"courtvision_player_tab_{season}",
+        default="Leaderboard",
     )
 
     with leaderboard_tab:
@@ -12403,6 +12405,7 @@ def render_player_explorer(ratings, games, season):
                 + " · " + players_by_id.loc[person_id, "currentTeam"]
             ),
             key=f"courtvision_player_intelligence_player_{season}",
+            help="Type a player name or team to search. Includes players with limited samples.",
         )
 
         player = (
@@ -12426,6 +12429,8 @@ def render_player_explorer(ratings, games, season):
             f"{season} regular season · {rank_label} in processed coverage",
             badge=player["ratingStatus"],
         )
+        st.button("View career & compare seasons", key=f"career_from_{season}",
+                  on_click=navigate_player_intelligence, args=(selected_player, None))
         render_player_metrics([
             ("Courtvision Rating", f"{float(player['courtvisionRating']):.1f}", "100 · historical reference"),
             ("Season Value", f"{float(player['seasonNetWPA']):+.2f}", "Cumulative attributed impact"),
@@ -12582,6 +12587,18 @@ def cached_player_career_data():
     return load_published_player_data()
 
 
+def navigate_player_intelligence(person_id, target_season=None):
+    """Widget callbacks run before navigation widgets are recreated."""
+    if target_season is None:
+        st.session_state["courtvision_player_career_person"] = person_id
+        st.session_state["courtvision_season_intelligence_view"] = "Player Career"
+    else:
+        st.session_state["courtvision_season_intelligence_season"] = target_season
+        st.session_state["courtvision_season_intelligence_view"] = "Players"
+        st.session_state[f"courtvision_player_intelligence_player_{target_season}"] = person_id
+        st.session_state[f"courtvision_player_tab_{target_season}"] = "Player Explorer"
+
+
 def render_player_career():
     render_player_design()
     render_intelligence_freshness(CURRENT_SEASON, "players")
@@ -12602,8 +12619,9 @@ def render_player_career():
     )
     person_id = st.selectbox(
         "Player", players.sort_values(["playerName"]).index.tolist(),
-        format_func=lambda value: players.loc[value, "playerName"],
+        format_func=lambda value: f"{players.loc[value, 'playerName']} · {players.loc[value, 'teamTricode']}",
         key="courtvision_player_career_person",
+        help="Type a name or latest covered team to search the published archive.",
     )
     career = build_player_career(games, person_id)
     player = players.loc[person_id]
@@ -12619,7 +12637,7 @@ def render_player_career():
     )
     render_player_metrics([
         ("Covered-games rating", f"{career['coveredRating']:.1f}", "Pooled impact · 100 reference"),
-        ("Career Season Value", f"{career['seasonNetWPA']:+.2f}", "Across covered appearances"),
+        ("Covered Season Value", f"{career['seasonNetWPA']:+.2f}", "Across covered appearances"),
         ("Games covered", f"{career['games']:,}", f"{career['minutes']:,.0f} minutes"),
         ("Seasons covered", f"{career['seasons']}", "Regular season only"),
     ])
@@ -12633,6 +12651,12 @@ def render_player_career():
     seasons = summaries.loc[summaries["personId"].eq(person_id)].merge(
         coverage, on="season", validate="one_to_one"
     ).sort_values("season")
+    complete_count = int(seasons["coverageStatus"].eq("Complete").sum())
+    st.caption(
+        f"{complete_count} of {len(seasons)} covered seasons have complete league coverage. "
+        "The remainder are partial, in progress, or unverified. "
+        "This is archive coverage, not the player's full NBA career."
+    )
     seasons["League Games Covered"] = seasons.apply(
         lambda row: f"{int(row['processedGames']):,} / {int(row['expectedGames']):,}"
         if pd.notna(row["expectedGames"]) else f"{int(row['processedGames']):,} / unknown",
@@ -12658,6 +12682,12 @@ def render_player_career():
         "not certify season completeness. An absent player-season means no "
         "published appearances, not necessarily that the player did not play."
     )
+    season_options = seasons["season"].tolist()[::-1]
+    selected_season = st.selectbox("Explore a covered season", season_options,
+                                   key=f"career_explore_season_{person_id}")
+    st.button("Open season profile", key=f"career_open_season_{person_id}",
+              on_click=navigate_player_intelligence, args=(person_id, selected_season))
+    render_career_season_comparison(summaries, coverage, person_id, season_options)
     chart = go.Figure(go.Scatter(
         x=seasons["season"], y=seasons["courtvisionRating"], mode="lines+markers",
         line=dict(color=player_visual_theme(player["teamTricode"])[1], width=3),
@@ -12676,6 +12706,38 @@ def render_player_career():
             "season": "Season", "processedGames": "Processed Games",
             "expectedGames": "Completed League Games", "coverageStatus": "Coverage",
         })), hide_index=True, width="stretch")
+
+
+def render_career_season_comparison(summaries, coverage, person_id, season_options):
+    st.markdown("#### Compare Seasons")
+    if len(season_options) < 2:
+        st.info("A season comparison will appear when a second season has published appearances for this player.")
+        return
+    left, right = st.columns(2)
+    first = left.selectbox("First season", season_options,
+                           key=f"career_compare_first_{person_id}")
+    second = right.selectbox("Second season", [s for s in season_options if s != first],
+                             key=f"career_compare_second_{person_id}")
+    compared = player_season_comparison(summaries, coverage, person_id, first, second)
+    for column, (_, row) in zip(st.columns(2), compared.iterrows()):
+        with column:
+            st.markdown(f"**{row['season']} · {row['teams']}**")
+            st.metric("Season rating", f"{row['courtvisionRating']:.1f}")
+            st.caption(f"{int(row['games'])} covered appearances · {row['ratingStatus']} sample · {row['coverageStatus']} coverage")
+    st.caption(f"Rating difference ({second} − {first}): "
+               f"{compared.iloc[1]['courtvisionRating'] - compared.iloc[0]['courtvisionRating']:+.1f} points. "
+               "Descriptive only—not adjusted for differences in sample or playing opportunity.")
+    if compared["coverageStatus"].ne("Complete").any():
+        st.info("At least one season is incomplete or still in progress. Missing appearances can change ratings and totals.")
+    if compared["ratingStatus"].ne("Qualified").any():
+        st.caption("At least one rating has a limited or provisional sample; compare reliability as well as rating.")
+    display = compared[["season", "games", "minutes", "seasonNetWPA", "ratingReliability", "coverageStatus"]].rename(columns={
+        "season": "Season", "games": "Covered Games", "minutes": "Minutes",
+        "seasonNetWPA": "Season Value", "ratingReliability": "Reliability", "coverageStatus": "Coverage"})
+    display["Minutes"] = display["Minutes"].map(lambda value: f"{value:,.0f}")
+    display["Season Value"] = display["Season Value"].map(lambda value: f"{value:+.2f}")
+    display["Reliability"] = display["Reliability"].map(lambda value: f"{value:.0%}")
+    st.dataframe(style_player_table(display), hide_index=True, width="stretch")
 
 
 def run_season_intelligence():
