@@ -134,3 +134,33 @@ An expanding-window walk-forward check repeats that test across multiple
 cutoffs. Each fold trains on every game available at that point and evaluates
 only the immediately following block, exposing candidates that depend on one
 favorable late-season split.
+
+## Frozen v1 specification
+
+Player Courtvision Rating v1 uses a fixed historical reference of `0.30` net
+WPA per 36 minutes and a neutral prior worth `120` minutes. The posterior rate
+is converted to a stable index:
+
+```text
+posterior WPA/36 =
+    (season net WPA + 120 × 0.30 / 36) / (minutes + 120) × 36
+
+Player Courtvision Rating =
+    100 + 50 × (posterior WPA/36 / 0.30 - 1)
+```
+
+`100` therefore represents the fixed historical reference, not the nightly
+mean. Rating v1 measures opportunity-adjusted impact quality. Cumulative net
+WPA remains a separate **Season Value** measure because walk-forward validation
+shows that accumulated impact carries useful information that should not be
+hidden inside the quality rating.
+
+Status and ranking rules:
+
+- fewer than 3 games: **Limited**, visible but not ranked
+- 3–9 games: **Provisional**, eligible for a clearly labeled leaderboard
+- 10 or more games and at least 60% reliability: **Qualified**
+- reliability is `minutes / (minutes + 120)`
+
+The fixed baseline candidate produced positive top-quartile future lift in all
+six evaluable walk-forward folds across the 2024-25 and 2025-26 samples.

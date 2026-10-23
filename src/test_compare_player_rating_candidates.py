@@ -126,7 +126,7 @@ class PlayerRatingCandidateComparisonTest(unittest.TestCase):
             top_n=2,
         )
 
-        self.assertEqual(len(diagnostics), 5)
+        self.assertEqual(len(diagnostics), 6)
         self.assertTrue(
             diagnostics["topNPlayersWithOneGame"].ge(0).all()
         )
@@ -240,7 +240,7 @@ class PlayerRatingCandidateComparisonTest(unittest.TestCase):
             [4, 6, 8],
         )
         self.assertTrue(diagnostics["holdoutGames"].eq(2).all())
-        self.assertEqual(len(diagnostics), 15)
+        self.assertEqual(len(diagnostics), 18)
         self.assertTrue(summary["validLiftFolds"].eq(3).all())
         self.assertTrue(summary["positiveLiftFolds"].eq(3).all())
 

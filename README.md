@@ -848,6 +848,15 @@ python src/compare_player_rating_candidates.py \
 This compares cumulative, per-minute, per-possession, and empirically shrunk
 WPA. The output is a research comparison, not a frozen production rating.
 
+Player Courtvision Rating v1 can be generated after the player-game dataset:
+
+```bash
+python src/player_rating.py --season 2025-26
+```
+
+The v1 quality index is centered at a fixed historical reference of 100 and is
+shown alongside cumulative Season Value, sample status, and reliability.
+
 Planned work includes:
 
 - define the player-rating objective

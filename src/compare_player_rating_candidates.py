@@ -10,6 +10,11 @@ from player_rating_dataset import (
     PLAYER_INTELLIGENCE_DIR,
     validate_player_game_dataset,
 )
+from player_rating_config import (
+    RATING_POINTS_PER_REFERENCE,
+    REFERENCE_NET_WPA_PER_36,
+    REFERENCE_PRIOR_MINUTES,
+)
 
 
 REQUIRED_COLUMNS = {
@@ -31,6 +36,7 @@ CANDIDATE_COLUMNS = [
     "netWPAper100Possessions",
     "shrunkNetWPAper36",
     "shrunkNetWPAper100Possessions",
+    "fixedBaselineShrunkNetWPAper36",
 ]
 
 
@@ -172,6 +178,25 @@ def build_candidate_table(
     players["shrunkAboveAveragePer36"] = (
         players["shrunkNetWPAper36"]
         - population_wpa_per_minute * 36.0
+    )
+    players["fixedBaselineShrunkNetWPAper36"] = (
+        (
+            players["cumulativeNetWPA"]
+            + REFERENCE_PRIOR_MINUTES
+            * REFERENCE_NET_WPA_PER_36
+            / 36.0
+        )
+        / (players["minutes"] + REFERENCE_PRIOR_MINUTES)
+        * 36.0
+    )
+    players["courtvisionRatingV1Candidate"] = (
+        100.0
+        + RATING_POINTS_PER_REFERENCE
+        * (
+            players["fixedBaselineShrunkNetWPAper36"]
+            / REFERENCE_NET_WPA_PER_36
+            - 1.0
+        )
     )
     players["largestGameShare"] = safe_divide(
         players[
