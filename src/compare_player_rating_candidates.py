@@ -283,71 +283,12 @@ def weighted_wpa_per_36(
     return float(frame[wpa_column].sum()) / minutes * 36.0
 
 
-def build_chronological_holdout_diagnostics(
-    dataset,
-    prior_games=5.0,
-    holdout_fraction=0.25,
-    min_training_games=2,
+def evaluate_holdout_split(
+    training,
+    holdout,
+    prior_games,
+    min_training_games,
 ):
-    if not 0.0 < holdout_fraction < 1.0:
-        raise ValueError(
-            "holdout_fraction must be between zero and one."
-        )
-
-    if min_training_games <= 0:
-        raise ValueError(
-            "min_training_games must be positive."
-        )
-
-    validate_source(dataset)
-    source = dataset.copy()
-    source["gameDate"] = pd.to_datetime(
-        source["gameDate"],
-        errors="raise",
-    )
-    games = (
-        source[
-            [
-                "gameId",
-                "gameDate",
-            ]
-        ]
-        .drop_duplicates(subset=["gameId"])
-        .sort_values(
-            [
-                "gameDate",
-                "gameId",
-            ],
-            kind="mergesort",
-        )
-        .reset_index(drop=True)
-    )
-
-    if len(games) < 2:
-        raise ValueError(
-            "Chronological holdout requires at least two games."
-        )
-
-    training_game_count = int(
-        np.floor(
-            len(games)
-            * (1.0 - holdout_fraction)
-        )
-    )
-    training_game_count = min(
-        max(training_game_count, 1),
-        len(games) - 1,
-    )
-    training_ids = set(
-        games.iloc[:training_game_count]["gameId"]
-    )
-    training = source.loc[
-        source["gameId"].isin(training_ids)
-    ].copy()
-    holdout = source.loc[
-        ~source["gameId"].isin(training_ids)
-    ].copy()
-
     candidates = build_candidate_table(
         training,
         prior_games=prior_games,
@@ -418,7 +359,80 @@ def build_chronological_holdout_diagnostics(
             }
         )
 
-    diagnostics = pd.DataFrame(rows)
+    return pd.DataFrame(rows)
+
+
+def build_chronological_holdout_diagnostics(
+    dataset,
+    prior_games=5.0,
+    holdout_fraction=0.25,
+    min_training_games=2,
+):
+    if not 0.0 < holdout_fraction < 1.0:
+        raise ValueError(
+            "holdout_fraction must be between zero and one."
+        )
+
+    if min_training_games <= 0:
+        raise ValueError(
+            "min_training_games must be positive."
+        )
+
+    validate_source(dataset)
+    source = dataset.copy()
+    source["gameDate"] = pd.to_datetime(
+        source["gameDate"],
+        errors="raise",
+    )
+    games = (
+        source[
+            [
+                "gameId",
+                "gameDate",
+            ]
+        ]
+        .drop_duplicates(subset=["gameId"])
+        .sort_values(
+            [
+                "gameDate",
+                "gameId",
+            ],
+            kind="mergesort",
+        )
+        .reset_index(drop=True)
+    )
+
+    if len(games) < 2:
+        raise ValueError(
+            "Chronological holdout requires at least two games."
+        )
+
+    training_game_count = int(
+        np.floor(
+            len(games)
+            * (1.0 - holdout_fraction)
+        )
+    )
+    training_game_count = min(
+        max(training_game_count, 1),
+        len(games) - 1,
+    )
+    training_ids = set(
+        games.iloc[:training_game_count]["gameId"]
+    )
+    training = source.loc[
+        source["gameId"].isin(training_ids)
+    ].copy()
+    holdout = source.loc[
+        ~source["gameId"].isin(training_ids)
+    ].copy()
+
+    diagnostics = evaluate_holdout_split(
+        training,
+        holdout,
+        prior_games=prior_games,
+        min_training_games=min_training_games,
+    )
     diagnostics.attrs["cutoffDate"] = (
         holdout["gameDate"].min().strftime("%Y-%m-%d")
     )
@@ -426,9 +440,137 @@ def build_chronological_holdout_diagnostics(
     diagnostics.attrs["holdoutGames"] = (
         len(games) - training_game_count
     )
-    diagnostics.attrs["eligiblePlayers"] = len(evaluation)
+    diagnostics.attrs["eligiblePlayers"] = int(
+        diagnostics["eligiblePlayers"].iloc[0]
+    )
 
     return diagnostics
+
+
+def build_walk_forward_diagnostics(
+    dataset,
+    prior_games=5.0,
+    folds=3,
+    initial_training_fraction=0.40,
+    min_training_games=2,
+):
+    if folds <= 0:
+        raise ValueError("folds must be positive.")
+
+    if not 0.0 < initial_training_fraction < 1.0:
+        raise ValueError(
+            "initial_training_fraction must be between zero and one."
+        )
+
+    if min_training_games <= 0:
+        raise ValueError(
+            "min_training_games must be positive."
+        )
+
+    validate_source(dataset)
+    source = dataset.copy()
+    source["gameDate"] = pd.to_datetime(
+        source["gameDate"],
+        errors="raise",
+    )
+    games = (
+        source[
+            [
+                "gameId",
+                "gameDate",
+            ]
+        ]
+        .drop_duplicates(subset=["gameId"])
+        .sort_values(
+            [
+                "gameDate",
+                "gameId",
+            ],
+            kind="mergesort",
+        )
+        .reset_index(drop=True)
+    )
+    initial_games = max(
+        1,
+        int(np.floor(len(games) * initial_training_fraction)),
+    )
+
+    if len(games) - initial_games < folds:
+        raise ValueError(
+            "Not enough games for the requested walk-forward folds."
+        )
+
+    boundaries = np.linspace(
+        initial_games,
+        len(games),
+        folds + 1,
+        dtype=int,
+    )
+    rows = []
+
+    for fold_index in range(folds):
+        training_end = int(boundaries[fold_index])
+        holdout_end = int(boundaries[fold_index + 1])
+        training_ids = set(
+            games.iloc[:training_end]["gameId"]
+        )
+        holdout_ids = set(
+            games.iloc[training_end:holdout_end]["gameId"]
+        )
+        training = source.loc[
+            source["gameId"].isin(training_ids)
+        ].copy()
+        holdout = source.loc[
+            source["gameId"].isin(holdout_ids)
+        ].copy()
+        fold = evaluate_holdout_split(
+            training,
+            holdout,
+            prior_games=prior_games,
+            min_training_games=min_training_games,
+        )
+        fold.insert(0, "fold", fold_index + 1)
+        fold.insert(1, "trainingGames", training_end)
+        fold.insert(2, "holdoutGames", holdout_end - training_end)
+        fold.insert(
+            3,
+            "cutoffDate",
+            holdout["gameDate"].min().strftime("%Y-%m-%d"),
+        )
+        rows.append(fold)
+
+    return pd.concat(
+        rows,
+        ignore_index=True,
+    )
+
+
+def summarize_walk_forward_diagnostics(diagnostics):
+    summary = diagnostics.groupby(
+        "candidate",
+        sort=False,
+    ).agg(
+        folds=("fold", "nunique"),
+        meanEligiblePlayers=("eligiblePlayers", "mean"),
+        meanFutureRankCorrelation=("futureRankCorrelation", "mean"),
+        minimumFutureRankCorrelation=("futureRankCorrelation", "min"),
+        meanTopQuartileHoldoutLift=("topQuartileHoldoutLift", "mean"),
+        minimumTopQuartileHoldoutLift=("topQuartileHoldoutLift", "min"),
+        validCorrelationFolds=(
+            "futureRankCorrelation",
+            lambda values: int(values.notna().sum()),
+        ),
+        validLiftFolds=(
+            "topQuartileHoldoutLift",
+            lambda values: int(values.notna().sum()),
+        ),
+        positiveLiftFolds=(
+            "topQuartileHoldoutLift",
+            lambda values: int((values > 0).sum()),
+        ),
+    ).reset_index()
+
+    return summary
 
 
 def parse_args():
@@ -466,6 +608,16 @@ def parse_args():
         type=int,
         default=2,
     )
+    parser.add_argument(
+        "--walk-forward-folds",
+        type=int,
+        default=3,
+    )
+    parser.add_argument(
+        "--initial-training-fraction",
+        type=float,
+        default=0.40,
+    )
     return parser.parse_args()
 
 
@@ -500,6 +652,16 @@ def main():
             min_training_games=args.min_training_games,
         )
     )
+    walk_forward = build_walk_forward_diagnostics(
+        dataset,
+        prior_games=args.prior_games,
+        folds=args.walk_forward_folds,
+        initial_training_fraction=args.initial_training_fraction,
+        min_training_games=args.min_training_games,
+    )
+    walk_forward_summary = summarize_walk_forward_diagnostics(
+        walk_forward
+    )
 
     player_output = (
         PLAYER_INTELLIGENCE_DIR
@@ -512,6 +674,10 @@ def main():
     holdout_output = (
         PLAYER_INTELLIGENCE_DIR
         / f"{args.season}_rating_holdout_diagnostics_v1.csv"
+    )
+    walk_forward_output = (
+        PLAYER_INTELLIGENCE_DIR
+        / f"{args.season}_rating_walk_forward_diagnostics_v1.csv"
     )
     player_output.parent.mkdir(
         parents=True,
@@ -527,6 +693,10 @@ def main():
     )
     holdout_diagnostics.to_csv(
         holdout_output,
+        index=False,
+    )
+    walk_forward.to_csv(
+        walk_forward_output,
         index=False,
     )
 
@@ -549,6 +719,8 @@ def main():
         f"eligible players: {holdout_diagnostics.attrs['eligiblePlayers']}"
     )
     print(holdout_diagnostics.to_string(index=False))
+    print("walk-forward summary")
+    print(walk_forward_summary.to_string(index=False))
     print("shrunk per-36 leaders")
     print(
         players[
@@ -569,6 +741,7 @@ def main():
     print(f"saved: {player_output}")
     print(f"saved: {diagnostics_output}")
     print(f"saved: {holdout_output}")
+    print(f"saved: {walk_forward_output}")
 
 
 if __name__ == "__main__":

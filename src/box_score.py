@@ -328,6 +328,117 @@ def prepare_advanced_players(
     return df
 
 
+def deduplicate_advanced_players(
+    advanced,
+    merge_keys,
+):
+    duplicate_mask = advanced.duplicated(
+        subset=merge_keys,
+        keep=False,
+    )
+
+    if not duplicate_mask.any():
+        return advanced
+
+    ranked = advanced.copy()
+    minutes = ranked.get(
+        "minutes",
+        pd.Series(
+            "",
+            index=ranked.index,
+            dtype="object",
+        ),
+    )
+    ranked["_has_minutes"] = (
+        minutes
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .ne("")
+    )
+    metric_columns = [
+        column
+        for column in [
+            "offensiveRating",
+            "defensiveRating",
+            "netRating",
+            "assistPercentage",
+            "assistToTurnover",
+            "assistRatio",
+            "offensiveReboundPercentage",
+            "defensiveReboundPercentage",
+            "reboundPercentage",
+            "turnoverRatio",
+            "effectiveFieldGoalPercentage",
+            "trueShootingPercentage",
+            "usagePercentage",
+            "pace",
+            "possessions",
+            "PIE",
+        ]
+        if column in ranked.columns
+    ]
+    ranked["_metric_count"] = (
+        ranked[metric_columns].notna().sum(axis=1)
+        if metric_columns
+        else 0
+    )
+    ranked = ranked.sort_values(
+        [
+            *merge_keys,
+            "_has_minutes",
+            "_metric_count",
+        ],
+        ascending=[
+            *([True] * len(merge_keys)),
+            False,
+            False,
+        ],
+        kind="mergesort",
+    )
+
+    duplicate_rows = ranked.loc[
+        ranked.duplicated(
+            subset=merge_keys,
+            keep=False,
+        )
+    ]
+
+    for _, group in duplicate_rows.groupby(
+        merge_keys,
+        sort=False,
+        dropna=False,
+    ):
+        top = group.iloc[0]
+        runner_up = group.iloc[1]
+
+        if (
+            bool(top["_has_minutes"])
+            == bool(runner_up["_has_minutes"])
+            and int(top["_metric_count"])
+            == int(runner_up["_metric_count"])
+        ):
+            raise ValueError(
+                "Ambiguous duplicate advanced player rows for "
+                f"{tuple(top[key] for key in merge_keys)}"
+            )
+
+    return (
+        ranked
+        .drop_duplicates(
+            subset=merge_keys,
+            keep="first",
+        )
+        .drop(
+            columns=[
+                "_has_minutes",
+                "_metric_count",
+            ]
+        )
+        .reset_index(drop=True)
+    )
+
+
 # ============================================================
 # Merge traditional + advanced
 # ============================================================
@@ -359,6 +470,11 @@ def merge_player_stats(
         "teamId",
         "personId",
     ]
+
+    advanced = deduplicate_advanced_players(
+        advanced,
+        merge_keys,
+    )
 
     advanced_columns = [
         column

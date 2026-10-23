@@ -129,3 +129,8 @@ The comparison also uses a global chronological cutoff. Candidate values are
 calculated only from games before that cutoff, then compared with per-36 WPA in
 later games for players represented on both sides. This prevents future games
 from influencing the prior, normalization, or player values being evaluated.
+
+An expanding-window walk-forward check repeats that test across multiple
+cutoffs. Each fold trains on every game available at that point and evaluates
+only the immediately following block, exposing candidates that depend on one
+favorable late-season split.

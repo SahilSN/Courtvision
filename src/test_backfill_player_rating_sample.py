@@ -140,6 +140,21 @@ class PlayerRatingSampleBackfillTest(unittest.TestCase):
                 retry_delay=-1,
             )
 
+    def test_box_score_failure_preserves_last_error(self):
+        def fetcher(_game_id):
+            raise TimeoutError("endpoint timed out")
+
+        with self.assertRaisesRegex(
+            RuntimeError,
+            "endpoint timed out",
+        ):
+            fetch_and_cache_box_score(
+                "0022500001",
+                retries=1,
+                retry_delay=0,
+                fetcher=fetcher,
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

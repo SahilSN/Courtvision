@@ -6,6 +6,8 @@ from compare_player_rating_candidates import (
     build_candidate_diagnostics,
     build_candidate_table,
     build_chronological_holdout_diagnostics,
+    build_walk_forward_diagnostics,
+    summarize_walk_forward_diagnostics,
 )
 
 
@@ -202,6 +204,45 @@ class PlayerRatingCandidateComparisonTest(unittest.TestCase):
                 self.dataset,
                 min_training_games=0,
             )
+
+    def test_walk_forward_uses_expanding_training_windows(self):
+        rows = []
+
+        for game_number in range(1, 11):
+            for person_id, name, wpa in (
+                (1, "Consistent", 0.30),
+                (2, "Quiet", 0.05),
+            ):
+                rows.append(
+                    make_row(
+                        person_id,
+                        name,
+                        f"00225000{game_number:02d}",
+                        f"2025-11-{game_number:02d}",
+                        30.0,
+                        60.0,
+                        wpa,
+                    )
+                )
+
+        diagnostics = build_walk_forward_diagnostics(
+            pd.DataFrame(rows),
+            folds=3,
+            initial_training_fraction=0.40,
+            min_training_games=2,
+        )
+        summary = summarize_walk_forward_diagnostics(
+            diagnostics
+        )
+
+        self.assertEqual(
+            diagnostics["trainingGames"].drop_duplicates().tolist(),
+            [4, 6, 8],
+        )
+        self.assertTrue(diagnostics["holdoutGames"].eq(2).all())
+        self.assertEqual(len(diagnostics), 15)
+        self.assertTrue(summary["validLiftFolds"].eq(3).all())
+        self.assertTrue(summary["positiveLiftFolds"].eq(3).all())
 
 
 if __name__ == "__main__":

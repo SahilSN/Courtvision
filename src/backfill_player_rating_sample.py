@@ -201,7 +201,7 @@ def fetch_and_cache_box_score(
                 time.sleep(retry_delay)
 
     raise RuntimeError(
-        f"Box score failed after {retries} attempts."
+        f"Box score failed after {retries} attempts: {last_error}"
     ) from last_error
 
 
