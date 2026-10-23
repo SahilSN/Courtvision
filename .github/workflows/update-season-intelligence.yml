@@ -1,11 +1,6 @@
-name: Update Season Intelligence
+name: Update Season Intelligence (manual diagnostic)
 
 on:
-  schedule:
-    - cron: "0 16-23 * * *"
-      timezone: "America/Los_Angeles"
-    - cron: "0 1 * * *"
-      timezone: "America/Los_Angeles"
   workflow_dispatch:
 
 permissions:
@@ -52,6 +47,7 @@ jobs:
           src/test_player_career.py
           src/test_backfill_player_intelligence.py
           src/test_update_intelligence.py
+          src/test_run_nightly_intelligence.py
 
       - name: Check generated diff
         run: git diff --check
