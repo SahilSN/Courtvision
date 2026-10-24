@@ -9,9 +9,10 @@ the existing full provider shows additional dependencies:
 | --- | --- | --- |
 | Canonical game mapping | `espn_live.resolve_espn_event` calls `resolve_nba_game_metadata`, which calls NBA ScoreboardV3 through `game_catalog` | NBA metadata is required before the ESPN event is selected; the ESPN probe bypassed it |
 | Player identity | `current_roster_name_map` calls CommonTeamRoster with a 30-second timeout; static NBA names are fallback | Roster failures are swallowed and may leave players unresolved; recent/ambiguous names need explicit validation |
-| Pregame context | `live_analysis.fetch_team_record_before_game` uses TeamGameLogs with a 60-second default timeout | NBA team-log access is not established by the probe |
+| Pregame context | `build_pregame_context` first checks the local season training table for regular-season games; otherwise `fetch_team_record_before_game` uses TeamGameLogs with a 60-second default timeout | Local training tables are not guaranteed on the host for today's game; the network fallback is not established by the probe |
 | Provider fallback | `fetch_true_live_play_by_play` tries ESPN and may fall back to NBA play-by-play | Failover must be bounded and visible, not conceal missing identity or multiply timeouts |
 | Analysis and rendering | Preprocessing, frozen V7 inference, score validation and downstream player/box-score views | HTTP access is not proof of end-to-end correctness, latency or resource use |
+| Live box-score panel | `dashboard.cached_live_box_score` calls `box_score.fetch_box_score`, using BoxScoreTraditionalV3 and BoxScoreAdvancedV3 | The ESPN summary probe does not validate the separate NBA box-score rendering path |
 
 No current local provider calls, model formulas, replay semantics, or pregame
 record smoothing were changed by this audit. Existing lru-cached metadata does
