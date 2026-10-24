@@ -56,6 +56,10 @@ and3.12, with existing deployment checks retained.
 
 ## Next gates
 
+The inactive [context publication tool](LIVE_CONTEXT_PUBLICATION.md) now validates
+schedule/result consistency and atomic local publication. It does not yet fetch
+or attest a production full schedule, or run in the nightly publisher.
+
 1. Produce a versioned, independently verified canonical schedule and complete
    prior-game context for the hosted current season; test publication gaps.
 2. Build a reviewed identity alias/ID artifact for unresolved participants, not
