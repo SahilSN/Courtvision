@@ -46,6 +46,10 @@ results and waiter timeout. No network is used by these tests.
 
 ## Next implementation gate
 
+A separate inactive adapter now exercises the network-free approach; see
+[CLOUD_ADAPTER_PROTOTYPE.md](CLOUD_ADAPTER_PROTOTYPE.md) for captured-feed parity,
+coverage checks and the remaining schedule/identity publication requirements.
+
 Before wiring this into a hosted path, validate a cloud-safe canonical game and
 player identity mapping and pregame record source. Do not silently substitute
 neutral values, mix preseason records, or treat unresolved identity as zero
