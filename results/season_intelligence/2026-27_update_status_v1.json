@@ -1,29 +1,42 @@
 {
   "season": "2026-27",
-  "checkedAt": "2026-10-23T08:00:11.687694+00:00",
+  "checkedAt": "2026-10-24T08:05:03.352773+00:00",
   "sourceError": null,
   "pipelines": {
     "teams": {
       "status": "success",
-      "checkedAt": "2026-10-23T08:00:11.687694+00:00",
-      "lastSuccessfulCheckAt": "2026-10-23T08:00:11.687694+00:00",
-      "gamesThrough": "2026-10-22",
-      "processedGames": 16,
-      "completedGames": 16,
+      "checkedAt": "2026-10-24T08:05:03.352773+00:00",
+      "lastSuccessfulCheckAt": "2026-10-24T08:05:03.352773+00:00",
+      "gamesThrough": "2026-10-23",
+      "processedGames": 28,
+      "completedGames": 28,
       "pendingGameIds": [],
       "failures": [],
       "error": null
     },
     "players": {
-      "status": "success",
-      "checkedAt": "2026-10-23T08:00:11.687694+00:00",
+      "status": "failed",
+      "checkedAt": "2026-10-24T08:05:03.352773+00:00",
       "lastSuccessfulCheckAt": "2026-10-23T08:00:11.687694+00:00",
       "gamesThrough": "2026-10-22",
       "processedGames": 16,
-      "completedGames": 16,
-      "pendingGameIds": [],
+      "completedGames": 28,
+      "pendingGameIds": [
+        "0022600008",
+        "0022600009",
+        "0022600094",
+        "0022600095",
+        "0022600096",
+        "0022600097",
+        "0022600098",
+        "0022600099",
+        "0022600100",
+        "0022600101",
+        "0022600102",
+        "0022600103"
+      ],
       "failures": [],
-      "error": null
+      "error": "Possessions are required for candidate comparison."
     }
   }
 }
