@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 
 from season_config import CURRENT_SEASON
 from update_intelligence import ROOT_DIR, game_ids, read_published, refresh_intelligence
-from espn_record_coverage import refresh_coverage
+from daily_live_context import refresh_nightly_context as refresh_coverage
 
 
 def published_paths(season=CURRENT_SEASON):
@@ -26,6 +26,7 @@ def published_paths(season=CURRENT_SEASON):
         f"results/player_intelligence/{season}_player_game_v1.csv",
         f"results/player_intelligence/{season}_player_ratings_v1.csv",
         f"results/live_context/{season}_coverage_v1.json",
+        f"results/live_context/{season}_day_context_v1.json",
     ]
 
 
@@ -58,6 +59,12 @@ def publish_current_data(root=ROOT_DIR, season=CURRENT_SEASON):
                     raise ValueError('Invalid coverage artifact context')
                 if destination.exists() and json.loads(destination.read_text())['completeThrough'] > incoming['completeThrough']:
                     raise ValueError('Refusing to regress published coverage')
+            if relative.endswith('_day_context_v1.json'):
+                incoming = json.loads(source.read_text())
+                if incoming['season'] != season or incoming['seasonType'] != 'Regular Season':
+                    raise ValueError('Invalid daily context season')
+                if destination.exists() and json.loads(destination.read_text())['gameDate'] > incoming['gameDate']:
+                    raise ValueError('Refusing to regress published day context')
             if relative.endswith(("_player_game_v1.csv", "_team_rating_games_v1.csv")):
                 if not game_ids(read_published(destination)).issubset(game_ids(read_published(source))):
                     raise ValueError("Refusing to publish fewer games than are already on GitHub.")
