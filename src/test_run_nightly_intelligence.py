@@ -4,7 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from datetime import datetime
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pandas as pd
 
@@ -13,6 +13,22 @@ from run_nightly_intelligence import git, nightly_due, publish_current_data, run
 
 
 class NightlyJobTest(unittest.TestCase):
+    def setUp(self):
+        checker = patch('run_nightly_intelligence.refresh_coverage', return_value={'status': 'success'})
+        checker.start()
+        self.addCleanup(checker.stop)
+
+    def test_coverage_failure_still_publishes_intelligence_but_marks_incomplete(self):
+        with tempfile.TemporaryDirectory() as directory:
+            publisher = Mock(return_value='published')
+            code = run_nightly(directory,
+                refresher=Mock(return_value={'pipelines': {'teams': {'status': 'success'}}}),
+                publisher=publisher, coverage_checker=Mock(side_effect=ValueError('missing game')))
+            status = json.loads((Path(directory) / 'results/.runtime/nightly/status.json').read_text())
+            self.assertEqual(code, 1)
+            self.assertEqual(status['recordCoverage']['status'], 'failed')
+            publisher.assert_called_once()
+
     def test_calendar_is_once_nightly_with_absolute_venv_paths(self):
         agent = build_launch_agent(Path("/tmp/Courtvision Test"))
         self.assertEqual(agent["StartCalendarInterval"], {"Hour": 1, "Minute": 0})

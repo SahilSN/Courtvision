@@ -1,5 +1,9 @@
 # Inactive pregame-context publication tool
 
+The separate [nightly ESPN prior-result check](ESPN_RECORD_COVERAGE.md) now
+publishes dated cross-source evidence. It does not activate this full-season
+contract or claim that future schedule completeness has been verified.
+
 `src/published_live_context.py` builds a versioned JSON artifact offline. It is
 not imported by the dashboard and is not added to the nightly job or its Git
 publication allowlist. Hosted Live remains disabled. This is the publication

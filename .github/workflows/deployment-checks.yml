@@ -11,6 +11,7 @@ on:
       - 'results/player_intelligence/**'
       - 'results/season_intelligence/**'
       - 'results/replay_pilot/**'
+      - 'results/live_context/**'
       - 'requirements.txt'
       - 'requirements-deployment.txt'
       - '.github/workflows/deployment-checks.yml'

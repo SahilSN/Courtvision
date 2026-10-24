@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 
 from season_config import CURRENT_SEASON
 from update_intelligence import ROOT_DIR, game_ids, read_published, refresh_intelligence
+from espn_record_coverage import refresh_coverage
 
 
 def published_paths(season=CURRENT_SEASON):
@@ -24,6 +25,7 @@ def published_paths(season=CURRENT_SEASON):
         f"results/season_intelligence/{season}_update_status_v1.json",
         f"results/player_intelligence/{season}_player_game_v1.csv",
         f"results/player_intelligence/{season}_player_ratings_v1.csv",
+        f"results/live_context/{season}_coverage_v1.json",
     ]
 
 
@@ -49,6 +51,13 @@ def publish_current_data(root=ROOT_DIR, season=CURRENT_SEASON):
             destination = checkout / relative
             if not source.exists():
                 continue
+            if relative.endswith('_coverage_v1.json'):
+                incoming = json.loads(source.read_text())
+                if (incoming['season'] != season or incoming['scope'] != 'prior-results-cross-check'
+                        or incoming['seasonType'] != 'Regular Season'):
+                    raise ValueError('Invalid coverage artifact context')
+                if destination.exists() and json.loads(destination.read_text())['completeThrough'] > incoming['completeThrough']:
+                    raise ValueError('Refusing to regress published coverage')
             if relative.endswith(("_player_game_v1.csv", "_team_rating_games_v1.csv")):
                 if not game_ids(read_published(destination)).issubset(game_ids(read_published(source))):
                     raise ValueError("Refusing to publish fewer games than are already on GitHub.")
@@ -95,7 +104,7 @@ def nightly_due(previous, now=None):
 
 
 def run_nightly(root=ROOT_DIR, publish=True, scheduled=False, refresher=refresh_intelligence,
-                publisher=publish_current_data):
+                publisher=publish_current_data, coverage_checker=None):
     root = Path(root)
     runtime = root / "results" / ".runtime" / "nightly"
     runtime.mkdir(parents=True, exist_ok=True)
@@ -124,6 +133,12 @@ def run_nightly(root=ROOT_DIR, publish=True, scheduled=False, refresher=refresh_
             with contextlib.redirect_stdout(stream), contextlib.redirect_stderr(stream):
                 health = refresher(root=root)
             incomplete = any(item["status"] != "success" for item in health["pipelines"].values())
+            try:
+                result['recordCoverage'] = (coverage_checker or refresh_coverage)(root=root)
+            except Exception as error:
+                result['recordCoverage'] = {'status': 'failed', 'error': type(error).__name__}
+                logger.warning('Record coverage check failed (%s); retaining last artifact', type(error).__name__)
+                incomplete = True
             result["refreshStatus"] = "incomplete" if incomplete else "success"
             if publish:
                 result["publication"] = publisher(root=root)
