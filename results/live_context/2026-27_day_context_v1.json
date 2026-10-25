@@ -2,160 +2,141 @@
   "schemaVersion": 1,
   "season": "2026-27",
   "seasonType": "Regular Season",
-  "gameDate": "2026-10-24",
-  "completeThrough": "2026-10-23",
-  "checkedAt": "2026-10-24T16:24:03.064792+00:00",
-  "coverageCheckedAt": "2026-10-24T16:24:02.561224+00:00",
+  "gameDate": "2026-10-25",
+  "completeThrough": "2026-10-24",
+  "checkedAt": "2026-10-25T17:56:56.685698+00:00",
+  "coverageCheckedAt": "2026-10-25T17:56:56.180422+00:00",
   "games": [
     {
       "season": "2026-27",
-      "gameDate": "2026-10-24",
-      "gameId": "0022600105",
-      "homeTeamId": 1610612739,
-      "awayTeamId": 1610612751,
-      "espnEventId": "401909854",
+      "gameDate": "2026-10-25",
+      "gameId": "0022600117",
+      "homeTeamId": 1610612755,
+      "awayTeamId": 1610612765,
+      "espnEventId": "401909866",
       "pregameContext": {
-        "homeTeamId": 1610612739,
-        "awayTeamId": 1610612751,
+        "homeTeamId": 1610612755,
+        "awayTeamId": 1610612765,
+        "homePreGameWins": 3,
+        "homePreGameLosses": 0,
+        "homePreGameWinPct": 0.8,
+        "awayPreGameWins": 2,
+        "awayPreGameLosses": 0,
+        "awayPreGameWinPct": 0.75,
+        "strengthDifference": 0.050000000000000044
+      }
+    },
+    {
+      "season": "2026-27",
+      "gameDate": "2026-10-25",
+      "gameId": "0022600113",
+      "homeTeamId": 1610612751,
+      "awayTeamId": 1610612754,
+      "espnEventId": "401909862",
+      "pregameContext": {
+        "homeTeamId": 1610612751,
+        "awayTeamId": 1610612754,
         "homePreGameWins": 0,
-        "homePreGameLosses": 1,
-        "homePreGameWinPct": 0.3333333333333333,
-        "awayPreGameWins": 0,
+        "homePreGameLosses": 2,
+        "homePreGameWinPct": 0.25,
+        "awayPreGameWins": 1,
         "awayPreGameLosses": 1,
-        "awayPreGameWinPct": 0.3333333333333333,
+        "awayPreGameWinPct": 0.5,
+        "strengthDifference": -0.25
+      }
+    },
+    {
+      "season": "2026-27",
+      "gameDate": "2026-10-25",
+      "gameId": "0022600116",
+      "homeTeamId": 1610612760,
+      "awayTeamId": 1610612746,
+      "espnEventId": "401909865",
+      "pregameContext": {
+        "homeTeamId": 1610612760,
+        "awayTeamId": 1610612746,
+        "homePreGameWins": 2,
+        "homePreGameLosses": 0,
+        "homePreGameWinPct": 0.75,
+        "awayPreGameWins": 1,
+        "awayPreGameLosses": 1,
+        "awayPreGameWinPct": 0.5,
+        "strengthDifference": 0.25
+      }
+    },
+    {
+      "season": "2026-27",
+      "gameDate": "2026-10-25",
+      "gameId": "0022600112",
+      "homeTeamId": 1610612762,
+      "awayTeamId": 1610612747,
+      "espnEventId": "401909861",
+      "pregameContext": {
+        "homeTeamId": 1610612762,
+        "awayTeamId": 1610612747,
+        "homePreGameWins": 1,
+        "homePreGameLosses": 1,
+        "homePreGameWinPct": 0.5,
+        "awayPreGameWins": 2,
+        "awayPreGameLosses": 0,
+        "awayPreGameWinPct": 0.75,
+        "strengthDifference": -0.25
+      }
+    },
+    {
+      "season": "2026-27",
+      "gameDate": "2026-10-25",
+      "gameId": "0022600118",
+      "homeTeamId": 1610612758,
+      "awayTeamId": 1610612763,
+      "espnEventId": "401909867",
+      "pregameContext": {
+        "homeTeamId": 1610612758,
+        "awayTeamId": 1610612763,
+        "homePreGameWins": 0,
+        "homePreGameLosses": 2,
+        "homePreGameWinPct": 0.25,
+        "awayPreGameWins": 2,
+        "awayPreGameLosses": 0,
+        "awayPreGameWinPct": 0.75,
+        "strengthDifference": -0.5
+      }
+    },
+    {
+      "season": "2026-27",
+      "gameDate": "2026-10-25",
+      "gameId": "0022600114",
+      "homeTeamId": 1610612752,
+      "awayTeamId": 1610612753,
+      "espnEventId": "401909863",
+      "pregameContext": {
+        "homeTeamId": 1610612752,
+        "awayTeamId": 1610612753,
+        "homePreGameWins": 0,
+        "homePreGameLosses": 2,
+        "homePreGameWinPct": 0.25,
+        "awayPreGameWins": 0,
+        "awayPreGameLosses": 2,
+        "awayPreGameWinPct": 0.25,
         "strengthDifference": 0.0
       }
     },
     {
       "season": "2026-27",
-      "gameDate": "2026-10-24",
-      "gameId": "0022600111",
-      "homeTeamId": 1610612756,
-      "awayTeamId": 1610612744,
-      "espnEventId": "401909860",
+      "gameDate": "2026-10-25",
+      "gameId": "0022600115",
+      "homeTeamId": 1610612750,
+      "awayTeamId": 1610612761,
+      "espnEventId": "401909864",
       "pregameContext": {
-        "homeTeamId": 1610612756,
-        "awayTeamId": 1610612744,
-        "homePreGameWins": 0,
-        "homePreGameLosses": 1,
-        "homePreGameWinPct": 0.3333333333333333,
-        "awayPreGameWins": 0,
-        "awayPreGameLosses": 2,
-        "awayPreGameWinPct": 0.25,
-        "strengthDifference": 0.08333333333333331
-      }
-    },
-    {
-      "season": "2026-27",
-      "gameDate": "2026-10-24",
-      "gameId": "0022600107",
-      "homeTeamId": 1610612737,
-      "awayTeamId": 1610612745,
-      "espnEventId": "401909856",
-      "pregameContext": {
-        "homeTeamId": 1610612737,
-        "awayTeamId": 1610612745,
+        "homeTeamId": 1610612750,
+        "awayTeamId": 1610612761,
         "homePreGameWins": 2,
         "homePreGameLosses": 0,
         "homePreGameWinPct": 0.75,
         "awayPreGameWins": 2,
         "awayPreGameLosses": 0,
         "awayPreGameWinPct": 0.75,
-        "strengthDifference": 0.0
-      }
-    },
-    {
-      "season": "2026-27",
-      "gameDate": "2026-10-24",
-      "gameId": "0022600104",
-      "homeTeamId": 1610612766,
-      "awayTeamId": 1610612748,
-      "espnEventId": "401909853",
-      "pregameContext": {
-        "homeTeamId": 1610612766,
-        "awayTeamId": 1610612748,
-        "homePreGameWins": 1,
-        "homePreGameLosses": 1,
-        "homePreGameWinPct": 0.5,
-        "awayPreGameWins": 0,
-        "awayPreGameLosses": 2,
-        "awayPreGameWinPct": 0.25,
-        "strengthDifference": 0.25
-      }
-    },
-    {
-      "season": "2026-27",
-      "gameDate": "2026-10-24",
-      "gameId": "0022600106",
-      "homeTeamId": 1610612755,
-      "awayTeamId": 1610612749,
-      "espnEventId": "401909855",
-      "pregameContext": {
-        "homeTeamId": 1610612755,
-        "awayTeamId": 1610612749,
-        "homePreGameWins": 2,
-        "homePreGameLosses": 0,
-        "homePreGameWinPct": 0.75,
-        "awayPreGameWins": 0,
-        "awayPreGameLosses": 2,
-        "awayPreGameWinPct": 0.25,
-        "strengthDifference": 0.5
-      }
-    },
-    {
-      "season": "2026-27",
-      "gameDate": "2026-10-24",
-      "gameId": "0022600110",
-      "homeTeamId": 1610612743,
-      "awayTeamId": 1610612740,
-      "espnEventId": "401909859",
-      "pregameContext": {
-        "homeTeamId": 1610612743,
-        "awayTeamId": 1610612740,
-        "homePreGameWins": 0,
-        "homePreGameLosses": 1,
-        "homePreGameWinPct": 0.3333333333333333,
-        "awayPreGameWins": 0,
-        "awayPreGameLosses": 2,
-        "awayPreGameWinPct": 0.25,
-        "strengthDifference": 0.08333333333333331
-      }
-    },
-    {
-      "season": "2026-27",
-      "gameDate": "2026-10-24",
-      "gameId": "0022600109",
-      "homeTeamId": 1610612742,
-      "awayTeamId": 1610612759,
-      "espnEventId": "401909858",
-      "pregameContext": {
-        "homeTeamId": 1610612742,
-        "awayTeamId": 1610612759,
-        "homePreGameWins": 1,
-        "homePreGameLosses": 1,
-        "homePreGameWinPct": 0.5,
-        "awayPreGameWins": 0,
-        "awayPreGameLosses": 2,
-        "awayPreGameWinPct": 0.25,
-        "strengthDifference": 0.25
-      }
-    },
-    {
-      "season": "2026-27",
-      "gameDate": "2026-10-24",
-      "gameId": "0022600108",
-      "homeTeamId": 1610612741,
-      "awayTeamId": 1610612764,
-      "espnEventId": "401909857",
-      "pregameContext": {
-        "homeTeamId": 1610612741,
-        "awayTeamId": 1610612764,
-        "homePreGameWins": 1,
-        "homePreGameLosses": 1,
-        "homePreGameWinPct": 0.5,
-        "awayPreGameWins": 1,
-        "awayPreGameLosses": 1,
-        "awayPreGameWinPct": 0.5,
         "strengthDifference": 0.0
       }
     }

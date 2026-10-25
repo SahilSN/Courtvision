@@ -1,42 +1,71 @@
 {
   "season": "2026-27",
-  "checkedAt": "2026-10-24T08:05:03.352773+00:00",
+  "checkedAt": "2026-10-25T08:26:37.818314+00:00",
   "sourceError": null,
   "pipelines": {
     "teams": {
       "status": "success",
-      "checkedAt": "2026-10-24T08:05:03.352773+00:00",
-      "lastSuccessfulCheckAt": "2026-10-24T08:05:03.352773+00:00",
-      "gamesThrough": "2026-10-23",
-      "processedGames": 28,
-      "completedGames": 28,
+      "checkedAt": "2026-10-25T08:26:37.818314+00:00",
+      "lastSuccessfulCheckAt": "2026-10-25T08:26:37.818314+00:00",
+      "gamesThrough": "2026-10-24",
+      "processedGames": 36,
+      "completedGames": 36,
       "pendingGameIds": [],
       "failures": [],
       "error": null
     },
     "players": {
-      "status": "failed",
-      "checkedAt": "2026-10-24T08:05:03.352773+00:00",
+      "status": "partial",
+      "checkedAt": "2026-10-25T08:26:37.818314+00:00",
       "lastSuccessfulCheckAt": "2026-10-23T08:00:11.687694+00:00",
-      "gamesThrough": "2026-10-22",
-      "processedGames": 16,
-      "completedGames": 28,
+      "gamesThrough": "2026-10-24",
+      "processedGames": 28,
+      "completedGames": 36,
       "pendingGameIds": [
         "0022600008",
         "0022600009",
         "0022600094",
-        "0022600095",
-        "0022600096",
         "0022600097",
         "0022600098",
         "0022600099",
-        "0022600100",
         "0022600101",
-        "0022600102",
-        "0022600103"
+        "0022600106"
       ],
-      "failures": [],
-      "error": "Possessions are required for candidate comparison."
+      "failures": [
+        {
+          "gameId": "0022600008",
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "gameId": "0022600009",
+          "error": "HTTPSConnectionPool(host='stats.nba.com', port=443): Read timed out. (read timeout=60)"
+        },
+        {
+          "gameId": "0022600094",
+          "error": "HTTPSConnectionPool(host='stats.nba.com', port=443): Read timed out. (read timeout=60)"
+        },
+        {
+          "gameId": "0022600097",
+          "error": "HTTPSConnectionPool(host='stats.nba.com', port=443): Read timed out. (read timeout=60)"
+        },
+        {
+          "gameId": "0022600098",
+          "error": "HTTPSConnectionPool(host='stats.nba.com', port=443): Read timed out. (read timeout=60)"
+        },
+        {
+          "gameId": "0022600099",
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "gameId": "0022600101",
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        },
+        {
+          "gameId": "0022600106",
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        }
+      ],
+      "error": null
     }
   }
 }
