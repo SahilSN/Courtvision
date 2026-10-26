@@ -15,9 +15,11 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'src'))
 render_live_analysis = runpy.run_path(str(Path(__file__).resolve().parents[1]/'src/live_preview_view.py'))['render_live_analysis']
 from offline_live_sample import sample_analysis
 
-st.title('Courtvision · Live integration preview')
+st.caption('COURTVISION / GAME CENTER')
+st.title('Houston at Oklahoma City')
 st.warning('ARCHIVED OFFLINE SAMPLE · HOU @ OKC, October 21, 2025. Not a current live game. Full-game spoilers.')
-state=st.selectbox('Preview state',['Validated snapshot','Unavailable','Stale snapshot','Possibly stalled'])
+with st.expander('Preview controls',expanded=False):
+    state=st.selectbox('Preview state',['Validated snapshot','Unavailable','Stale snapshot','Possibly stalled'])
 if state == 'Unavailable':
     render_live_analysis(None)
 else:

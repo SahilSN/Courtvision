@@ -18,6 +18,12 @@ class PreviewTest(unittest.TestCase):
             app=AppTest.from_file(str(path),default_timeout=60).run()
             self.assertFalse(app.exception)
             self.assertEqual(len(app.dataframe),2)
+            html=' '.join(str(element.value) for element in app.markdown)
+            self.assertIn('Game snapshot scoreboard',html)
+            self.assertIn('data:image/svg+xml;base64,',html)
+            self.assertIn('Houston Rockets',html)
+            self.assertIn('Oklahoma City Thunder',html)
+            self.assertIn('SNAPSHOT',html)
             for state,phrase in [('Stale snapshot','last validated'),('Possibly stalled','not changed'),('Unavailable','No estimate')]:
                 app.selectbox[0].set_value(state).run()
                 self.assertFalse(app.exception)
