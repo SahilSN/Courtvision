@@ -19,15 +19,29 @@ partial panel mixing, neutral data or invented stats are returned. Different
 game/season/date/schema contexts use separate keys. Canonical team identity is
 rechecked even on a warm cache hit.
 
-Current implementation intentionally repeats pure normalization for validation
-and per-caller reconstruction, including the box adapter's timeline check. It
+Current implementation repeats pure normalization for validation
+and per-caller reconstruction, but reuses each pass's validated timeline in the
+private box parser. This removes two of four timeline normalizations on a cold
+joint call (and one of two on a warm call); it is a call-count reduction, not a
+claimed whole-pipeline speedup. Standalone box validation remains unchanged. It
 does NOT coalesce CPU inference/normalization, and this cost must be factored and
 measured before hosted integration. Existing loader timeouts, waiter timeout,
 container-local cache and encoded-byte/actual-memory limits still apply.
 
 Acquisition freshness is NOT upstream event progress: an upstream server may
-repeat an old but internally consistent response. Progress-age detection and
-the corresponding UI wording remain required. This code adds no timer, HTTP
+repeat an old but internally consistent response. An optional shared FeedProgress
+now records bounded per-game observations (16 entries, 120-second default).
+Repeated identical normalized-source plays/box/status/competitors do not reset
+the observation window, even after successful refetch. Explicit active play only
+can yield possibly_stalled; unknown/final/intermission statuses are not_active.
+A changed payload resets the window, including corrections, not necessarily
+forward clock progress. First observation, eviction, restart or reactivation
+starts a new window. This is a warning heuristic, not a guaranteed outage detector:
+metadata changes may reset it and legitimate stoppages can trigger it. Source
+ordering/late concurrent observations are not enforced. No tracker gives unknown.
+Acquisition is_stale and progress_state remain separate, and no final/intermission
+outage is inferred. UI integration and wording are still required.
+This code adds no timer, HTTP
 loader, model inference or frontend state. It does not yet join dated pregame
 context or certify the full hosted pipeline.
 

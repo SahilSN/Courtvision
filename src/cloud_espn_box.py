@@ -15,10 +15,15 @@ SHOTS = {'FG': 'fieldGoals', '3PT': 'threePointers', 'FT': 'freeThrows'}
 
 
 def normalize_box(event, summary, canonical):
+    return _normalize_box(event, summary, canonical)
+
+
+def _normalize_box(event, summary, canonical, timeline=None):
     try:
         # Reuse strict game/date/team/timeline validation. One caller-owned JSON
         # snapshot supplies both panels; this never performs another HTTP request.
-        timeline = normalize_snapshot(event, summary, canonical)
+        if timeline is None:
+            timeline = normalize_snapshot(event, summary, canonical)
         sides = {str(c['team']['id']): c['homeAway'] for c in summary['header']['competitions'][0]['competitors']}
         names = {}
         for person in players.get_players():

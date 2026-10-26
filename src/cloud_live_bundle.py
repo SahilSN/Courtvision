@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from copy import deepcopy
 
 from cloud_espn_adapter import normalize_snapshot, validate_canonical
-from cloud_espn_box import normalize_box
+from cloud_espn_box import _normalize_box
 from live_snapshot_cache import SnapshotKey
 
 
@@ -15,9 +15,11 @@ class LiveBundle:
     age_seconds: float
     is_stale: bool
     refresh_error_type: str = None
+    progress_state: str = 'unknown'
+    unchanged_seconds: float = None
 
 
-def get_live_bundle(cache, canonical, loader):
+def get_live_bundle(cache, canonical, loader, progress=None):
     """Caller owns shared cache, verified canonical context, and bounded I/O loader.
 
     Invalid/lagging box or timeline never replaces the last jointly valid value.
@@ -33,7 +35,7 @@ def get_live_bundle(cache, canonical, loader):
         if canonical.get('espnEventId') is not None and str(data['event']['id']) != str(canonical['espnEventId']):
             raise ValueError('Snapshot differs from verified ESPN event mapping')
         timeline = normalize_snapshot(data['event'], data['summary'], canonical)
-        box = normalize_box(data['event'], data['summary'], canonical)
+        box = _normalize_box(data['event'], data['summary'], canonical, timeline=timeline)
         return timeline, box
 
     def validated_loader():
@@ -44,5 +46,7 @@ def get_live_bundle(cache, canonical, loader):
     snapshot = cache.get(key, validated_loader)
     # Defensive reconstruction per caller; raw cache never holds DataFrames.
     timeline, box = validate_pair(snapshot.data)
+    progress_key = (key, canonical['homeTeamId'], canonical['awayTeamId'], snapshot.data['event']['id'])
+    state, age = progress.observe(progress_key, snapshot.data) if progress is not None else ('unknown', None)
     return LiveBundle(timeline, box, snapshot.age_seconds, snapshot.is_stale,
-                      snapshot.refresh_error_type)
+                      snapshot.refresh_error_type, state, age)

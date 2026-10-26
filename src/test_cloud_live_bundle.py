@@ -7,6 +7,8 @@ from unittest.mock import Mock, patch
 
 from cloud_live_bundle import get_live_bundle
 from live_snapshot_cache import LiveSnapshotCache, SnapshotUnavailable
+from feed_progress import FeedProgress
+from cloud_espn_adapter import normalize_snapshot
 
 
 class BundleTest(unittest.TestCase):
@@ -70,3 +72,19 @@ class BundleTest(unittest.TestCase):
         broken['summary']['plays'].append(deepcopy(broken['summary']['plays'][0]))
         self.clock.return_value=5
         self.assertTrue(self.get(lambda:broken).is_stale)
+
+    def test_single_timeline_per_joint_pass_and_progress_across_fresh_fetches(self):
+        feed=deepcopy(self.feed)
+        feed['summary']['header']['competitions'][0]['status']['type'].update(
+            state='in',name='STATUS_IN_PROGRESS',completed=False)
+        tracker=FeedProgress(threshold=10,clock=self.clock)
+        with patch('cloud_live_bundle.normalize_snapshot',wraps=normalize_snapshot) as normalize:
+            first=get_live_bundle(self.cache,feed['canonical'],lambda:feed,tracker)
+            self.assertEqual(normalize.call_count,2)  # before installation + caller copy
+            self.assertEqual(first.progress_state,'observing')
+            self.clock.return_value=11
+            fresh=get_live_bundle(self.cache,feed['canonical'],lambda:feed,tracker)
+            self.assertFalse(fresh.is_stale)
+            self.assertEqual(fresh.progress_state,'possibly_stalled')
+            self.assertEqual(fresh.unchanged_seconds,11)
+            self.assertEqual(normalize.call_count,4)
