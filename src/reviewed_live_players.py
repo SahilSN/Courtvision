@@ -1,7 +1,7 @@
-"""Exact, season/team-scoped additions verified against NBA box scores.
+"""Exact, season/team-scoped additions verified against official NBA sources.
 
-Reviewed October26,2026 via BoxScoreTraditionalV3; canonical source game IDs
-are retained for audit. No fuzzy names, synthesized IDs or global roster changes.
+Reviewed October26,2026 via BoxScoreTraditionalV3 or official NBA profiles;
+source game IDs/profile URLs retained for audit. No fuzzy names or guessed IDs.
 """
 from functools import lru_cache
 from nba_api.stats.static import players
@@ -11,6 +11,8 @@ REVIEWED = (
     ('2026-27',1610612762,'Darryn Peterson',1643408,'0022600112'),
     ('2026-27',1610612751,'Chaney Johnson',1643052,'0022600113'),
     ('2026-27',1610612751,'Joshua Jefferson',1643538,'0022600113'),
+    ('2026-27',1610612766,'Christian Anderson',1643515,'https://www.nba.com/player/1643515/christian-anderson'),
+    ('2026-27',1610612739,'Meleek Thomas',1643509,'https://www.nba.com/player/1643509/meleek-thomas/profile'),
 )
 
 

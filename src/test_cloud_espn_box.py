@@ -60,6 +60,43 @@ class BoxAdapterTest(unittest.TestCase):
         self.assertFalse(result.didNotPlay)
         self.assertEqual(result.minutesDisplay,'0')
 
+    def test_live_missing_minutes_preserved_not_zero_or_dnp(self):
+        self.feed['summary']['header']['competitions'][0]['status']['type']['state']='in'
+        stats=self.feed['summary']['boxscore']['players'][0]['statistics'][0]
+        athlete=stats['athletes'][0]
+        for value in ('-','--'):
+            athlete['stats'][stats['labels'].index('MIN')]=value
+            result=self.normalize()['players'].iloc[0]
+            self.assertFalse(result.didNotPlay)
+            self.assertFalse(result.minutesAvailable)
+            self.assertIsNone(result.minutesDisplay)
+        for value in ('','unknown','-1','1:99'):
+            athlete['stats'][stats['labels'].index('MIN')]=value
+            with self.assertRaises(ProviderContextUnavailable):self.normalize()
+
+    def test_live_missing_minutes_do_not_relax_other_fields(self):
+        self.feed['summary']['header']['competitions'][0]['status']['type']['state']='in'
+        stats=self.feed['summary']['boxscore']['players'][0]['statistics'][0]
+        stats['athletes'][0]['stats'][stats['labels'].index('MIN')]='--'
+        stats['athletes'][0]['stats'][stats['labels'].index('+/-')]='--'
+        with self.assertRaises(ProviderContextUnavailable):self.normalize()
+
+    def test_missing_minutes_rejected_outside_in_progress(self):
+        competition=self.feed['summary']['header']['competitions'][0]
+        stats=self.feed['summary']['boxscore']['players'][0]['statistics'][0]
+        for state in ('pre','post','unknown'):
+            competition['status']['type']['state']=state
+            for value in ('-','--'):
+                stats['athletes'][0]['stats'][stats['labels'].index('MIN')]=value
+                with self.subTest(state=state,value=value),self.assertRaises(ProviderContextUnavailable):self.normalize()
+
+    def test_missing_live_minutes_still_requires_reconciled_points(self):
+        self.feed['summary']['header']['competitions'][0]['status']['type']['state']='in'
+        stats=self.feed['summary']['boxscore']['players'][0]['statistics'][0]
+        stats['athletes'][0]['stats'][stats['labels'].index('MIN')]='--'
+        stats['totals'][stats['labels'].index('PTS')]='999'
+        with self.assertRaises(ProviderContextUnavailable):self.normalize()
+
     def test_wrong_canonical_game_refused(self):
         self.feed['canonical']['gameDate'] = '2025-10-22'
         with self.assertRaises(ProviderContextUnavailable): self.normalize()

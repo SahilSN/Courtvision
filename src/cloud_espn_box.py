@@ -24,6 +24,9 @@ def _normalize_box(event, summary, canonical, timeline=None):
         if timeline is None:
             timeline = normalize_snapshot(event, summary, canonical)
         sides = {str(c['team']['id']): c['homeAway'] for c in summary['header']['competitions'][0]['competitors']}
+        # Live display only: providers can mark a player as participating before
+        # publishing minutes. Preserve missingness, never infer zero or DNP.
+        in_progress = summary['header']['competitions'][0]['status']['type'].get('state') == 'in'
         rows, totals, seen, seen_teams, seen_people = [], [], set(), set(), set()
         for group in summary['boxscore']['players']:
             provider_team = str(group['team']['id'])
@@ -80,9 +83,11 @@ def _normalize_box(event, summary, canonical, timeline=None):
                             row['threePointersAttempted'] > row['fieldGoalsAttempted'] or
                             row['reboundsTotal'] != row['reboundsOffensive'] + row['reboundsDefensive']):
                         raise ValueError('Inconsistent player totals')
-                    if not re.fullmatch(r'\d+(?::[0-5]\d)?', values['MIN']) or not re.fullmatch(r'[+-]?\d+', values['+/-']):
+                    minutes_missing = in_progress and values['MIN'] in ('-', '--')
+                    if (not minutes_missing and not re.fullmatch(r'\d+(?::[0-5]\d)?', values['MIN'])) or not re.fullmatch(r'[+-]?\d+', values['+/-']):
                         raise ValueError('Invalid minutes or plus/minus')
-                    row['minutesDisplay'] = values['MIN']  # Preserve provider precision, including played 0 minutes.
+                    row['minutesDisplay'] = None if minutes_missing else values['MIN']
+                    row['minutesAvailable'] = not minutes_missing
                     row['plusMinusPoints'] = int(values['+/-'])
                     team_points += row['points']
                 rows.append(row)

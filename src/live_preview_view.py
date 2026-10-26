@@ -82,7 +82,7 @@ def render_live_analysis(result, home_label='Home', away_label='Away'):
             st.caption(f'Observed unchanged for {snapshot.unchanged_seconds:.0f}s; not proof of a feed outage.')
         st.write('ESPN traditional statistics · frozen V7 probabilities. Advanced metrics are unavailable; missing values are not zeros.')
     with box_tab:
-        st.caption('Traditional stats · DNPs are shown explicitly · swipe tables to see more columns')
+        st.caption('Traditional stats · DNPs are explicit · missing MIN is unavailable, not zero · swipe tables for more columns')
     players = snapshot.box['players']
     for side,label in (('away',away_label),('home',home_label)):
         with box_tab:
