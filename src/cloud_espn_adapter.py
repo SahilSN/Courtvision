@@ -4,11 +4,12 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pandas as pd
-from nba_api.stats.static import players, teams
+from nba_api.stats.static import teams
 
 from espn_live import ESPNLiveFeedError, normalize_espn_play, normalize_name
 from live_analysis import apply_current_season_pregame_smoothing
 from preprocess import parse_clock, preprocess_live_game
+from reviewed_live_players import candidates
 
 
 class ProviderContextUnavailable(ValueError):
@@ -68,9 +69,6 @@ def _normalize_snapshot(event, summary, canonical):
         if len(mapping) != 2 or (team_map is not None and mapping != team_map):
             raise ProviderContextUnavailable("Scoreboard/summary team mapping mismatch")
         team_map = mapping
-    player_index = {}
-    for person in players.get_players():
-        player_index.setdefault(normalize_name(person["full_name"]), set()).add(int(person["id"]))
     athlete_map, name_map = {}, {}
     for group in summary["boxscore"]["players"]:
         espn_team = str(group["team"]["id"])
@@ -79,7 +77,7 @@ def _normalize_snapshot(event, summary, canonical):
         for stats in group["statistics"]:
             for record in stats["athletes"]:
                 athlete = record["athlete"]
-                ids = player_index.get(normalize_name(athlete["displayName"]), set())
+                ids = candidates(athlete['displayName'], canonical['season'], team_map[espn_team]['team_id'])
                 metadata = {"player_name": athlete["displayName"], "nba_person_id": next(iter(ids)) if len(ids) == 1 else None,
                             "nba_team_id": team_map[espn_team]["team_id"], "team_tricode": team_map[espn_team]["team_tricode"]}
                 key = str(athlete["id"])

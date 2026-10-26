@@ -2,10 +2,9 @@
 
 import re
 import pandas as pd
-from nba_api.stats.static import players
 
 from cloud_espn_adapter import normalize_snapshot, ProviderContextUnavailable
-from espn_live import normalize_name
+from reviewed_live_players import candidates
 
 
 COUNTS = {'PTS': 'points', 'REB': 'reboundsTotal', 'AST': 'assists', 'TO': 'turnovers',
@@ -25,9 +24,6 @@ def _normalize_box(event, summary, canonical, timeline=None):
         if timeline is None:
             timeline = normalize_snapshot(event, summary, canonical)
         sides = {str(c['team']['id']): c['homeAway'] for c in summary['header']['competitions'][0]['competitors']}
-        names = {}
-        for person in players.get_players():
-            names.setdefault(normalize_name(person['full_name']), set()).add(person['id'])
         rows, totals, seen, seen_teams, seen_people = [], [], set(), set(), set()
         for group in summary['boxscore']['players']:
             provider_team = str(group['team']['id'])
@@ -49,7 +45,7 @@ def _normalize_box(event, summary, canonical, timeline=None):
                 seen.add(key)
                 if type(athlete['didNotPlay']) is not bool:
                     raise ValueError('Unknown participation')
-                matches = names.get(normalize_name(person['displayName']), set())
+                matches = candidates(person['displayName'],canonical['season'],team_id)
                 played = not athlete['didNotPlay']
                 if played and len(matches) != 1:
                     raise ValueError('Unresolved participating player')
