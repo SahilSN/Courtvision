@@ -12,6 +12,20 @@ from cloud_espn_adapter import normalize_snapshot
 
 
 class BundleTest(unittest.TestCase):
+    def test_coherent_stat_correction_replaces_pair_without_mutating_previous_result(self):
+        first=self.get(lambda:self.feed)
+        corrected=deepcopy(self.feed)
+        stats=corrected['summary']['boxscore']['players'][0]['statistics'][0]
+        index=stats['labels'].index('AST')
+        previous=int(stats['athletes'][0]['stats'][index])
+        stats['athletes'][0]['stats'][index]=str(previous+1)
+        stats['totals'][index]=str(int(stats['totals'][index])+1)
+        self.clock.return_value=5
+        refreshed=self.get(lambda:corrected)
+        self.assertFalse(refreshed.is_stale)
+        self.assertEqual(int(refreshed.box['players'].assists.iloc[0]),previous+1)
+        self.assertEqual(int(first.box['players'].assists.iloc[0]),previous)
+
     @classmethod
     def setUpClass(cls):
         directory = Path(__file__).parent/'fixtures'
