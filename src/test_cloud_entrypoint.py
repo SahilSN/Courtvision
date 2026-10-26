@@ -1,12 +1,41 @@
 import os
 from pathlib import Path
 import unittest
+import runpy
+import streamlit as st
 from unittest.mock import patch
 
 from streamlit.testing.v1 import AppTest
 
 
 class CloudEntrypointTest(unittest.TestCase):
+    def test_prepared_route_defaults_to_intelligence_and_kill_recovers_session(self):
+        entrypoint=Path(__file__).resolve().parents[1]/'cloud/app.py'
+        real_run=runpy.run_path
+        calls=[]
+        def fake_view(root,games,rollout_guard=None):
+            self.assertIsNotNone(rollout_guard)
+            calls.append(tuple(games));st.info('TEST LIVE ROUTE')
+        def dispatch(path,*args,**kwargs):
+            if Path(path).name=='live_beta_view.py': return {'render_live_beta':fake_view}
+            return real_run(path,*args,**kwargs)
+        with patch.dict(os.environ,{'COURTVISION_CLOUD_READY':'1','COURTVISION_DISABLE_OPERATOR_PROBES':'1'}), \
+             patch('live_rollout.allowed_games',return_value=('0022600125',)) as gate, \
+             patch('runpy.run_path',side_effect=dispatch), \
+             patch('requests.sessions.Session.request',side_effect=AssertionError('Unexpected network')):
+            app=AppTest.from_file(str(entrypoint),default_timeout=90).run()
+            self.assertFalse(app.exception)
+            self.assertEqual(app.sidebar.radio(key='cloud_workspace').value,'Season Intelligence')
+            self.assertFalse(calls)
+            app.sidebar.radio(key='cloud_workspace').set_value('Live Beta').run()
+            self.assertFalse(app.exception)
+            self.assertEqual(calls,[('0022600125',)])
+            gate.return_value=()
+            app.run()
+            self.assertFalse(app.exception)
+            self.assertEqual(app.session_state['cloud_workspace'],'Season Intelligence')
+            self.assertFalse(any(x.value=='TEST LIVE ROUTE' for x in app.info))
+
     def test_setup_is_closed_without_explicit_readiness(self):
         entrypoint = Path(__file__).resolve().parents[1] / "cloud" / "app.py"
         with patch.dict(os.environ, {"COURTVISION_CLOUD_READY": ""}), \

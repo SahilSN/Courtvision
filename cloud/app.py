@@ -7,7 +7,7 @@ import sys
 
 import streamlit as st
 
-# Never allow a host setting to enable expensive live/historical analysis here.
+# Keep legacy full/live/historical discovery disabled regardless of host settings.
 os.environ["COURTVISION_DEPLOYMENT_PROFILE"] = "published"
 
 # Public repositories default to public apps on Community Cloud. Keep data off
@@ -34,6 +34,25 @@ if (root / "cloud/live_probe_request.json").exists() and os.environ.get("COURTVI
         # Diagnostics are optional and must never block the published dashboard,
         # including during a hot deployment's transient source-file updates.
         print("COURTVISION_HOST_PROBE unavailable " + type(error).__name__, flush=True)
+
+if str(root/'src') not in sys.path:
+    sys.path.append(str(root/'src'))
+from live_rollout import allowed_games
+games=allowed_games(root/'cloud/live_rollout.json',os.environ)
+if games:
+    workspace=st.sidebar.radio('Workspace',['Season Intelligence','Live Beta'],key='cloud_workspace')
+    if workspace=='Live Beta':
+        st.set_page_config(page_title='Courtvision · Live beta',page_icon='🏀',layout='wide')
+        try:
+            view=runpy.run_path(str(root/'src/live_beta_view.py'))
+            view['render_live_beta'](root,games,rollout_guard=lambda:allowed_games(root/'cloud/live_rollout.json',os.environ))
+        except Exception as error:
+            print('COURTVISION_LIVE_VIEW unavailable '+type(error).__name__,flush=True)
+            st.warning('Live is temporarily unavailable. Return to Season Intelligence in the sidebar.')
+        st.stop()
+else:
+    # A killed/expired rollout must not strand a viewer in its previous selection.
+    st.session_state['cloud_workspace']='Season Intelligence'
 
 runpy.run_path(
     str(Path(__file__).resolve().parents[1] / "dashboard" / "app.py"),

@@ -4,6 +4,7 @@ from datetime import datetime
 import json
 from pathlib import Path
 import runpy
+import time
 from zoneinfo import ZoneInfo
 
 import streamlit as st
@@ -16,6 +17,7 @@ from live_refresh import current_event, summary_pair
 from live_snapshot_cache import LiveSnapshotCache
 from offline_live_sample import load_cpu_artifacts
 from season_config import CURRENT_SEASON
+from live_diagnostics import diagnostics
 
 
 @st.cache_resource
@@ -33,13 +35,15 @@ def scoreboard_event(canonical,event_id):
     return current_event(canonical,event_id)
 
 
-def render_live_beta(root,allowed_games):
+def render_live_beta(root,allowed_games,rollout_guard=None):
     st.title('Game Center · Live check')
     st.caption('Two-game testing scope · frozen V7 · refreshes are paused unless enabled below')
     root=Path(root)
     today=datetime.now(ZoneInfo('America/New_York')).date().isoformat()
     path=root/'results/live_context'/f'{CURRENT_SEASON}_day_context_v1.json'
     render=runpy.run_path(str(root/'src/live_preview_view.py'))['render_live_analysis']
+    if not allowed_games or len(set(allowed_games))>2:
+        render(None);return
     try:
         day=json.loads(path.read_text())
         if day['gameDate']!=today:
@@ -59,11 +63,17 @@ def render_live_beta(root,allowed_games):
 
     @st.fragment(run_every='15s' if auto else None)
     def panel():
+        started=time.perf_counter()
         st.button('Refresh game',key='live_beta_refresh')
+        if rollout_guard is not None and selected not in rollout_guard():
+            diagnostics.record(selected,'paused',time.perf_counter()-started)
+            st.info('Live is paused or this rollout has expired. Return to Season Intelligence in the sidebar.')
+            return
         try:
             mapped=read_day_context(path,canonical)  # Gate before all HTTP/model work.
             event=scoreboard_event(canonical,mapped['espnEventId'])
             if event['competitions'][0]['status']['type']['state']=='pre':
+                diagnostics.record(selected,'scheduled',time.perf_counter()-started)
                 st.info('Scheduled · this game has not started. No in-game estimate is shown.')
                 st.caption('Verified pregame regular-season records are ready; check back after tip-off.')
                 return
@@ -71,7 +81,10 @@ def render_live_beta(root,allowed_games):
             result=analyze_live_snapshot(cache,canonical,path,
                 lambda:summary_pair(event,mapped['espnEventId']),cpu_artifacts(),tracker)
             render(result,registry[canonical['homeTeamId']],registry[canonical['awayTeamId']])
-        except (RuntimeError,ValueError,KeyError,TypeError,OSError,IndexError):
+            diagnostics.record(selected,result.display_state,time.perf_counter()-started,age=result.snapshot.age_seconds,
+                error_type=result.snapshot.refresh_error_type)
+        except (RuntimeError,ValueError,KeyError,TypeError,OSError,IndexError) as error:
+            diagnostics.record(selected,'unavailable',time.perf_counter()-started,error_type=type(error).__name__)
             # No provider exception details, guessed probabilities or neutral records.
             render(None)
             st.caption('Waiting for a coherent feed and verified context. Try refreshing shortly.')
