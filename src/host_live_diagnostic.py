@@ -4,6 +4,7 @@ from datetime import date, datetime, timezone
 import json
 from pathlib import Path
 import re
+import runpy
 
 from probe_live_access import probe
 
@@ -36,8 +37,7 @@ def run_requested_probe(request_path, runtime, now=None, runner=None):
     try:
         if runner is None:
             if kind == 'pipeline':
-                from host_pipeline_probe import probe_pipeline
-                runner=probe_pipeline
+                runner=runpy.run_path(str(Path(__file__).with_name('host_pipeline_probe.py')))['probe_pipeline']
             else:
                 runner=probe
         report = runner(day, "community-cloud")

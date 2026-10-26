@@ -21,7 +21,8 @@ class HostDiagnosticTest(unittest.TestCase):
             self.assertIsNone(run_requested_probe(path,root/'runtime',now,runner))
             runner.assert_not_called()
             request['kind']='pipeline';path.write_text(json.dumps(request))
-            with patch('host_pipeline_probe.probe_pipeline',return_value={'status':'pipeline_baseline_passed'}) as pipeline:
+            pipeline=Mock(return_value={'status':'pipeline_baseline_passed'})
+            with patch('host_live_diagnostic.runpy.run_path',return_value={'probe_pipeline':pipeline}):
                 result=run_requested_probe(path,root/'runtime',now)
             self.assertEqual(result['status'],'pipeline_baseline_passed')
             pipeline.assert_called_once()
