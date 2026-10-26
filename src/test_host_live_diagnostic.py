@@ -10,6 +10,22 @@ from host_live_diagnostic import run_requested_probe
 
 
 class HostDiagnosticTest(unittest.TestCase):
+    def test_pipeline_dispatch_is_explicit_and_unknown_kind_refused(self):
+        from unittest.mock import patch
+        now=datetime.now(timezone.utc)
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            path=self.request(root,now)
+            request=json.loads(path.read_text());request['kind']='unknown';path.write_text(json.dumps(request))
+            runner=Mock()
+            self.assertIsNone(run_requested_probe(path,root/'runtime',now,runner))
+            runner.assert_not_called()
+            request['kind']='pipeline';path.write_text(json.dumps(request))
+            with patch('host_pipeline_probe.probe_pipeline',return_value={'status':'pipeline_baseline_passed'}) as pipeline:
+                result=run_requested_probe(path,root/'runtime',now)
+            self.assertEqual(result['status'],'pipeline_baseline_passed')
+            pipeline.assert_called_once()
+
     def request(self, root, now):
         path = root / "request.json"
         path.write_text(json.dumps({"requestId": "test-probe", "issuedAt": now.isoformat(),

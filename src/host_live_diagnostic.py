@@ -8,7 +8,7 @@ import re
 from probe_live_access import probe
 
 
-def run_requested_probe(request_path, runtime, now=None, runner=probe):
+def run_requested_probe(request_path, runtime, now=None, runner=None):
     now = now or datetime.now(timezone.utc)
     try:
         request = json.loads(Path(request_path).read_text())
@@ -16,6 +16,9 @@ def run_requested_probe(request_path, runtime, now=None, runner=probe):
         issued = datetime.fromisoformat(request["issuedAt"].replace("Z", "+00:00"))
         expires = datetime.fromisoformat(request["expiresAt"].replace("Z", "+00:00"))
         day = date.fromisoformat(request["date"]).isoformat()
+        kind=request.get('kind','access')
+        if kind not in ('access','pipeline'):
+            return None
         if (not re.fullmatch(r"[a-z0-9-]{1,64}", request_id) or issued.tzinfo is None or expires.tzinfo is None
                 or not 0 < (expires - issued).total_seconds() <= 900 or not issued <= now < expires):
             return None
@@ -31,6 +34,12 @@ def run_requested_probe(request_path, runtime, now=None, runner=probe):
     except FileExistsError:
         return None
     try:
+        if runner is None:
+            if kind == 'pipeline':
+                from host_pipeline_probe import probe_pipeline
+                runner=probe_pipeline
+            else:
+                runner=probe
         report = runner(day, "community-cloud")
     except Exception as error:
         report = {"status": "failed", "errorType": type(error).__name__}
