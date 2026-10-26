@@ -37,8 +37,16 @@ if (root / "cloud/live_probe_request.json").exists() and os.environ.get("COURTVI
 
 if str(root/'src') not in sys.path:
     sys.path.append(str(root/'src'))
-from live_rollout import allowed_games
-games=allowed_games(root/'cloud/live_rollout.json',os.environ)
+games=()
+if os.environ.get('COURTVISION_ENABLE_LIVE_BETA')=='1' and os.environ.get('COURTVISION_DISABLE_LIVE_BETA')!='1':
+    try:
+        import importlib
+        importlib.invalidate_caches()
+        from live_rollout import allowed_games
+        games=allowed_games(root/'cloud/live_rollout.json',os.environ)
+    except Exception as error:
+        # Optional rollout policy must not break the default dashboard during a hot deployment.
+        print('COURTVISION_LIVE_POLICY unavailable '+type(error).__name__,flush=True)
 if games:
     workspace=st.sidebar.radio('Workspace',['Season Intelligence','Live Beta'],key='cloud_workspace')
     if workspace=='Live Beta':

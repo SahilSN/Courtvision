@@ -19,7 +19,8 @@ class CloudEntrypointTest(unittest.TestCase):
         def dispatch(path,*args,**kwargs):
             if Path(path).name=='live_beta_view.py': return {'render_live_beta':fake_view}
             return real_run(path,*args,**kwargs)
-        with patch.dict(os.environ,{'COURTVISION_CLOUD_READY':'1','COURTVISION_DISABLE_OPERATOR_PROBES':'1'}), \
+        with patch.dict(os.environ,{'COURTVISION_CLOUD_READY':'1','COURTVISION_DISABLE_OPERATOR_PROBES':'1',
+                                   'COURTVISION_ENABLE_LIVE_BETA':'1','COURTVISION_DISABLE_LIVE_BETA':'0'}), \
              patch('live_rollout.allowed_games',return_value=('0022600125',)) as gate, \
              patch('runpy.run_path',side_effect=dispatch), \
              patch('requests.sessions.Session.request',side_effect=AssertionError('Unexpected network')):
@@ -35,6 +36,10 @@ class CloudEntrypointTest(unittest.TestCase):
             self.assertFalse(app.exception)
             self.assertEqual(app.session_state['cloud_workspace'],'Season Intelligence')
             self.assertFalse(any(x.value=='TEST LIVE ROUTE' for x in app.info))
+            gate.side_effect=RuntimeError('private diagnostic detail')
+            app.run()
+            self.assertFalse(app.exception)
+            self.assertEqual(app.session_state['cloud_workspace'],'Season Intelligence')
 
     def test_setup_is_closed_without_explicit_readiness(self):
         entrypoint = Path(__file__).resolve().parents[1] / "cloud" / "app.py"
