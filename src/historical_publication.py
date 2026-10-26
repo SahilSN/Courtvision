@@ -22,12 +22,12 @@ class MilestonePublication:
         temporary.write_text(json.dumps(self.state, indent=2) + "\n")
         temporary.replace(self.path)
 
-    def update(self, coverage):
+    def update(self, coverage, flush_seasons=()):
         published = self.state["publishedGames"]
         due = [s for s, c in coverage.items()
                if c["processedGames"] > published.get(s, 0)
                and (c["processedGames"] - published.get(s, 0) >= self.every_games
-                    or c["processedGames"] == c["expectedGames"])]
+                    or c["processedGames"] == c["expectedGames"] or s in flush_seasons)]
         self.state["pendingSeasons"] = due
         if not due:
             return True

@@ -9,6 +9,15 @@ from run_historical_backfill import run_backfill
 
 
 class BackfillRunnerTest(unittest.TestCase):
+    def test_blocked_season_does_not_starve_older_season(self):
+        coverage = {'2024-25': {'processedGames': 1229, 'expectedGames': 1230},
+                    '2023-24': {'processedGames': 10, 'expectedGames': 1230}}
+        with tempfile.TemporaryDirectory() as directory, \
+             patch('run_historical_backfill.progress', return_value=coverage), \
+             patch('run_historical_backfill.backfill_season', return_value=[{'gameId': 'x','error':'invalid source'}]) as runner:
+            run_backfill(list(coverage), directory, max_rounds=3, sleeper=Mock())
+            self.assertEqual([c.args[0] for c in runner.call_args_list], ['2024-25','2023-24','2024-25'])
+
     def test_snapshot_lock_contention_is_retried(self):
         before = {"2025-26": {"processedGames": 0, "expectedGames": 1}}
         after = {"2025-26": {"processedGames": 1, "expectedGames": 1}}

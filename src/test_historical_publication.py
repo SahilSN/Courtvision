@@ -13,6 +13,17 @@ def coverage(count, expected=1230):
 
 
 class HistoricalPublicationTest(unittest.TestCase):
+    def test_stalled_season_flushes_validated_partial_without_claiming_complete(self):
+        publish = Mock(return_value='commit')
+        with tempfile.TemporaryDirectory() as directory:
+            worker = MilestonePublication(Path(directory) / 'publication.json', 500, publish)
+            worker.state['publishedGames'] = {'2025-26': 1039}
+            worker.update(coverage(1229), flush_seasons=['2025-26'])
+            publish.assert_called_once_with(['2025-26'])
+            self.assertEqual(worker.state['publishedGames']['2025-26'], 1229)
+            worker.update(coverage(1229), flush_seasons=['2025-26'])
+            self.assertEqual(publish.call_count, 1)
+
     def test_milestones_restart_and_completion(self):
         publish = Mock(return_value="commit")
         with tempfile.TemporaryDirectory() as directory:

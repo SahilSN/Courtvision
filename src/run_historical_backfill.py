@@ -53,8 +53,9 @@ def run_backfill(seasons, output_dir=PLAYER_INTELLIGENCE_DIR, batch_size=25,
                  "lastProgressAt": None, "failureCount": 0, "recentFailures": [],
                  "scope": "Validated milestone publication" if publication else "Local historical checkpoints; not hosted publication"}
 
-        def publish():
-            ready = publication.update(state["coverage"]) if publication else True
+        def publish(flush_seasons=()):
+            ready = (publication.update(state["coverage"], flush_seasons=flush_seasons)
+                     if publication else True)
             if publication:
                 state["publication"] = publication.state
             return ready
@@ -66,6 +67,7 @@ def run_backfill(seasons, output_dir=PLAYER_INTELLIGENCE_DIR, batch_size=25,
             temporary.replace(path)
 
         delay = cooldown
+        last_season = None
         try:
             while True:
                 state["coverage"] = progress(seasons, output_dir)
@@ -83,7 +85,10 @@ def run_backfill(seasons, output_dir=PLAYER_INTELLIGENCE_DIR, batch_size=25,
                 if max_rounds and state["round"] >= max_rounds:
                     save("incomplete", nextRetryAt=None)
                     return 1
-                season = pending[0]
+                # A permanently invalid source game must not starve older seasons.
+                candidates = [s for s in pending if last_season is None or seasons.index(s) > seasons.index(last_season)]
+                season = candidates[0] if candidates else pending[0]
+                last_season = season
                 before = state["coverage"][season]["processedGames"]
                 state["round"] += 1
                 save("running", season=season, nextRetryAt=None, waitReason=None)
@@ -103,7 +108,7 @@ def run_backfill(seasons, output_dir=PLAYER_INTELLIGENCE_DIR, batch_size=25,
                 state["recentFailures"] = (state["recentFailures"] + [
                     {"season": season, "gameId": f["gameId"], "error": f["error"][:1000]}
                     for f in failures])[-20:]
-                publication_ready = publish()
+                publication_ready = publish(flush_seasons=[season] if after == before else ())
                 if max_rounds and state["round"] >= max_rounds:
                     complete = all(c["processedGames"] == c["expectedGames"] for c in state["coverage"].values())
                     status = "complete" if complete and publication_ready else (
