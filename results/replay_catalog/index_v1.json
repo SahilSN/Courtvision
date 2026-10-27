@@ -39,6 +39,51 @@
       "sha256": "a693e941a83922b0cf56addb85b5b9ee7a28f863f30913162a6f96293e2e0d9c"
     },
     {
+      "gameId": "0021900560",
+      "season": "2019-20",
+      "date": "2020-01-08",
+      "home": "NOP",
+      "away": "CHI",
+      "collection": "catalog",
+      "sha256": "eb89c01c425d8bdc823b4f7a47747dd66e830f4dfdfcdf6510eb0a4a153b0206"
+    },
+    {
+      "gameId": "0021900561",
+      "season": "2019-20",
+      "date": "2020-01-08",
+      "home": "UTA",
+      "away": "NYK",
+      "collection": "catalog",
+      "sha256": "7cae2e853ea767e98c077cf40473efba7c90db1a290762c3858f5d25f768c18d"
+    },
+    {
+      "gameId": "0021900562",
+      "season": "2019-20",
+      "date": "2020-01-08",
+      "home": "GSW",
+      "away": "MIL",
+      "collection": "catalog",
+      "sha256": "3acf1f565b1016beaa9ce9d13c71cd4713cf2c269534f34179bd4a40615fb3a4"
+    },
+    {
+      "gameId": "0021900563",
+      "season": "2019-20",
+      "date": "2020-01-09",
+      "home": "DET",
+      "away": "CLE",
+      "collection": "catalog",
+      "sha256": "a473e2b0254bb25abc2087e361c72bfa05a67aa54cbb03aed4ed804fd79338b9"
+    },
+    {
+      "gameId": "0021900564",
+      "season": "2019-20",
+      "date": "2020-01-09",
+      "home": "PHI",
+      "away": "BOS",
+      "collection": "catalog",
+      "sha256": "9603a2e47d662ac7c3b869ff6fe6e89e29b9e6325a209b25b2eaa7d5b2d83bb5"
+    },
+    {
       "gameId": "0021900606",
       "season": "2019-20",
       "date": "2020-01-15",
@@ -55,6 +100,195 @@
       "away": "ATL",
       "collection": "catalog",
       "sha256": "339287d64b1b5f95593a0527a4dbb5ca9aa91aaca9a2671c2dce9b0fcd46e6dd"
+    },
+    {
+      "gameId": "0022000575",
+      "season": "2020-21",
+      "date": "2021-03-11",
+      "home": "OKC",
+      "away": "DAL",
+      "collection": "catalog",
+      "sha256": "f5e8d2cfa96d925594c2db2f11839eb705741a90b0497ab86cb69b8eea005816"
+    },
+    {
+      "gameId": "0022000576",
+      "season": "2020-21",
+      "date": "2021-03-11",
+      "home": "LAC",
+      "away": "GSW",
+      "collection": "catalog",
+      "sha256": "2b7ec05f1019367a96e87f5095723032c94554ace00d3271381ddd7949c8a4ae"
+    },
+    {
+      "gameId": "0022000577",
+      "season": "2020-21",
+      "date": "2021-03-11",
+      "home": "POR",
+      "away": "PHX",
+      "collection": "catalog",
+      "sha256": "8edb5e16e985d7fa9064b7a8505517a7266dccc2f1e7994a5ccc35d228c2c0dd"
+    },
+    {
+      "gameId": "0022000578",
+      "season": "2020-21",
+      "date": "2021-03-11",
+      "home": "SAC",
+      "away": "HOU",
+      "collection": "catalog",
+      "sha256": "c3b4330705b02f06ff8bf50febbcf8b55933817fbb1a025fdce35138bf088bbf"
+    },
+    {
+      "gameId": "0022000579",
+      "season": "2020-21",
+      "date": "2021-03-12",
+      "home": "WAS",
+      "away": "PHI",
+      "collection": "catalog",
+      "sha256": "fa9e69f4557aabd871f701bd0afc40543651bab3b2acd40794cec9add8a3b858"
+    },
+    {
+      "gameId": "0022100596",
+      "season": "2021-22",
+      "date": "2022-01-08",
+      "home": "PHX",
+      "away": "MIA",
+      "collection": "catalog",
+      "sha256": "32b9c238c5ba665a51786db8918a85f92c6066a8730ebf79f1b40158e0b1bbc3"
+    },
+    {
+      "gameId": "0022100597",
+      "season": "2021-22",
+      "date": "2022-01-09",
+      "home": "LAC",
+      "away": "ATL",
+      "collection": "catalog",
+      "sha256": "31cae3ad454d5e2c67e531a13e8f460a37b13787afe7bf82f729df5212f3d447"
+    },
+    {
+      "gameId": "0022100598",
+      "season": "2021-22",
+      "date": "2022-01-09",
+      "home": "ORL",
+      "away": "WAS",
+      "collection": "catalog",
+      "sha256": "b8a41eea8a9d2e5117393cab8ed890e1e083161aca8d52110e4c99e980bfded4"
+    },
+    {
+      "gameId": "0022100599",
+      "season": "2021-22",
+      "date": "2022-01-09",
+      "home": "TOR",
+      "away": "NOP",
+      "collection": "catalog",
+      "sha256": "a1ac866974209a7d69574d26acc3c4b64fe8263552f56de5dfceed273f595858"
+    },
+    {
+      "gameId": "0022100600",
+      "season": "2021-22",
+      "date": "2022-01-09",
+      "home": "HOU",
+      "away": "MIN",
+      "collection": "catalog",
+      "sha256": "801a3546b4489f1354c25b5896e179f0e2fbcc3aa0ba737b06658d321ef2a93d"
+    },
+    {
+      "gameId": "0022200605",
+      "season": "2022-23",
+      "date": "2023-01-09",
+      "home": "WAS",
+      "away": "NOP",
+      "collection": "catalog",
+      "sha256": "4c636d1a4d695db3fa753ed35cf48d7bc4725a6c73e4ee0bde42c71fb4f8fe4e"
+    },
+    {
+      "gameId": "0022200606",
+      "season": "2022-23",
+      "date": "2023-01-09",
+      "home": "BOS",
+      "away": "CHI",
+      "collection": "catalog",
+      "sha256": "6e41a82f045c1a932f32e5e9de05e81acd6ee97466f526a27ddadaed8a34f6f7"
+    },
+    {
+      "gameId": "0022200607",
+      "season": "2022-23",
+      "date": "2023-01-09",
+      "home": "NYK",
+      "away": "MIL",
+      "collection": "catalog",
+      "sha256": "b6924b09187a4969d854c2bd4f105e68e4d97e22c1eef8f1e59088ea050da624"
+    },
+    {
+      "gameId": "0022200608",
+      "season": "2022-23",
+      "date": "2023-01-09",
+      "home": "MEM",
+      "away": "SAS",
+      "collection": "catalog",
+      "sha256": "0297173260ba02c3784b2613a9cf9836a081dbcc296629755f992e579c05c15e"
+    },
+    {
+      "gameId": "0022200609",
+      "season": "2022-23",
+      "date": "2023-01-09",
+      "home": "DEN",
+      "away": "LAL",
+      "collection": "catalog",
+      "sha256": "08bf9d229c8e61436e4648141459f0b66f1312dfddec57185a2cc9f0a0585c46"
+    },
+    {
+      "gameId": "0022200654",
+      "season": "2022-23",
+      "date": "2023-01-15",
+      "home": "POR",
+      "away": "DAL",
+      "collection": "catalog",
+      "sha256": "ccb53bf6198dc48c96508f85c2ebc833951a6713491818eb1a3f4592bf13f2a9"
+    },
+    {
+      "gameId": "0022300592",
+      "season": "2023-24",
+      "date": "2024-01-20",
+      "home": "DET",
+      "away": "MIL",
+      "collection": "catalog",
+      "sha256": "53b06c3b94a7634c12d138c08eee225edbccc00456f29bd460d94884530737fb"
+    },
+    {
+      "gameId": "0022300593",
+      "season": "2023-24",
+      "date": "2024-01-20",
+      "home": "CHA",
+      "away": "PHI",
+      "collection": "catalog",
+      "sha256": "a2aee69192c915f005808f981b2564e310dd7d5a34f9603d26bb05e9e0c26486"
+    },
+    {
+      "gameId": "0022300594",
+      "season": "2023-24",
+      "date": "2024-01-20",
+      "home": "WAS",
+      "away": "SAS",
+      "collection": "catalog",
+      "sha256": "2305569bcfdb34ffdfc2fe870bac4b5524f43ccc86686f3b18f130725eaf848f"
+    },
+    {
+      "gameId": "0022300595",
+      "season": "2023-24",
+      "date": "2024-01-20",
+      "home": "ATL",
+      "away": "CLE",
+      "collection": "catalog",
+      "sha256": "a0d2a44a5e57b0b0e615eb837bfd3d96c053670f47a2b1d8f21c5c4ab0ab4efa"
+    },
+    {
+      "gameId": "0022300596",
+      "season": "2023-24",
+      "date": "2024-01-20",
+      "home": "NYK",
+      "away": "TOR",
+      "collection": "catalog",
+      "sha256": "36aa40752d0e1320a1cf135b37b9d72a8cffdffb86aaaca419b67754ebdb231d"
     },
     {
       "gameId": "0022500011",
@@ -199,6 +433,51 @@
       "away": "ORL",
       "collection": "catalog",
       "sha256": "94bb97351cbcacbe6ad91b06d2d115d5d36ff8953faace6a101ab99edbd2f57a"
+    },
+    {
+      "gameId": "0022501196",
+      "season": "2025-26",
+      "date": "2026-04-12",
+      "home": "OKC",
+      "away": "PHX",
+      "collection": "catalog",
+      "sha256": "ddc98e2d6316269e688e232026aaa9b9bb4c407234c24c2fa1e2a3e540549a9a"
+    },
+    {
+      "gameId": "0022501197",
+      "season": "2025-26",
+      "date": "2026-04-12",
+      "home": "SAS",
+      "away": "DEN",
+      "collection": "catalog",
+      "sha256": "c402c47b135e8a0c929e8859b3ac9016a5049cb2b566f41b3c3a2fb8f620dae8"
+    },
+    {
+      "gameId": "0022501198",
+      "season": "2025-26",
+      "date": "2026-04-12",
+      "home": "LAL",
+      "away": "UTA",
+      "collection": "catalog",
+      "sha256": "b1ae50fb32aadeccd753c1492a731f5462960d60c6cf08c3790b688b2a370213"
+    },
+    {
+      "gameId": "0022501199",
+      "season": "2025-26",
+      "date": "2026-04-12",
+      "home": "LAC",
+      "away": "GSW",
+      "collection": "catalog",
+      "sha256": "110de701505a24183d69431853b4a1ee4bb9012d010bd538be05d902a21106ea"
+    },
+    {
+      "gameId": "0022501200",
+      "season": "2025-26",
+      "date": "2026-04-12",
+      "home": "POR",
+      "away": "SAC",
+      "collection": "catalog",
+      "sha256": "8995ca21106f8847079f05c9dc3635c6e243d16bae0033ec31eea0c5d9cb6f8b"
     }
   ]
 }
