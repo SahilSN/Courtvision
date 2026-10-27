@@ -5,22 +5,23 @@ import streamlit as st
 from deployment_health import intelligence_status
 from live_diagnostics import diagnostics
 from live_operations import operations_status
+from ui_shell import time_label
 
 
 def render_health(root):
     with st.sidebar.expander('Update health'):
-        st.caption('Published evidence as of page load · timestamps are UTC. This page does not run updates.')
+        st.caption('Published evidence as of page load · Pacific time. This page does not run updates.')
         for name, item in intelligence_status(root)['pipelines'].items():
             st.markdown(f'**{name.title()} · {item["state"]}**')
             if 'lastCheckAt' in item:
-                st.caption(f'Last check: {item["lastCheckAt"]}')
+                st.caption(f'Last check: {time_label(item["lastCheckAt"])}')
                 total = item['completedGames'] if item['completedGames'] is not None else 'unknown'
                 st.caption(f'{item["processedGames"]}/{total} completed games · games through {item["gamesThrough"] or "none yet"}')
             st.caption(item['action'])
         live = operations_status(root)
         st.markdown(f'**Live preparation · {live["preparation"]}**')
         if 'preparedAt' in live:
-            st.caption(f'{live["gameDate"]} · prepared {live["preparedAt"]} · expires {live["expiresAt"]}')
+            st.caption(f'{live["gameDate"]} · prepared {time_label(live["preparedAt"])} · expires {time_label(live["expiresAt"])}')
             st.caption(f'{live["preparedGames"]} prepared · {live["deferredGames"]} deferred · '
                        f'{live["rosterTeamsUnavailable"]} roster teams unavailable · {live["pendingIdentities"]} identity reviews')
         if live['preparation'] != 'prepared':

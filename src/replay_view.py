@@ -10,7 +10,9 @@ from replay_chart import build_replay_chart
 def render_replay_view():
     import streamlit as st
 
-    st.subheader("Historical Replay · Collection")
+    from ui_shell import page_heading
+    page_heading('Replay Collection','Revisit four curated games with frozen win probabilities, turning points and player impact.',
+                 'Historical replay · Limited collection')
     st.caption("Four curated games · precomputed full-game analysis · Frozen V7 · no live feed or inference")
     try:
         collection = load_collection()

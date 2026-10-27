@@ -478,21 +478,14 @@ st.markdown(
 
 
 
-st.title(
-
-    "🏀 Courtvision"
-
-)
-
-
-
-st.caption(
-
-    "NBA win probability "
-
-    "and turning-point analysis"
-
-)
+if DEPLOYMENT_PROFILE != 'published':
+    st.title('🏀 Courtvision')
+    st.caption('NBA win probability and turning-point analysis')
+else:
+    from ui_shell import apply_shell, sidebar_brand, page_heading, feature_label
+    if not globals().get('CLOUD_SHELL'):
+        apply_shell()
+        sidebar_brand()
 
 
 
@@ -780,11 +773,8 @@ def cached_player_impact(
 
 
 
-st.sidebar.header(
-
-    "Navigation"
-
-)
+if DEPLOYMENT_PROFILE != 'published':
+    st.sidebar.header('Navigation')
 
 
 st.sidebar.caption(
@@ -801,22 +791,13 @@ available_modes = navigation_modes(DEPLOYMENT_PROFILE)
 if st.session_state.get("courtvision_mode") not in available_modes:
     st.session_state["courtvision_mode"] = available_modes[0]
 
-mode = st.sidebar.radio(
-
-    "Mode",
-
-    available_modes,
-
-    key="courtvision_mode",
-
-)
+if DEPLOYMENT_PROFILE == 'published':
+    mode = 'Season Intelligence'
+else:
+    mode = st.sidebar.radio('Mode',available_modes,key='courtvision_mode')
 
 if DEPLOYMENT_PROFILE == "published":
-    st.sidebar.info(
-        "Published beta · Team and Player Intelligence plus four curated offline replays. "
-        "Live games and unrestricted replay are not enabled. "
-        "Historical player coverage may be partial."
-    )
+    st.sidebar.caption('Published ratings and covered-season careers. Historical coverage may be partial.')
 
 
 
@@ -1628,49 +1609,25 @@ else:
 
 
 
-    season = st.sidebar.selectbox(
-
-        "Season",
-
-        SEASON_INTELLIGENCE_SEASONS,
-
-        index=0,
-
-        key="courtvision_season_intelligence_season",
-
-    )
-
-
-
-    st.sidebar.caption(
-
-        (
-            "Current regular-season context"
-            if season == CURRENT_SEASON
-            else "Historical regular-season context"
-        )
-
-    )
-
-
     intelligence_view = st.sidebar.radio(
-
-        "Intelligence",
-
-        (
-            [
-                "Teams",
-
-                "Players",
-
-            ]
-            + ["Player Career", "Replay Pilot"]
-        ),
-
+        'Explore',
+        ['Teams','Players','Player Career','Replay Pilot'],
         key="courtvision_season_intelligence_view",
+        format_func=feature_label if DEPLOYMENT_PROFILE=='published' else str,
+        horizontal=DEPLOYMENT_PROFILE!='published',
+    )
 
-        horizontal=True,
-
+    st.sidebar.divider()
+    season = st.sidebar.selectbox(
+        'Season',SEASON_INTELLIGENCE_SEASONS,index=0,
+        key='courtvision_season_intelligence_season',
+        disabled=DEPLOYMENT_PROFILE=='published' and intelligence_view in ('Player Career','Replay Pilot'),
+        help='Applies to team and player ratings. Careers span covered seasons; replays have their own game selector.',
+    )
+    st.sidebar.caption(
+        'Across published seasons' if intelligence_view=='Player Career' else
+        'Four curated games · not the full archive' if intelligence_view=='Replay Pilot' else
+        'Current regular season' if season==CURRENT_SEASON else 'Historical regular season'
     )
 
 
@@ -10634,6 +10591,9 @@ def format_signed_rating(
 def render_season_intelligence(
     season,
 ):
+    if DEPLOYMENT_PROFILE=='published':
+        page_heading('Team Intelligence','Explore league rankings, team profiles and how ratings change throughout the season.',
+                     f'{season} · Regular season')
     render_intelligence_freshness(season, "teams")
     if season == CURRENT_SEASON:
         summary_path = (
@@ -10709,16 +10669,9 @@ def render_season_intelligence(
 
 
 
-    st.subheader(
-        "Season Intelligence"
-    )
-
-    st.caption(
-        (
-            f"{season} regular season · "
-            "Team Courtvision Rating v1"
-        )
-    )
+    if DEPLOYMENT_PROFILE!='published':
+        st.subheader('Season Intelligence')
+    st.caption(f'{season} regular season · Team Courtvision Rating v1')
 
 
 
@@ -11975,14 +11928,10 @@ def render_intelligence_freshness(season, pipeline):
         elif pd.Timestamp.now(tz="UTC") - checked > pd.Timedelta(hours=26):
             st.warning("The last refresh is over a day old. New completed games may be missing.")
         if entry["status"] != "success":
-            with st.expander("Update details"):
-                st.write({
-                    "Processed games": entry.get("processedGames"),
-                    "Completed games discovered": entry.get("completedGames"),
-                    "Last successful check": entry.get("lastSuccessfulCheckAt"),
-                    "Pending games": entry.get("pendingGameIds"),
-                    "Error": entry.get("error"),
-                })
+            with st.expander('Data coverage'):
+                st.caption(f"Processed games: {entry.get('processedGames','Unknown')} · "
+                           f"Completed games discovered: {entry.get('completedGames','Unknown')}")
+                st.caption('Published data is retained while missing games are retried. Check Update health for the latest refresh evidence.')
     except (ValueError, KeyError, OSError):
         st.caption("Update status is temporarily unavailable; showing published data.")
 
@@ -12085,10 +12034,12 @@ def render_player_intelligence(
     season,
 ):
     render_player_design()
+    if DEPLOYMENT_PROFILE=='published':
+        page_heading('Player Intelligence','Compare player ratings, explore individual profiles and follow their season impact.',
+                     f'{season} · Regular season')
     render_intelligence_freshness(season, "players")
-    st.subheader(
-        "Player Intelligence"
-    )
+    if DEPLOYMENT_PROFILE!='published':
+        st.subheader('Player Intelligence')
 
     st.caption(
         (
@@ -12601,8 +12552,12 @@ def navigate_player_intelligence(person_id, target_season=None):
 
 def render_player_career():
     render_player_design()
+    if DEPLOYMENT_PROFILE=='published':
+        page_heading('Player Careers','Follow a player across published seasons. Totals reflect covered games—not necessarily a complete NBA career.',
+                     'Historical intelligence')
     render_intelligence_freshness(CURRENT_SEASON, "players")
-    st.subheader("Player Career")
+    if DEPLOYMENT_PROFILE!='published':
+        st.subheader('Player Career')
     st.caption("Regular-season Player Intelligence across published seasons")
     try:
         summaries, games, coverage = cached_player_career_data()

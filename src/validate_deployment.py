@@ -78,9 +78,9 @@ def validate_published_app(entrypoint="dashboard/app.py"):
         app.session_state["courtvision_mode"] = "Live"
         app.run()
         check_render(app)
-        mode = app.sidebar.radio(key="courtvision_mode")
-        require(mode.options == ["Season Intelligence"], "Published mode leaks game navigation")
-        require(mode.value == "Season Intelligence", "Disabled mode retained in session")
+        require(app.session_state['courtvision_mode']=='Season Intelligence', "Disabled mode retained in session")
+        require(not any(radio.key=='courtvision_mode' for radio in app.sidebar.radio),
+                'Published navigation should not show a redundant one-option mode')
         season_picker = app.sidebar.selectbox(key="courtvision_season_intelligence_season")
         require(season_picker.value == CURRENT_SEASON, "Current season is not the default")
         seasons = list(season_picker.options)

@@ -37,11 +37,18 @@ if (root / "cloud/live_probe_request.json").exists() and os.environ.get("COURTVI
 
 if str(root/'src') not in sys.path:
     sys.path.append(str(root/'src'))
-try:
-    runpy.run_path(str(root/'src/deployment_health_view.py'))['render_health'](root)
-except Exception:
-    # Optional read-only health must not take down intelligence or Live.
-    st.sidebar.caption('Update health temporarily unavailable.')
+from ui_shell import apply_shell, sidebar_brand, workspace_label
+apply_shell()
+sidebar_brand()
+
+
+def render_health_footer():
+    st.sidebar.divider()
+    try:
+        runpy.run_path(str(root/'src/deployment_health_view.py'))['render_health'](root)
+    except Exception:
+        st.sidebar.caption('Update health temporarily unavailable.')
+
 games=()
 if os.environ.get('COURTVISION_ENABLE_LIVE_BETA')=='1' and os.environ.get('COURTVISION_DISABLE_LIVE_BETA')!='1':
     try:
@@ -58,7 +65,7 @@ if os.environ.get('COURTVISION_ENABLE_LIVE_BETA')=='1' and os.environ.get('COURT
         # Optional rollout policy must not break the default dashboard during a hot deployment.
         print('COURTVISION_LIVE_POLICY unavailable '+type(error).__name__,flush=True)
 if games:
-    workspace=st.sidebar.radio('Workspace',['Season Intelligence','Live Beta'],key='cloud_workspace')
+    workspace=st.sidebar.radio('Workspace',['Season Intelligence','Live Beta'],key='cloud_workspace',format_func=workspace_label)
     if workspace=='Live Beta':
         st.set_page_config(page_title='Courtvision · Live beta',page_icon='🏀',layout='wide')
         try:
@@ -68,6 +75,7 @@ if games:
         except Exception as error:
             print('COURTVISION_LIVE_VIEW unavailable '+type(error).__name__,flush=True)
             st.warning('Live is temporarily unavailable. Return to Season Intelligence in the sidebar.')
+        render_health_footer()
         st.stop()
 else:
     # A killed/expired rollout must not strand a viewer in its previous selection.
@@ -76,4 +84,6 @@ else:
 runpy.run_path(
     str(Path(__file__).resolve().parents[1] / "dashboard" / "app.py"),
     run_name="__main__",
+    init_globals={'CLOUD_SHELL':True},
 )
+render_health_footer()
