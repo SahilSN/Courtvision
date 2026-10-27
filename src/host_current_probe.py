@@ -27,8 +27,10 @@ def probe_current(day, environment):
         if bundle['gameDate']!=day: raise ValueError('Wrong day')
         stage='scoreboard'
         board,_=fetch_json(BASE+'scoreboard?dates='+day.replace('-',''))
-        active={str(e['id']) for e in board['events'] if e['status']['type']['state']=='in'}
-        games=[g for g in bundle['games'] if g['espnEventId'] in active and g['gameId'] in ('0022600120','0022600121','0022600122','0022600123')]
+        # Same-day completed games can validate coverage, but are not evidence
+        # that four feeds are advancing simultaneously. Never analyze pregame.
+        available={str(e['id']) for e in board['events'] if e['status']['type']['state'] in ('in','post')}
+        games=[g for g in bundle['games'] if g['espnEventId'] in available and g['gameId'] in ('0022600120','0022600121','0022600122','0022600123')]
         reports=[]
         artifacts=None
         for game in games:
@@ -48,7 +50,7 @@ def probe_current(day, environment):
                 stage='predictions'
                 result=predict_live_probabilities(add_live_model_features(timeline,mapped['pregameContext']),*artifacts)
                 if len(result)!=len(timeline) or not result.winProbability.between(0,1).all(): raise ValueError('Invalid predictions')
-                reports.append(dict(gameId=game['gameId'],status='passed',states=len(result)))
+                reports.append(dict(gameId=game['gameId'],status='passed',states=len(result),sourceState=event['status']['type']['state']))
             except Exception as error:
                 reports.append(dict(gameId=game['gameId'],status='failed',stage=stage,errorType=type(error).__name__,
                                     causeType=type(error.__cause__).__name__ if error.__cause__ else None,
