@@ -148,12 +148,14 @@ def probe_progress(day, environment, game_ids):
         from live_release_recovery import verify_recovery
         path = ROOT/'results/live_context'/f'{CURRENT_SEASON}_day_context_v1.json'
         bundle = json.loads(path.read_text())
-        selected = next(g for g in report.get('games', []) if g['advanced'])
+        # Retention safety does not depend on the game clock advancing (e.g.
+        # a timeout). Keep its result independent of the progression gate.
+        selected = next(g for g in report.get('games', []) if g['gameId'] in pairs)
         game, = [g for g in bundle['games'] if g['gameId'] == selected['gameId']]
         report['controlledRecovery'] = verify_recovery(game, path,
             pairs[selected['gameId']], artifacts[0])
     except StopIteration:
-        report['controlledRecovery'] = dict(status='not_run_no_progressing_game')
+        report['controlledRecovery'] = dict(status='not_run_no_validated_pair')
     except Exception as error:
         report['controlledRecovery'] = dict(status='failed', errorType=type(error).__name__)
     return {**report, 'environment': environment}
