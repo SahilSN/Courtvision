@@ -5,14 +5,18 @@
 `src/run_replay_expansion.py` is a separate low-priority LaunchAgent, defined in
 `deploy/com.courtvision.replay-expansion.plist`. It does not modify the existing
 nightly intelligence or historical backfill agents. On the configured Mac it
-runs at login, every 30 minutes while awake, and at 1:30 a.m. local time.
+runs continuously while awake, starting at login and restarting after failure.
 Publication eligibility uses America/Los_Angeles explicitly; missed publication
 catches up on the next invocation after 1:30 a.m. Pacific. Sleep does not process
 games; wake/login resumes from the saved queue. No ChatGPT execution is needed.
 
-Each run attempts at most five completed games, one season at a time, with a
+Each batch attempts at most five completed games, one season at a time, with a
 180-second subprocess timeout, single-thread CPU-library settings, background
-priority, no overlap and a daily cap of 200 attempts. Frozen model and season
+priority and no overlap. There is no daily or total processing cap. Successful
+work continues after a two-second pause, rather than waiting 30 minutes; idle
+queues poll once per minute and errors back off five minutes. New metadata is
+refreshed every 15 minutes rather than re-copying the archive every batch.
+Frozen model and season
 context are reused within each batch. A 2 GB free-space guard stops safely.
 Only local processed PBP, box, impact, training and model inputs qualify.
 Missing-input games wait for normal backfill; unchanged invalid games are skipped;
@@ -31,6 +35,16 @@ The hosted Update health panel shows the last published expansion snapshot, not
 live Mac liveness. Local authoritative state: `state.json`, `last-batch.log`,
 `launchd.log`, `launchd-error.log` in that runtime directory. Publication failure
 stays local until a successful push; the hosted timestamp then remains old.
+
+### Track local progress
+
+Open **http://127.0.0.1:8520/** on this Mac. The read-only page refreshes every
+10 seconds and shows prepared vs published counts, waiting-for-publication,
+per-season totals, active batch, attempts today, failures and last worker update
+in Pacific time. It binds only to loopback, serves no arbitrary files, and adds
+no public exposure. The `/status` endpoint returns the same sanitized counts.
+If the Mac is asleep or the worker is stopped, this local page is unavailable.
+The hosted app's Update health remains a nightly snapshot, not realtime progress.
 
 To pause: `launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.courtvision.replay-expansion.plist`.
 To resume: bootstrap that same plist. Do not remove active prepared artifacts or

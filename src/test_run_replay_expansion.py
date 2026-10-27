@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import patch
 
 from live_artifacts import read_json, write_json
-from run_replay_expansion import choose_batch, publication_due, run, publish
+from run_replay_expansion import choose_batch, publication_due, run, publish, continuous
 
 
 class ReplayExpansionTest(unittest.TestCase):
@@ -46,7 +46,7 @@ class ReplayExpansionTest(unittest.TestCase):
                 (root / 'data/processed/0022500001.csv').write_bytes(b'updated')
                 self.assertEqual(len(choose_batch(root, root, state)[1]), 1)
 
-    def test_daily_cap_and_publication_failure_backoff(self):
+    def test_no_daily_cap_and_publication_failure_backoff(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             state_path = root / 'results/.runtime/replay-expansion/state.json'
@@ -54,14 +54,25 @@ class ReplayExpansionTest(unittest.TestCase):
             now = datetime(2026, 10, 28, 9, tzinfo=timezone.utc)
             with patch('run_replay_expansion.seed_workspace'), \
                     patch('run_replay_expansion.read_index', return_value={}), \
-                    patch('run_replay_expansion.choose_batch') as choose, \
+                    patch('run_replay_expansion.choose_batch', return_value=(None, [])) as choose, \
                     patch('run_replay_expansion.publish', side_effect=RuntimeError('offline')):
                 result = run(root, now=now)
-                choose.assert_not_called()
+                choose.assert_called_once()
+                self.assertEqual(choose.call_args.args[-1], 5)
             self.assertEqual(result['publicationState'], 'retry_pending')
             saved = read_json(state_path)
             self.assertEqual(saved['nextPublishRetry'], now.timestamp() + 3600)
             self.assertNotIn('publishedDay', saved)
+
+    def test_continuous_catchup_no_half_hour_wait_and_idle_backoff(self):
+        with patch('run_replay_expansion.run', side_effect=[
+                {'attempted': 5}, {'attempted': 5}, {'attempted': 0}]) as worker, \
+                patch('run_replay_expansion.time.monotonic', return_value=1):
+            sleeper = unittest.mock.Mock(side_effect=[None, None, KeyboardInterrupt])
+            with self.assertRaises(KeyboardInterrupt):
+                continuous('/tmp/worker-test', sleeper=sleeper)
+            self.assertEqual([call.args[0] for call in sleeper.call_args_list], [2, 2, 60])
+            self.assertEqual([call.kwargs['refresh'] for call in worker.call_args_list], [True, False, False])
 
     def test_corrupt_state_fails_closed(self):
         with tempfile.TemporaryDirectory() as directory:

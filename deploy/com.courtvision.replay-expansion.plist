@@ -5,6 +5,7 @@
   <key>ProgramArguments</key><array>
     <string>/Users/sahilnayak/Courtvision/.venv/bin/python</string>
     <string>/Users/sahilnayak/Courtvision/src/run_replay_expansion.py</string>
+    <string>--continuous</string>
   </array>
   <key>WorkingDirectory</key><string>/Users/sahilnayak/Courtvision</string>
   <key>EnvironmentVariables</key><dict>
@@ -16,10 +17,8 @@
   <key>Nice</key><integer>10</integer>
   <key>LowPriorityIO</key><true/>
   <key>RunAtLoad</key><true/>
-  <key>StartInterval</key><integer>1800</integer>
-  <key>StartCalendarInterval</key><dict>
-    <key>Hour</key><integer>1</integer><key>Minute</key><integer>30</integer>
-  </dict>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>60</integer>
   <key>StandardOutPath</key><string>/Users/sahilnayak/Courtvision/results/.runtime/replay-expansion/launchd.log</string>
   <key>StandardErrorPath</key><string>/Users/sahilnayak/Courtvision/results/.runtime/replay-expansion/launchd-error.log</string>
 </dict></plist>

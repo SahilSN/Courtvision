@@ -127,7 +127,7 @@ def publish(source, workspace, health):
         return git(checkout, 'rev-parse', 'HEAD').stdout.strip()
 
 
-def run(source, publish_now=False, prepare=True, now=None):
+def run(source, publish_now=False, prepare=True, now=None, refresh=True):
     source = Path(source).resolve()
     now = now or datetime.now(timezone.utc)
     runtime = source / 'results/.runtime/replay-expansion'
@@ -143,12 +143,19 @@ def run(source, publish_now=False, prepare=True, now=None):
         workspace = runtime / 'prepared'
         if shutil.disk_usage(runtime).free < 2_000_000_000:
             raise OSError('Replay expansion requires at least 2 GB free disk space')
-        seed_workspace(source, workspace)
-        if prepare and state['dailyAttempts'] < 200:
-            season, batch = choose_batch(source, workspace, state, min(5, 200 - state['dailyAttempts']))
+        if refresh:
+            seed_workspace(source, workspace)
+        attempted = 0
+        state.update(workerPhase='idle', batchGameIds=[])
+        if prepare:
+            season, batch = choose_batch(source, workspace, state, 5)
             if batch:
-                # Reserve attempts before spawning: crash/restart cannot defeat daily cap.
+                attempted = len(batch)
+                # Checkpoint before spawning; counts survive interruption.
                 state['dailyAttempts'] += len(batch)
+                state.update(workerPhase='processing', batchSeason=season,
+                             batchGameIds=[gid for gid, _ in batch],
+                             heartbeatAt=datetime.now(timezone.utc).isoformat())
                 write_json(state_path, state)
                 args = [sys.executable, '-B', str(source / 'src/rebuild_saved_replays.py'),
                         '--root', str(workspace), '--cache-root', str(source),
@@ -173,11 +180,13 @@ def run(source, publish_now=False, prepare=True, now=None):
                               'blocked' if report.get(gid, {}).get('status') == 'blocked' else 'pending')
                     state['games'][gid] = {'fingerprint': signature, 'status': status,
                                            'nextRetry': now.timestamp() + 3600 if status == 'pending' else 0}
-        health = {'schemaVersion': 1, 'checkedAt': now.isoformat(),
+        state.update(workerPhase='between_batches' if attempted else 'waiting_for_inputs',
+                     batchGameIds=[], heartbeatAt=datetime.now(timezone.utc).isoformat())
+        health = {'schemaVersion': 1, 'checkedAt': datetime.now(timezone.utc).isoformat(),
                   'preparedReplayCount': len(read_index(workspace)),
                   'blockedGames': sum(g['status'] == 'blocked' for g in state['games'].values()),
                   'pausedSeasons': ['2024-25'], 'dailyAttempts': state['dailyAttempts'],
-                  'schedule': 'Mac: bounded batch every 30 minutes; publish nightly after 1:30 a.m. Pacific'}
+                  'schedule': 'Mac: continuous low-priority batches, no daily cap; publish nightly after 1:30 a.m. Pacific'}
         state['health'] = health
         write_json(state_path, state)
         if publish_now or publication_due(state, now):
@@ -188,10 +197,34 @@ def run(source, publish_now=False, prepare=True, now=None):
                              nextPublishRetry=now.timestamp() + 3600)
             else:
                 state.update(publicationState='success', publishedDay=day,
-                             lastPublishAt=now.isoformat(), nextPublishRetry=0)
+                             lastPublishAt=now.isoformat(), nextPublishRetry=0,
+                             publishedReplayCount=len(read_index(workspace)))
                 state.pop('publicationError', None)
         write_json(state_path, state)
-        return {'health': health, 'publicationState': state.get('publicationState', 'not_due')}
+        return {'health': health, 'publicationState': state.get('publicationState', 'not_due'),
+                'attempted': attempted}
+
+
+def continuous(source, sleeper=time.sleep):
+    """Finite child batches, unlimited catch-up; idle polling without busy-waiting."""
+    refresh_at = 0
+    while True:
+        try:
+            refresh = time.monotonic() >= refresh_at
+            result = run(source, refresh=refresh)
+            if refresh:
+                refresh_at = time.monotonic() + 900
+            sleeper(2 if result['attempted'] else 60)
+        except BlockingIOError:
+            sleeper(60)
+        except Exception as error:
+            # Record a visible failure without discarding queue/retry state.
+            runtime = Path(source) / 'results/.runtime/replay-expansion'
+            write_json(runtime / 'worker_error.json', {
+                'checkedAt': datetime.now(timezone.utc).isoformat(),
+                'errorType': type(error).__name__, 'message': str(error)[:200]})
+            print(f'Replay worker paused for retry: {type(error).__name__}', flush=True)
+            sleeper(300)
 
 
 if __name__ == '__main__':
@@ -199,9 +232,20 @@ if __name__ == '__main__':
     parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument('--publish-now', action='store_true')
     parser.add_argument('--publish-only', action='store_true')
+    parser.add_argument('--continuous', action='store_true')
     args = parser.parse_args()
     try:
         os.nice(10)
-        print(run(args.root, args.publish_now, not args.publish_only))
+        if args.continuous:
+            if args.publish_now or args.publish_only:
+                parser.error('Continuous mode uses the nightly publication policy')
+            from replay_progress import start_progress_server
+            server = start_progress_server(args.root)
+            try:
+                continuous(args.root)
+            finally:
+                server.shutdown()
+        else:
+            print(run(args.root, args.publish_now, not args.publish_only))
     except BlockingIOError:
         print('Replay worker already running; skipped overlap.')
