@@ -1613,7 +1613,7 @@ else:
         'Explore',
         ['Teams','Players','Player Career'] + ([] if globals().get('CLOUD_SHELL') else ['Replay Pilot']),
         key="courtvision_season_intelligence_view",
-        format_func=feature_label if DEPLOYMENT_PROFILE=='published' else str,
+        format_func=(lambda value: {'Players':'Player ratings · season','Player Career':'Career ratings · secondary'}.get(value,feature_label(value))) if DEPLOYMENT_PROFILE=='published' else str,
         horizontal=DEPLOYMENT_PROFILE!='published',
     )
 
@@ -12035,7 +12035,7 @@ def render_player_intelligence(
 ):
     render_player_design()
     if DEPLOYMENT_PROFILE=='published':
-        page_heading('Player Intelligence','Compare player ratings, explore individual profiles and follow their season impact.',
+        page_heading('Player Intelligence','Season-reset ratings: follow progress within the selected season, without carrying forward prior seasons.',
                      f'{season} · Regular season')
     render_intelligence_freshness(season, "players")
     if DEPLOYMENT_PROFILE!='published':
@@ -12383,8 +12383,8 @@ def render_player_explorer(ratings, games, season):
         st.button("View career & compare seasons", key=f"career_from_{season}",
                   on_click=navigate_player_intelligence, args=(selected_player, None))
         render_player_metrics([
-            ("Courtvision Rating", f"{float(player['courtvisionRating']):.1f}", "100 · historical reference"),
-            ("Season Value", f"{float(player['seasonNetWPA']):+.2f}", "Cumulative attributed impact"),
+            ("Season Rating", f"{float(player['courtvisionRating']):.1f}", "100 baseline · resets each season"),
+            ("Season Value", f"{float(player['seasonNetWPA']):+.2f}", "Selected season only"),
             ("Games", f"{int(player['games'])}", f"{float(player['minutes']):,.0f} minutes processed"),
             ("Reliability", f"{float(player['ratingReliability']):.0%}", player["ratingStatus"]),
         ])
@@ -12401,11 +12401,12 @@ def render_player_explorer(ratings, games, season):
             st.info("No processed game log is available for this player yet.")
             return
 
-        st.markdown("#### Rating Trend")
+        st.markdown("#### Season rating progress")
         if len(history) == 1:
             st.caption("One completed appearance: a trend will develop after more games.")
         st.caption(
-            "Each point uses only games processed up to that date. "
+            "The season starts from a 100 reference baseline, with no career carry-over. "
+            "Each point uses only this season's games processed up to that date. "
             "Missing games may be filled by a later update. Reliability measures "
             "sample weight, not the probability that a rating is correct."
         )
@@ -12553,8 +12554,8 @@ def navigate_player_intelligence(person_id, target_season=None):
 def render_player_career():
     render_player_design()
     if DEPLOYMENT_PROFILE=='published':
-        page_heading('Player Careers','Follow a player across published seasons. Totals reflect covered games—not necessarily a complete NBA career.',
-                     'Historical intelligence')
+        page_heading('Career Ratings','Secondary view: pool a player’s covered appearances across seasons. Coverage may not represent a complete NBA career.',
+                     'Career intelligence · Pooled across seasons')
     render_intelligence_freshness(CURRENT_SEASON, "players")
     if DEPLOYMENT_PROFILE!='published':
         st.subheader('Player Career')
@@ -12695,7 +12696,23 @@ def render_career_season_comparison(summaries, coverage, person_id, season_optio
     st.dataframe(style_player_table(display), hide_index=True, width="stretch")
 
 
+def change_player_rating_scope():
+    scope=st.session_state['courtvision_player_rating_scope']
+    st.session_state['courtvision_season_intelligence_view']='Players' if scope=='Season · resets each year' else 'Player Career'
+    if scope=='Career · covered seasons':
+        selected_season=st.session_state.get('courtvision_season_intelligence_season',CURRENT_SEASON)
+        person=st.session_state.get(f'courtvision_player_intelligence_player_{selected_season}')
+        if person is not None:
+            st.session_state['courtvision_player_career_person']=person
+
+
 def run_season_intelligence():
+    if DEPLOYMENT_PROFILE=='published' and intelligence_view in ('Players','Player Career'):
+        st.session_state['courtvision_player_rating_scope']=(
+            'Season · resets each year' if intelligence_view=='Players' else 'Career · covered seasons')
+        st.radio('Rating view',['Season · resets each year','Career · covered seasons'],
+                 key='courtvision_player_rating_scope',horizontal=True,on_change=change_player_rating_scope)
+        st.caption('Season ratings use only the selected season. Career pooling is optional; age and years in the league are not rating inputs.')
     if intelligence_view == "Replay Pilot":
         # The dashboard itself is loaded through runpy on Community Cloud.
         # Give its UI renderer a fresh namespace too, avoiding stale imported
