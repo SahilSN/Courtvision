@@ -1613,7 +1613,7 @@ else:
         'Explore',
         ['Teams','Players','Player Career'] + ([] if globals().get('CLOUD_SHELL') else ['Replay Pilot']),
         key="courtvision_season_intelligence_view",
-        format_func=(lambda value: {'Players':'Player ratings · season','Player Career':'Career ratings · secondary'}.get(value,feature_label(value))) if DEPLOYMENT_PROFILE=='published' else str,
+        format_func=(lambda value: {'Players':'Player ratings - season','Player Career':'Player ratings - career'}.get(value,feature_label(value))) if DEPLOYMENT_PROFILE=='published' else str,
         horizontal=DEPLOYMENT_PROFILE!='published',
     )
 
