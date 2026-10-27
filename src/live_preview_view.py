@@ -41,7 +41,10 @@ def scoreboard_html(result, home_label, away_label):
             '.cv-prob{font-size:18px;font-weight:700;color:var(--team)}.cv-prob span{display:block;font-size:11px;color:#b0bbce;font-weight:400}'
             '.cv-phase{text-align:center;color:#b7c2d4;font-size:12px;letter-spacing:1px}.cv-badge{display:inline-block;padding:6px 12px;border:1px solid #526078;border-radius:20px;color:#e1eaff;font-size:11px;font-weight:700;letter-spacing:1.5px}'
             '.cv-clock{display:block;font-size:15px;color:#fff;margin:12px 0}'
-            '@media(max-width:500px){.cv-board{gap:6px;padding:20px 8px}.cv-score{font-size:43px}.cv-team img{width:48px;height:48px}.cv-name{font-size:10px}.cv-code{font-size:20px}.cv-clock{font-size:17px}}</style>'
+            '@media(max-width:500px){.cv-board{gap:5px;padding:18px 6px;grid-template-columns:minmax(0,1fr) 78px minmax(0,1fr)}'
+            '.cv-score{font-size:36px}.cv-team img{width:40px;height:40px}.cv-name{display:none}.cv-code{font-size:18px}'
+            '.cv-record{font-size:10px}.cv-clock{font-size:12px;letter-spacing:0}.cv-badge{padding:5px 7px;font-size:9px}'
+            '.cv-prob{font-size:16px}.cv-prob span{font-size:10px}}</style>'
             f'<section class="cv-board" aria-label="Game snapshot scoreboard">{cards[0]}<div class="cv-phase">'
             f'<span class="cv-badge" style="color:{status_color};border-color:{status_color}">{status.upper()}</span>'
             f'<span class="cv-clock">{escape(phase_text)}</span></div>{cards[1]}</section>')

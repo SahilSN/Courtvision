@@ -37,6 +37,11 @@ if (root / "cloud/live_probe_request.json").exists() and os.environ.get("COURTVI
 
 if str(root/'src') not in sys.path:
     sys.path.append(str(root/'src'))
+try:
+    runpy.run_path(str(root/'src/deployment_health_view.py'))['render_health'](root)
+except Exception:
+    # Optional read-only health must not take down intelligence or Live.
+    st.sidebar.caption('Update health temporarily unavailable.')
 games=()
 if os.environ.get('COURTVISION_ENABLE_LIVE_BETA')=='1' and os.environ.get('COURTVISION_DISABLE_LIVE_BETA')!='1':
     try:

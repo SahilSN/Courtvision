@@ -10,14 +10,21 @@ import pandas as pd
 
 from season_config import CURRENT_SEASON, CURRENT_SEASON_TYPE
 from update_live_season import fetch_completed_season_games
+from live_artifacts import read_json
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
 
 def load_update_status(path):
-    path = Path(path)
-    return json.loads(path.read_text()) if path.exists() else {}
+    try:
+        saved = read_json(path)
+        pipelines = saved.get('pipelines',{})
+        if not isinstance(pipelines,dict) or any(not isinstance(item,dict) for item in pipelines.values()):
+            raise ValueError('Invalid pipeline status')
+        return saved
+    except (OSError,ValueError,TypeError):
+        return {}
 
 
 def read_published(path):

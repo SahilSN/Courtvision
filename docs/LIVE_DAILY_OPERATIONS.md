@@ -81,6 +81,10 @@ logs; old artifacts never receive a fresh successful timestamp.
 
 ## Health, release identification and rollback
 
+See [deployment recovery](DEPLOYMENT_RECOVERY.md) for the always-available
+sidebar Update health panel, separate published intelligence/local nightly
+evidence, independent switches and scoped code rollback checklist.
+
 The Live view's collapsed **Data readiness** section exposes preparation date,
 expiry, prepared/deferred counts and degraded roster/review status. The release
 label `owner-beta-daily-v1` identifies this implementation, not a cryptographic

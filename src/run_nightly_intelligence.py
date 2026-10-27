@@ -124,9 +124,12 @@ def nightly_due(previous, now=None):
     cutoff = now.replace(hour=1, minute=0, second=0, microsecond=0)
     if now < cutoff:
         cutoff -= timedelta(days=1)
-    completed = previous.get("finishedAt")
-    return not (previous.get("status") == "success" and completed
-                and datetime.fromisoformat(completed) >= cutoff)
+    try:
+        completed = datetime.fromisoformat(previous['finishedAt'])
+        return not (previous.get('status') == 'success' and completed.tzinfo is not None
+                    and cutoff <= completed <= now)
+    except (KeyError, ValueError, TypeError, AttributeError):
+        return True
 
 
 def run_nightly(root=ROOT_DIR, publish=True, scheduled=False, refresher=refresh_intelligence,
@@ -141,7 +144,10 @@ def run_nightly(root=ROOT_DIR, publish=True, scheduled=False, refresher=refresh_
             print("Nightly update already running; skipped.")
             return 0
         status_path = runtime / "status.json"
-        previous = json.loads(status_path.read_text()) if status_path.exists() else {}
+        try:
+            previous = read_json(status_path)
+        except (OSError, ValueError, TypeError):
+            previous = {}  # Missing/corrupt saved evidence must not suppress catch-up.
         if scheduled and not nightly_due(previous):
             print("This nightly update already completed successfully; skipped.")
             return 0
@@ -158,7 +164,8 @@ def run_nightly(root=ROOT_DIR, publish=True, scheduled=False, refresher=refresh_
             logger.info("Starting nightly team and player refresh")
             with contextlib.redirect_stdout(stream), contextlib.redirect_stderr(stream):
                 health = refresher(root=root)
-            incomplete = any(item["status"] != "success" for item in health["pipelines"].values())
+            incomplete = any(health.get('pipelines',{}).get(name,{}).get('status') != 'success'
+                             for name in ('teams','players'))
             try:
                 result['recordCoverage'] = (coverage_checker or refresh_coverage)(root=root)
                 preparation = result['recordCoverage'].get('livePreparation')

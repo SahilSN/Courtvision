@@ -9,6 +9,7 @@ import os
 from daily_live_policy import active_games, validate_daily_manifest
 from live_artifacts import read_json
 from season_config import CURRENT_SEASON
+from deployment_health import intelligence_status, nightly_status
 
 
 def operations_status(root, environ=None, now=None):
@@ -18,6 +19,8 @@ def operations_status(root, environ=None, now=None):
     report = dict(release='owner-beta-daily-v1', checkedAt=now.isoformat(),
                   activeGameIds=list(active_games(root,environ,now)), preparation='unavailable',
                   scope='offline-artifact-health-not-provider-uptime-or-model-readiness')
+    report['intelligence'] = intelligence_status(root,now)
+    report['localNightly'] = nightly_status(root)
     try:
         directory = root/'results/live_context'
         context = read_json(directory/f'{CURRENT_SEASON}_day_context_v1.json')

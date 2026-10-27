@@ -17,6 +17,14 @@ class RefreshDiagnostics:
     def __init__(self,clock=time.monotonic,emit=_emit,max_entries=16,interval=60):
         self.clock,self.emit,self.max_entries,self.interval=clock,emit,max_entries,interval
         self.states=OrderedDict();self.lock=RLock()
+        self.observations=OrderedDict()
+
+    def recent(self):
+        """Copy bounded sanitized observations; no raw errors or uptime inference."""
+        with self.lock:
+            now=self.clock()
+            return [dict(gameId=gid,state=state,observedSecondsAgo=max(0,now-observed))
+                    for gid,(state,observed) in self.observations.items() if 0<=now-observed<=120]
 
     def record(self,game_id,state,seconds,age=None,error_type=None):
         if not re.fullmatch(r'002\d{7}',str(game_id)) or state not in {
@@ -26,6 +34,9 @@ class RefreshDiagnostics:
             return False
         with self.lock:
             now=self.clock();previous=self.states.pop(game_id,None)
+            self.observations.pop(game_id,None)
+            self.observations[game_id]=(state,now)
+            while len(self.observations)>self.max_entries:self.observations.popitem(last=False)
             count=previous[2]+1 if previous else 1
             if previous and previous[0]==state and now-previous[1]<self.interval:
                 self.states[game_id]=(state,previous[1],count)
