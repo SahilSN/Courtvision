@@ -9,7 +9,7 @@ PILOT_PATH = Path(__file__).resolve().parents[1] / "results/replay_pilot/0022500
 
 
 def load_replay(path=PILOT_PATH):
-    data = json.loads(Path(path).read_text())
+    data = json.load(path) if hasattr(path,'read') else json.loads(Path(path).read_text())
     if data.get("schemaVersion") != 1 or data.get("model") != "Frozen V7":
         raise ValueError("Unsupported replay artifact")
     timeline = pd.DataFrame(data["timeline"])

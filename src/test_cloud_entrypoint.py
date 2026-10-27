@@ -9,6 +9,24 @@ from streamlit.testing.v1 import AppTest
 
 
 class CloudEntrypointTest(unittest.TestCase):
+    def test_historical_workspace_is_independent_of_live_kill_and_resources(self):
+        entrypoint=Path(__file__).resolve().parents[1]/'cloud/app.py'
+        with patch.dict(os.environ,{'COURTVISION_CLOUD_READY':'1','COURTVISION_DISABLE_OPERATOR_PROBES':'1',
+                                   'COURTVISION_DISABLE_LIVE_BETA':'1'}), \
+             patch('requests.sessions.Session.request',side_effect=AssertionError('Historical replay must stay offline')), \
+             patch('live_beta_view.cpu_artifacts',side_effect=AssertionError('No Live model')) as model, \
+             patch('live_beta_view.scoreboard_event',side_effect=AssertionError('No Live discovery')) as feed:
+            app=AppTest.from_file(str(entrypoint),default_timeout=90)
+            app.session_state['cloud_workspace']='Historical Replay'
+            app.run()
+            self.assertFalse(app.exception)
+            self.assertEqual(app.sidebar.radio(key='cloud_workspace').value,'Historical Replay')
+            self.assertFalse(any(r.key=='courtvision_season_intelligence_view' for r in app.sidebar.radio))
+            self.assertEqual(app.selectbox(key='replay_catalog_season').value,'2026-27')
+            app.run()
+            self.assertEqual(app.sidebar.radio(key='cloud_workspace').value,'Historical Replay')
+            model.assert_not_called();feed.assert_not_called()
+
     def test_prepared_route_defaults_to_intelligence_and_kill_recovers_session(self):
         # Load the health consumer before mocking its provider, so it cannot
         # retain a temporary mock in its module namespace after this test.

@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "scope": "prepared-completed-regular-season-replays",
+  "games": [
+    {
+      "gameId": "0022500001",
+      "season": "2025-26",
+      "date": "2025-10-21",
+      "home": "OKC",
+      "away": "HOU",
+      "collection": "pilot",
+      "sha256": "9a797d18ae6a0d33538425c75d6162cc38120515a4fadd5241a4ce21ebe52168"
+    },
+    {
+      "gameId": "0022500009",
+      "season": "2025-26",
+      "date": "2025-12-25",
+      "home": "NYK",
+      "away": "CLE",
+      "collection": "pilot",
+      "sha256": "3a1ad0e97cae2894f6cd05d4c967ebb0b1b1ef71220c888d6658275ab3bd90a7"
+    },
+    {
+      "gameId": "0022500365",
+      "season": "2025-26",
+      "date": "2025-12-08",
+      "home": "MIN",
+      "away": "PHX",
+      "collection": "pilot",
+      "sha256": "6b73fc8bb4271923ae89bc84e5d8a409f2ba0f62b44bb517c76ca109506decee"
+    },
+    {
+      "gameId": "0022500581",
+      "season": "2025-26",
+      "date": "2026-01-15",
+      "home": "HOU",
+      "away": "OKC",
+      "collection": "pilot",
+      "sha256": "a693e941a83922b0cf56addb85b5b9ee7a28f863f30913162a6f96293e2e0d9c"
+    },
+    {
+      "gameId": "0022500582",
+      "season": "2025-26",
+      "date": "2026-01-15",
+      "home": "SAS",
+      "away": "MIL",
+      "collection": "catalog",
+      "sha256": "891b0888acb33176326effb02905b63f245449433758523068f758266576ba7c"
+    },
+    {
+      "gameId": "0022500637",
+      "season": "2025-26",
+      "date": "2026-01-23",
+      "home": "BKN",
+      "away": "BOS",
+      "collection": "catalog",
+      "sha256": "64e4b63836c1a0806aefa3d92c4ecd693d84925bddb5998b4111f3b55401b929"
+    }
+  ]
+}

@@ -1,18 +1,19 @@
 # Published interface
 
-The private deployment shares one shell across Intelligence and Live. The
-workspace switch is shown only while a verified Live window is eligible; it
-does not enable feeds or override rollout/runtime gates.
+The private deployment shares one shell across Intelligence, Live and Historical
+Replay. Workspace selection does not enable feeds or override rollout/runtime
+gates. Unavailable Live selections recover to Intelligence with an explanation;
+Historical Replay remains available independently of Live activation.
 
-Within Intelligence, **Explore** offers Team ratings, Player ratings, Player
-careers and Replay collection. These are presentation labels; existing widget
+Within Intelligence, **Explore** offers Team ratings, Player ratings and Player
+careers. Historical Replay has its own workspace. These are presentation labels; existing widget
 keys/internal values are retained so player-preserving career/season links keep
 working. The redundant published Mode selector is removed. The separate full
 local dashboard retains its original mode discovery and historical/live paths.
 
 The season picker starts with the current regular season. It applies to team
-and player ratings; it remains visible but disabled for covered-season careers
-and the four-game replay collection. Each of those pages owns its relevant
+and player ratings; it remains visible but disabled for covered-season careers.
+The independent replay catalog owns its own season/team/date selectors. Each page owns its relevant
 player/season or game controls. Selecting a historical ratings season remains
 explicit. No new archive coverage or game acquisition is included.
 
@@ -27,6 +28,6 @@ replay spoilers, frozen models and all activation/validation guards are unchange
 Raw error payloads were removed from the inline refresh-details drawer; owner
 diagnostics remain available through the existing health/log workflow.
 
-Before expanding historical replay in production, retain the current curated
-collection label and coverage limits. Broader catalogs, storage and processing
-are separate deployment work—not unlocked by the new navigation.
+See [Historical Replay catalog](HISTORICAL_REPLAY_CATALOG.md) for the independent
+completed-game index and explicit preparation states. Broader replay acquisition,
+storage and processing remain separate from navigation or intelligence backfill.

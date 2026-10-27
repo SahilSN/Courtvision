@@ -120,10 +120,26 @@ def validate_published_app(entrypoint="dashboard/app.py"):
                 "Season-to-career navigation lost selected player")
         print("PASS: distinct-season comparison and player-preserving career/season round trip")
 
-        app.sidebar.radio(key="courtvision_season_intelligence_view").set_value("Replay Pilot").run()
+        def open_replays():
+            if is_cloud_entrypoint:
+                app.sidebar.radio(key='cloud_workspace').set_value('Historical Replay').run()
+            else:
+                app.sidebar.radio(key='courtvision_season_intelligence_view').set_value('Replay Pilot').run()
+            app.selectbox(key='replay_catalog_season').select('2025-26').run()
+            app.selectbox(key='replay_catalog_availability').select('Prepared').run()
+            check_render(app)
+
+        def return_to_intelligence(view):
+            if is_cloud_entrypoint:
+                app.sidebar.radio(key='cloud_workspace').set_value('Season Intelligence').run()
+            app.sidebar.radio(key='courtvision_season_intelligence_view').set_value(view).run()
+
+        open_replays()
         check_render(app)
-        from replay_collection import GAME_IDS
-        for game_id in GAME_IDS:
+        from replay_catalog import read_index, load_catalog_replay
+        prepared=read_index(ROOT)
+        for game_id,entry in prepared.items():
+            app.selectbox(key='replay_catalog_season').select(entry['season']).run()
             app.selectbox(key="published_replay_game").set_value(game_id).run()
             check_render(app)
             app.slider[0].set_value(0).run()
@@ -131,8 +147,7 @@ def validate_published_app(entrypoint="dashboard/app.py"):
             app.slider[0].set_value(app.slider[0].max).run()
             check_render(app)
             from replay_exploration import replay_bookmarks
-            from replay_collection import load_collection
-            data, timeline = load_collection()[game_id]
+            data, timeline = load_catalog_replay(entry,ROOT)
             periods, swings = replay_bookmarks(data, timeline)
             app.button(key=f"replay_jump_period_{game_id}").click().run()
             check_render(app)
@@ -150,15 +165,15 @@ def validate_published_app(entrypoint="dashboard/app.py"):
             require(len(labels) == len(set(labels)), "Turning-point buttons need distinct accessible labels")
         require(any("full-game" in caption.value.lower() for caption in app.caption),
                 "Replay must disclose full-game precomputation")
-        app.sidebar.radio(key="courtvision_season_intelligence_view").set_value("Player Career").run()
+        return_to_intelligence('Player Career')
         check_render(app)
-        print("PASS: all four offline replays, first/final event inspection, and return to career")
+        print(f"PASS: all {len(prepared)} indexed offline replays, first/final event inspection, and return to career")
 
-        app.sidebar.radio(key="courtvision_season_intelligence_view").set_value("Replay Pilot").run()
-        with patch("replay_collection.load_collection", side_effect=FileNotFoundError("missing artifact")):
+        open_replays()
+        with patch("replay_catalog.load_catalog_replay", side_effect=FileNotFoundError("missing artifact")):
             app.run()
             require(not app.exception and bool(app.error), "Missing replay must show a recoverable error")
-        app.sidebar.radio(key="courtvision_season_intelligence_view").set_value("Teams").run()
+        return_to_intelligence('Teams')
         app.sidebar.selectbox(key="courtvision_season_intelligence_season").select(CURRENT_SEASON).run()
         with patch("update_intelligence.load_update_status", return_value={"pipelines": {"teams": {
                 "checkedAt": "2020-01-01T00:00:00+00:00", "status": "failed", "gamesThrough": None}}}):

@@ -44,12 +44,14 @@ def benchmark(repeats=3):
         report["firstRenderSeconds"] = render(app.run)
         report["startupThroughFirstRenderSeconds"] = round(time.perf_counter() - started, 4)
         for view in ("Teams", "Players", "Player Career", "Replay Pilot"):
-            first = render(lambda: app.sidebar.radio(key="courtvision_season_intelligence_view").set_value(view).run())
+            first = render(lambda: app.sidebar.radio(key='cloud_workspace').set_value('Historical Replay').run()
+                           if view=='Replay Pilot' else app.sidebar.radio(key="courtvision_season_intelligence_view").set_value(view).run())
             samples = [render(app.run) for _ in range(repeats)]
             report["views"][view] = {"firstSelectionSeconds": first, "warmRerunSeconds": samples,
                                     "warmMedianSeconds": round(statistics.median(samples), 4)}
+        from replay_catalog import read_index
         report.update(feedRequests=network.call_count, backgroundProcesses=workers.call_count,
-                      season=CURRENT_SEASON, replayGames=4)
+                      season=CURRENT_SEASON, replayGames=len(read_index(ROOT)))
     # ru_maxrss is bytes on macOS, kilobytes on Linux. This is process high-water
     # usage for the whole benchmark, NOT cloud memory consumption or per-view RSS.
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss

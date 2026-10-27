@@ -2,26 +2,53 @@
 
 import pandas as pd
 
-from replay_collection import clock_label, final_label, load_collection
+from replay_collection import clock_label, final_label
+from replay_catalog import ROOT, catalog_seasons, season_catalog, load_catalog_replay
 from replay_exploration import game_overview, replay_bookmarks, set_replay_event
 from replay_chart import build_replay_chart
 
 
-def render_replay_view():
+def render_replay_view(root=ROOT):
     import streamlit as st
 
     from ui_shell import page_heading
-    page_heading('Replay Collection','Revisit four curated games with frozen win probabilities, turning points and player impact.',
-                 'Historical replay · Limited collection')
-    st.caption("Four curated games · precomputed full-game analysis · Frozen V7 · no live feed or inference")
+    page_heading('Historical Replay','Browse completed games by season, team and date. Open prepared replays to explore how the game unfolded.',
+                 'Completed games · Offline archive')
+    st.caption('Completed games from every published season belong here—including 2026–27. No Live feed, refresh timer or on-demand inference.')
+    seasons=catalog_seasons(root)
+    season=st.selectbox('Replay season',seasons,key='replay_catalog_season')
     try:
-        collection = load_collection()
+        catalog,index_error=season_catalog(season,root)
     except (OSError, ValueError, KeyError, TypeError):
-        st.error("The replay collection is temporarily unavailable. Season Intelligence remains available in the sidebar.")
+        st.error('The completed-game catalog is temporarily unavailable. Season Intelligence remains available.')
         return
-    selected = st.selectbox("Choose a replay", list(collection), key="published_replay_game",
-        format_func=lambda gid: f"{collection[gid][0]['away']['tricode']} @ {collection[gid][0]['home']['tricode']} · {collection[gid][0]['date']}")
-    data, timeline = collection[selected]
+    if index_error:
+        st.warning('The prepared-replay index is unavailable. Completed-game metadata can still be browsed; no replay is assumed ready.')
+    st.caption(f'{len(catalog):,} published completed games · {sum(g["availability"]=="Prepared" for g in catalog):,} indexed prepared replays. This is published coverage, not a complete NBA archive.')
+    left,middle,right=st.columns(3)
+    team=left.selectbox('Replay team',['All teams',*sorted({g[side] for g in catalog for side in ('home','away')})],key=f'replay_catalog_team_{season}')
+    day=middle.selectbox('Replay date',['All dates',*sorted({g['date'] for g in catalog},reverse=True)],key=f'replay_catalog_date_{season}')
+    state=right.selectbox('Replay availability',['All completed games','Prepared','Not prepared'],key='replay_catalog_availability')
+    filtered=[g for g in catalog if (team=='All teams' or team in (g['home'],g['away']))
+              and (day=='All dates' or g['date']==day) and (state=='All completed games' or g['availability']==state)]
+    if not filtered:
+        st.info('No published completed games match these filters. Try another date, team or season.')
+        return
+    st.dataframe(pd.DataFrame([{'Date':g['date'],'Matchup':f'{g["away"]} @ {g["home"]}',
+                               'Replay':g['availability']} for g in filtered]),hide_index=True,width='stretch',height=260)
+    st.caption('Not prepared means the completed game is cataloged, but its full replay has not been exported and published. Opening this page does not start that work.')
+    ready={g['gameId']:g for g in filtered if g['availability']=='Prepared'}
+    if not ready:
+        st.info('No prepared replays match these filters yet. Playback becomes available here when replay artifacts are prepared and published—not inside Live.')
+        return
+    selected = st.selectbox('Choose a replay',list(ready),key='published_replay_game',
+        format_func=lambda gid:f'{ready[gid]["away"]} @ {ready[gid]["home"]} · {ready[gid]["date"]}')
+    try:
+        data,timeline=load_catalog_replay(ready[selected],root)
+    except (OSError,ValueError,KeyError,TypeError,IndexError):
+        st.error('This prepared replay is temporarily unavailable or failed validation. Choose another game; no Live fallback or estimated replacement is used.')
+        return
+    st.caption('Validated precomputed full-game analysis · Frozen V7 · artifacts checked when opened')
     home, away = data["home"], data["away"]
     st.markdown(f"### {away['tricode']} {away['score']} · {home['tricode']} {home['score']}")
     st.caption(f"{data['date']} · {data['season']} regular season · {final_label(timeline.period.max())}")

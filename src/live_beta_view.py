@@ -56,6 +56,7 @@ def render_readiness(root):
 def render_live_beta(root,allowed_games,rollout_guard=None):
     st.title('Game Center')
     st.caption('Private Live beta · verified matchups · frozen V7')
+    st.caption('Current game window only. Completed-game archive browsing is separate: Historical Replay in the sidebar.')
     root=Path(root)
     now=datetime.now(ZoneInfo('America/New_York'))
     path=root/'results/live_context'/f'{CURRENT_SEASON}_day_context_v1.json'

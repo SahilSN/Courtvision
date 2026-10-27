@@ -50,7 +50,12 @@ def render_health_footer():
         st.sidebar.caption('Update health temporarily unavailable.')
 
 games=()
-if os.environ.get('COURTVISION_ENABLE_LIVE_BETA')=='1' and os.environ.get('COURTVISION_DISABLE_LIVE_BETA')!='1':
+# Historical Replay is an independent offline route, not a Live replay mode.
+# Migrate the old nested replay selection before any sidebar widgets are built.
+if st.session_state.get('courtvision_season_intelligence_view')=='Replay Pilot':
+    st.session_state['cloud_workspace']='Historical Replay'
+    st.session_state['courtvision_season_intelligence_view']='Teams'
+if st.session_state.get('cloud_workspace')=='Live Beta' and os.environ.get('COURTVISION_ENABLE_LIVE_BETA')=='1' and os.environ.get('COURTVISION_DISABLE_LIVE_BETA')!='1':
     try:
         import importlib
         importlib.invalidate_caches()
@@ -64,8 +69,18 @@ if os.environ.get('COURTVISION_ENABLE_LIVE_BETA')=='1' and os.environ.get('COURT
     except Exception as error:
         # Optional rollout policy must not break the default dashboard during a hot deployment.
         print('COURTVISION_LIVE_POLICY unavailable '+type(error).__name__,flush=True)
+live_unavailable=not games and st.session_state.get('cloud_workspace')=='Live Beta'
+if live_unavailable:
+    st.session_state['cloud_workspace']='Season Intelligence'
+workspace=st.sidebar.radio('Workspace',['Season Intelligence','Live Beta','Historical Replay'],key='cloud_workspace',format_func=workspace_label)
+if live_unavailable:
+    st.sidebar.info('Live is not available in the current beta window. Use Historical Replay to browse completed games.')
+if workspace=='Historical Replay':
+    st.set_page_config(page_title='Courtvision · Historical Replay',page_icon='🏀',layout='wide')
+    runpy.run_path(str(root/'src/replay_view.py'))['render_replay_view'](root)
+    render_health_footer()
+    st.stop()
 if games:
-    workspace=st.sidebar.radio('Workspace',['Season Intelligence','Live Beta'],key='cloud_workspace',format_func=workspace_label)
     if workspace=='Live Beta':
         st.set_page_config(page_title='Courtvision · Live beta',page_icon='🏀',layout='wide')
         try:
@@ -77,9 +92,6 @@ if games:
             st.warning('Live is temporarily unavailable. Return to Season Intelligence in the sidebar.')
         render_health_footer()
         st.stop()
-else:
-    # A killed/expired rollout must not strand a viewer in its previous selection.
-    st.session_state['cloud_workspace']='Season Intelligence'
 
 runpy.run_path(
     str(Path(__file__).resolve().parents[1] / "dashboard" / "app.py"),

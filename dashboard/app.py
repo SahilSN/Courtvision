@@ -1611,7 +1611,7 @@ else:
 
     intelligence_view = st.sidebar.radio(
         'Explore',
-        ['Teams','Players','Player Career','Replay Pilot'],
+        ['Teams','Players','Player Career'] + ([] if globals().get('CLOUD_SHELL') else ['Replay Pilot']),
         key="courtvision_season_intelligence_view",
         format_func=feature_label if DEPLOYMENT_PROFILE=='published' else str,
         horizontal=DEPLOYMENT_PROFILE!='published',
