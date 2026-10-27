@@ -3,6 +3,12 @@ from reviewed_live_players import candidates
 
 
 class ReviewedPlayersTest(unittest.TestCase):
+    def test_late_participating_boston_rookie(self):
+        self.assertEqual(candidates('Chris Cenac Jr.','2026-27',1610612738),{1643416})
+        self.assertNotIn(1643416,candidates('Chris Cenac Jr.','2025-26',1610612738))
+        self.assertNotIn(1643416,candidates('Chris Cenac Jr.','2026-27',1610612741))
+        self.assertFalse(candidates('C Cenac','2026-27',1610612738))
+
     def test_expansion_rookies_exact_scope(self):
         for name,person,team in [('Caleb Wilson',1643410,1610612741),('Tobe Awaka',1643591,1610612741),
                 ('Dailyn Swain',1643517,1610612741),('Jaylin Sellers',1643637,1610612741),

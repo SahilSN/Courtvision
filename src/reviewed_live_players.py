@@ -21,6 +21,7 @@ REVIEWED = (
     ('2026-27',1610612742,'Sergio de Larrea',1643547,'https://www.nba.com/player/1643547'),
     ('2026-27',1610612749,'Nate Ament',1643417,'https://www.nba.com/player/1643417/nate-ament'),
     ('2026-27',1610612749,'Brayden Burries',1643415,'https://www.nba.com/player/1643415'),
+    ('2026-27',1610612738,'Chris Cenac Jr.',1643416,'https://www.nba.com/player/1643416/chris-cenac-jr'),
 )
 
 

@@ -6,7 +6,7 @@ from types import CodeType
 
 # Validate function code AND literal policy data. A matching file on disk alone
 # is not evidence that an already-imported function is current.
-MODULES = ('season_config','live_rollout','reviewed_live_players','cloud_espn_adapter','cloud_espn_box',
+MODULES = ('season_config','live_rollout','reviewed_live_players','source_score_ledger','cloud_espn_adapter','cloud_espn_box',
            'daily_live_context','live_snapshot_cache','cloud_live_bundle',
            'cloud_live_analysis','live_refresh','live_analysis','feature_engineering')
 LITERALS = {'season_config':('CURRENT_SEASON','CURRENT_SEASON_TYPE'),

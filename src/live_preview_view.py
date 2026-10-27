@@ -45,6 +45,8 @@ def render_live_analysis(result, home_label='Home', away_label='Away'):
         st.info('Live analysis unavailable. A verified feed and dated pregame context are required. No estimate is shown.')
         return
     snapshot = result.snapshot
+    if snapshot.timeline.attrs.get('scoreSource')=='reconciled_scoring_events':
+        st.caption('Score source: explicit scoring events reconciled with every scorer, team totals and header. Reported cumulative scores are retained for audit.')
     if result.display_state == 'stale_snapshot':
         st.warning('Feed refresh failed or is delayed. Showing the last validated snapshot—not the current game state.')
     elif result.display_state == 'possibly_stalled':

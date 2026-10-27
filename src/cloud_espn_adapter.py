@@ -10,6 +10,7 @@ from espn_live import ESPNLiveFeedError, normalize_espn_play, normalize_name
 from live_analysis import apply_current_season_pregame_smoothing
 from preprocess import parse_clock, preprocess_live_game
 from reviewed_live_players import candidates
+from source_score_ledger import reconciled_scores
 
 
 class ProviderContextUnavailable(ValueError):
@@ -115,6 +116,16 @@ def _normalize_snapshot(event, summary, canonical):
         if play.get("participants") and not row["personId"]:
             raise ProviderContextUnavailable("Normalized event lost player identity")
         rows.append(row)
+    expected={c['homeAway']:int(c['score']) for c in header['competitions'][0]['competitors']}
+    used_ledger=False
+    if int(rows[-1]['scoreHome'])!=expected['home'] or int(rows[-1]['scoreAway'])!=expected['away']:
+        scores=reconciled_scores(plays,rows,header,summary['boxscore']['players'],team_map,athlete_map)
+        if scores is None:
+            raise ScoreSectionsUnreconciled('Play timeline is not reconciled to the header score')
+        used_ledger=True
+        for row,(home,away) in zip(rows,scores):
+            row['reportedScoreHome'],row['reportedScoreAway']=row['scoreHome'],row['scoreAway']
+            row['scoreHome'],row['scoreAway']=home,away
     raw = pd.DataFrame(rows)
     raw["gameId"] = canonical["gameId"]
     timeline = preprocess_live_game(raw)
@@ -126,6 +137,7 @@ def _normalize_snapshot(event, summary, canonical):
         column = "scoreHome" if competitor["homeAway"] == "home" else "scoreAway"
         if int(timeline[column].iloc[-1]) != int(competitor["score"]):
             raise ScoreSectionsUnreconciled("Play timeline is not reconciled to the header score")
+    if used_ledger:timeline.attrs['scoreSource']='reconciled_scoring_events'
     return timeline
 
 
