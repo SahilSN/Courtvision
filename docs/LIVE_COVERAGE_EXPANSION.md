@@ -49,3 +49,20 @@ for another brief viewer-disrupting restart, verify runtimeReady=true and curren
 feeds afterward, then perform the guarded four-game hosted trial.181tests passed
 on Python3.10/3.12; deployment smoke, compilation and diff checks passed. Live
 remains off; temporary diagnostic request removed.
+
+## Approved restart and remaining source-data gate
+
+User approved another brief viewer interruption; host restarted01:45:46UTC
+October27. Post-restart request expansion-after-reboot-20261027 reported
+runtimeReady=true and the new identities loaded. CHI@BOS497states and
+IND@MIL347states passed on the host. MIN@CLE and DAL@MIA failed strict score
+reconciliation, not identity validation. A later public-source check showed
+MIN@CLE header121–118 versus latest play118–118 in overtime; DAL@MIA header97–103
+versus latest play100–103. Repeated gaps are not proof of a parser defect or
+permission to guess corrections. No four-game allowlist was activated.
+
+The prepared four-game capacity, identity additions and archived four-caller
+performance gate are complete; a four-game current-feed/hosted-view certificate
+is NOT complete. Retest coherent pairs and actual hosted selection/refresh before
+activation. Runtime restart is no longer the blocker. Temporary request removed;
+Live remains off and normal Season Intelligence remains available.
