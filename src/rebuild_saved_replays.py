@@ -20,7 +20,14 @@ def rebuild(root, cache_root, season, game_ids, from_catalog=False):
     runtime.mkdir(parents=True, exist_ok=True)
     with (runtime / 'batch.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        return _rebuild(root, cache_root, season, game_ids, from_catalog)
+        try:
+            return _rebuild(root, cache_root, season, game_ids, from_catalog)
+        finally:
+            import sys
+            analysis = sys.modules.get('live_analysis')
+            if analysis is not None:
+                analysis.load_local_season_data.cache_clear()
+                analysis.load_live_artifacts.cache_clear()
 
 
 def _rebuild(root, cache_root, season, game_ids, from_catalog=False):
@@ -40,6 +47,8 @@ def _rebuild(root, cache_root, season, game_ids, from_catalog=False):
     # Import only for operator execution; hosted readers never import this module.
     import live_analysis as analysis
     import player_impact as impact
+    analysis.load_local_season_data.cache_clear()
+    analysis.load_live_artifacts.cache_clear()
 
     status_path = root / f'results/.runtime/replay-rebuild/{season}.json'
     try:
@@ -80,8 +89,6 @@ def _rebuild(root, cache_root, season, game_ids, from_catalog=False):
                                  'fetch_team_record_before_game'):
                         stack.enter_context(patch.object(analysis, name,
                             side_effect=RuntimeError('Offline rebuild cannot acquire remote data')))
-                    analysis.load_local_season_data.cache_clear()
-                    analysis.load_live_artifacts.cache_clear()
                     # Re-run original frozen pipeline, never fill/clamp missing probabilities.
                     result = analysis.analyze_live_game(gid, season, result['game_date'], assume_final=True)
                     if from_catalog:
@@ -114,9 +121,6 @@ def _rebuild(root, cache_root, season, game_ids, from_catalog=False):
         except Exception as error:
             report['games'][gid] = {'status': 'blocked', 'errorType': type(error).__name__,
                                     'reason': str(error)[:300]}
-        finally:
-            analysis.load_local_season_data.cache_clear()
-            analysis.load_live_artifacts.cache_clear()
         write_json(status_path, report)
     return report
 

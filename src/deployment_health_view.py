@@ -36,3 +36,15 @@ def render_health(root):
             st.caption(f'{item["gameId"]} · {item["state"]} · observed {item["observedSecondsAgo"]:.0f}s ago')
         st.caption('If feeds fail, retain only unexpired verified data. Use Refresh game; do not force estimates.')
         st.caption('Mac nightly job: 1 a.m. local time. This hosted snapshot cannot prove the Mac is awake or the next job will succeed.')
+        from live_artifacts import read_json
+        try:
+            replay = read_json(root / 'results/replay_catalog/expansion_status_v1.json')
+        except (OSError, ValueError, TypeError):
+            st.caption('Replay expansion: no published worker snapshot yet.')
+        else:
+            st.markdown('**Historical replay expansion**')
+            st.caption(f'{replay["publishedReplayCount"]} published replays · '
+                       f'{replay["blockedGames"]} blocked attempted games · '
+                       f'worker checked {time_label(replay["checkedAt"])}')
+            st.caption('2024–25 paused for opening-state repair. Local preparation resumes while your Mac is awake; '
+                       'validated batches publish nightly after 1:30 a.m. Pacific. This is a published snapshot, not a live worker monitor.')
