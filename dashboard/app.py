@@ -12004,7 +12004,7 @@ def style_player_table(frame):
     for column in ["Status", "Sample Status", "Season Coverage", "Coverage", "Result"]:
         if column in frame.columns:
             styled = styled.map(status_color, subset=[column])
-    for column in ["Season Value", "Game WPA"]:
+    for column in ["Season Value", "Total Season Impact", "Game WPA"]:
         if column in frame.columns:
             styled = styled.map(
                 lambda value: "color:#6ac8a1" if float(value) > 0 else "color:#ef8793" if float(value) < 0 else "",
@@ -12120,7 +12120,7 @@ def render_player_intelligence(
             "toward a fixed historical baseline. A player "
             "enters the leaderboard after three games and "
             "becomes Qualified after at least 10 games with "
-            "60% reliability. Season Value separately tracks "
+            "60% reliability. Total Season Impact separately tracks "
             "cumulative impact."
         )
 
@@ -12257,61 +12257,27 @@ def render_player_intelligence(
                     "courtvisionRating": "Rating",
                     "ratingStatus": "Status",
                     "ratingReliability": "Reliability",
-                    "seasonNetWPA": "Season Value",
+                    "seasonNetWPA": "Total Season Impact",
                     "seasonValueRank": "NBA Value Rank",
                 }
             )
         )
 
-        leaderboard[
-            "NBA Rank"
-        ] = leaderboard[
-            "NBA Rank"
-        ].map(
-            lambda value: f"#{int(value)}"
-        )
-
-        leaderboard[
-            "NBA Value Rank"
-        ] = leaderboard[
-            "NBA Value Rank"
-        ].map(
-            lambda value: f"#{int(value)}"
-        )
-
-        leaderboard[
-            "Rating"
-        ] = leaderboard[
-            "Rating"
-        ].map(
-            lambda value: f"{float(value):.1f}"
-        )
-
-        leaderboard[
-            "Reliability"
-        ] = leaderboard[
-            "Reliability"
-        ].map(
-            lambda value: f"{float(value):.0%}"
-        )
-
-        leaderboard[
-            "Season Value"
-        ] = leaderboard[
-            "Season Value"
-        ].map(
-            lambda value: f"{float(value):+.2f}"
-        )
+        from player_table_display import leaderboard_display, leaderboard_columns
+        leaderboard=leaderboard_display(leaderboard,coverage['coverageStatus'] in ('Partial','Unknown'))
 
         if leaderboard.empty:
             st.info("No players on this team have reached three processed games yet.")
+        st.caption('Rating is a sample-adjusted per-36-minute measure on a 100-reference scale. '
+                   'Total Season Impact accumulates attributed impact; it is not added to 100. '
+                   'For example, rating 153 is 53 above the reference—not 100 plus Total Season Impact. '
+                   'NBA Impact Rank sorts by total impact, independently of Rating.')
         st.dataframe(
-            style_player_table(leaderboard.rename(columns={
-                "NBA Rank": "Sample Rank", "NBA Value Rank": "Sample Value Rank",
-            }) if coverage["coverageStatus"] in ("Partial", "Unknown") else leaderboard),
+            style_player_table(leaderboard),
             hide_index=True,
             width="stretch",
             height=560,
+            column_config=leaderboard_columns(),
         )
 
         st.caption(
@@ -12384,7 +12350,7 @@ def render_player_explorer(ratings, games, season):
                   on_click=navigate_player_intelligence, args=(selected_player, None))
         render_player_metrics([
             ("Season Rating", f"{float(player['courtvisionRating']):.1f}", "100 baseline · resets each season"),
-            ("Season Value", f"{float(player['seasonNetWPA']):+.2f}", "Selected season only"),
+            ("Total Season Impact", f"{float(player['seasonNetWPA']):+.2f}", "Accumulated impact · not rating points"),
             ("Games", f"{int(player['games'])}", f"{float(player['minutes']):,.0f} minutes processed"),
             ("Reliability", f"{float(player['ratingReliability']):.0%}", player["ratingStatus"]),
         ])
@@ -12421,7 +12387,7 @@ def render_player_explorer(ratings, games, season):
             hovertemplate=(
                 "%{x|%b %d, %Y}<br>Rating: %{y:.1f}"
                 "<br>Opponent: %{customdata[0]}<br>Status: %{customdata[1]}"
-                "<br>Season Value: %{customdata[2]:+.2f}<extra></extra>"
+                "<br>Total Season Impact: %{customdata[2]:+.2f}<extra></extra>"
             ),
         ))
         chart.add_hline(y=100, line_dash="dash", opacity=0.45,
@@ -12440,18 +12406,18 @@ def render_player_explorer(ratings, games, season):
         log["Result"] = np.where(log["teamWin"].eq(1), "W", "L")
         log = log.rename(columns={
             "teamTricode": "Team", "minutes": "Minutes", "netWPA": "Game WPA",
-            "seasonNetWPA": "Season Value", "courtvisionRating": "Rating After",
+            "seasonNetWPA": "Total Season Impact", "courtvisionRating": "Rating After",
             "ratingStatus": "Status", "ratingReliability": "Reliability",
         })
-        for column in ["Game WPA", "Season Value"]:
+        for column in ["Game WPA", "Total Season Impact"]:
             log[column] = log[column].map(lambda value: f"{value:+.2f}")
         for column in ["Minutes", "Rating After"]:
             log[column] = log[column].map(lambda value: f"{value:.1f}")
         log["Reliability"] = log["Reliability"].map(lambda value: f"{value:.0%}")
         st.dataframe(style_player_table(log[["Date", "Team", "Matchup", "Result", "Minutes", "Game WPA",
-                          "Season Value", "Rating After", "Status", "Reliability"]]),
+                          "Total Season Impact", "Rating After", "Status", "Reliability"]]),
                      hide_index=True, width="stretch")
-        st.caption("Game WPA and Season Value are attributed win-probability impact, not wins added.")
+        st.caption("Game WPA and Total Season Impact are attributed win-probability impact, not wins added or rating points.")
         render_player_comparison(ratings, games, season, selected_player)
 
 
@@ -12497,7 +12463,7 @@ def render_player_comparison(ratings, games, season, selected_player):
     comparison = comparison.rename(columns={
         "playerName": "Player", "currentTeam": "Team", "games": "Games",
         "minutes": "Minutes", "courtvisionRating": "Rating",
-        "seasonNetWPA": "Season Value", "ratingStatus": "Status",
+        "seasonNetWPA": "Total Season Impact", "ratingStatus": "Status",
         "ratingReliability": "Reliability", "courtvisionRank": "NBA Rank",
     })
     st.dataframe(style_player_table(comparison), hide_index=True, width="stretch")
@@ -12507,7 +12473,7 @@ def render_player_comparison(ratings, games, season, selected_player):
             "Compare games, minutes, and reliability alongside the rating."
         )
     st.caption(
-        "Rating measures sample-adjusted impact per 36 minutes; Season Value "
+        "Rating measures sample-adjusted impact per 36 minutes; Total Season Impact "
         "is cumulative and depends on playing opportunity. Each line shows "
         "processed appearances on its actual game dates; schedules may differ."
     )
@@ -12593,7 +12559,7 @@ def render_player_career():
     )
     render_player_metrics([
         ("Covered-games rating", f"{career['coveredRating']:.1f}", "Pooled impact · 100 reference"),
-        ("Covered Season Value", f"{career['seasonNetWPA']:+.2f}", "Across covered appearances"),
+        ("Covered Career Impact", f"{career['seasonNetWPA']:+.2f}", "Across covered appearances · not rating points"),
         ("Games covered", f"{career['games']:,}", f"{career['minutes']:,.0f} minutes"),
         ("Seasons covered", f"{career['seasons']}", "Regular season only"),
     ])
@@ -12601,7 +12567,7 @@ def render_player_career():
         st.write(
             f"Raw WPA per 36: {career['netWPAper36']:+.3f}. The covered-games rating "
             "pools minutes and impact with one historical prior, rather than averaging "
-            "season ratings. Season Value is attributed win-probability impact, not wins added. "
+            "season ratings. Accumulated impact is not rating points or wins added. "
             "Seasons before the published archive are excluded."
         )
     seasons = summaries.loc[summaries["personId"].eq(person_id)].merge(
@@ -12624,14 +12590,14 @@ def render_player_career():
         "ratingStatus", "ratingReliability", "coverageStatus", "League Games Covered",
     ]].rename(columns={
         "season": "Season", "teams": "Teams", "games": "Covered Games",
-        "minutes": "Minutes", "courtvisionRating": "Rating", "seasonNetWPA": "Season Value",
+        "minutes": "Minutes", "courtvisionRating": "Rating", "seasonNetWPA": "Total Season Impact",
         "ratingStatus": "Sample Status", "ratingReliability": "Reliability",
         "coverageStatus": "Season Coverage",
     })
     display["Reliability"] = display["Reliability"].map(lambda value: f"{value:.0%}")
     for name in ["Minutes", "Rating"]:
         display[name] = display[name].map(lambda value: f"{value:.1f}")
-    display["Season Value"] = display["Season Value"].map(lambda value: f"{value:+.2f}")
+    display["Total Season Impact"] = display["Total Season Impact"].map(lambda value: f"{value:+.2f}")
     st.dataframe(style_player_table(display), hide_index=True, width="stretch")
     st.caption(
         "Sample status measures the amount of processed playing time; it does "
@@ -12689,9 +12655,9 @@ def render_career_season_comparison(summaries, coverage, person_id, season_optio
         st.caption("At least one rating has a limited or provisional sample; compare reliability as well as rating.")
     display = compared[["season", "games", "minutes", "seasonNetWPA", "ratingReliability", "coverageStatus"]].rename(columns={
         "season": "Season", "games": "Covered Games", "minutes": "Minutes",
-        "seasonNetWPA": "Season Value", "ratingReliability": "Reliability", "coverageStatus": "Coverage"})
+        "seasonNetWPA": "Total Season Impact", "ratingReliability": "Reliability", "coverageStatus": "Coverage"})
     display["Minutes"] = display["Minutes"].map(lambda value: f"{value:,.0f}")
-    display["Season Value"] = display["Season Value"].map(lambda value: f"{value:+.2f}")
+    display["Total Season Impact"] = display["Total Season Impact"].map(lambda value: f"{value:+.2f}")
     display["Reliability"] = display["Reliability"].map(lambda value: f"{value:.0%}")
     st.dataframe(style_player_table(display), hide_index=True, width="stretch")
 
