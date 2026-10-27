@@ -54,7 +54,10 @@ not interpret unavailable games as a completed four-game rollout.
 `PYTHONPATH=src .venv/bin/python src/check_live_deployment.py --game-ids <1–4 exact NBA game IDs>`
 checks the complete dated selection and loaded runtime before network/model
 work, then runs two concurrent per-game rounds separated by 16 seconds (16–30
-configurable). The existing HTTP limits, strict joined validation, frozen CPU
+configurable), or three with `--rounds 3`. The final two observations must both
+validate and advance: a final failure/stale/unchanged observation still blocks.
+This allows cold-failure recovery to be tested without resetting the cache or
+relaxing validation. The existing HTTP limits, strict joined validation, frozen CPU
 artifacts and shared raw cache remain in force. This is an explicit bounded
 operator command, not a new scheduler, automatic discovery or an activation.
 
@@ -63,7 +66,7 @@ elapsed game time or event number. Completed-only, unchanged, corrected-only,
 stale, missing and failed observations do not certify progression. Exit zero
 means the selected current-feed check passed, NOT production release approval;
 canEnableLive is always false. The fixed owner-only diagnostic kind `progress`
-uses the same check with explicit gameIds, two rounds/30-second separation,
+uses the same check with explicit gameIds, three rounds/30-second separation,
 existing 15-minute request expiry and once-per-container claim. It returns only
 public IDs/scores/timings/states/error classes; no raw payloads or identities.
 

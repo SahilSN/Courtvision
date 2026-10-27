@@ -39,6 +39,17 @@ class DeploymentReadinessTest(unittest.TestCase):
                 check(['0022600120'], path, today='2026-10-26', fetcher=fetcher, artifacts_loader=artifacts)
         fetcher.assert_not_called(); artifacts.assert_not_called()
 
+    def test_recovered_feed_needs_two_consecutive_valid_final_observations(self):
+        good = dict(gameId='0022600127', status='validated', sourceState='in', elapsed=10, action=5)
+        bad = dict(gameId='0022600127', status='failed')
+        newer = dict(good, elapsed=11)
+        self.assertEqual(summarize([[bad], [good], [newer]], ['0022600127'])['status'], 'current_feed_passed')
+        for rounds in ([[good], [newer], [bad]], [[good], [bad], [newer]], [[bad], [good], [good]]):
+            self.assertEqual(summarize(rounds, ['0022600127'])['status'], 'not_ready')
+        for count in (1, 4, True):
+            with self.assertRaises(ValueError):
+                check(['0022600127'], '/missing', rounds_count=count)
+
     def test_runtime_block_never_fetches_or_loads_model(self):
         _, bundle = sample_inputs()
         game = dict(bundle['games'][0], gameId='0022600120')

@@ -37,23 +37,25 @@ def summarize(rounds, game_ids):
     for game_id in game_ids:
         observations = [next((r for r in batch if r['gameId'] == game_id),
                              {'gameId': game_id, 'status': 'missing'}) for batch in rounds]
-        advanced = len(observations) == 2 and progression(*observations)
+        # A cold acquisition may fail, then recover. Require the LAST two
+        # observations to be valid and advancing; never ignore a final failure.
+        advanced = len(observations) in (2, 3) and progression(*observations[-2:])
         games.append(dict(gameId=game_id, advanced=advanced, observations=observations))
     return dict(status='current_feed_passed' if games and all(g['advanced'] for g in games)
                 else 'not_ready', games=games, canEnableLive=False,
-                scope='Two bounded rounds of current public feeds and frozen CPU analysis; '
+                scope='Two or three bounded rounds of current public feeds and frozen CPU analysis; '
                       'not hosted browser/load, interruption-recovery, or release approval')
 
 
 def check(game_ids, context_path, *, interval=16, fetcher=fetch_json,
           sleeper=time.sleep, artifacts_loader=load_cpu_artifacts, today=None,
-          runtime_check=None, verified_pairs=None):
+          runtime_check=None, verified_pairs=None, rounds_count=2):
     if (not isinstance(game_ids, (list, tuple)) or not 1 <= len(game_ids) <= MAX_LIVE_GAMES
             or len(set(game_ids)) != len(game_ids)
             or any(not isinstance(g, str) or len(g) != 10 or not g.isdigit()
                    or not g.startswith('002' + CURRENT_SEASON[2:4]) for g in game_ids)
-            or not 16 <= interval <= 30):
-        raise ValueError('Choose 1–4 unique current-season IDs and a 16–30 second interval')
+            or not 16 <= interval <= 30 or type(rounds_count) is not int or rounds_count not in (2, 3)):
+        raise ValueError('Choose 1–4 unique current-season IDs, 2–3 rounds and a 16–30 second interval')
     today = today or datetime.now(ZoneInfo('America/New_York')).date().isoformat()
     bundle = json.loads(Path(context_path).read_text())
     if (bundle['gameDate'] != today or bundle.get('season') != CURRENT_SEASON
@@ -72,7 +74,7 @@ def check(game_ids, context_path, *, interval=16, fetcher=fetch_json,
     cache = LiveSnapshotCache(max_entries=MAX_LIVE_GAMES)
     tracker = FeedProgress(max_entries=MAX_LIVE_GAMES)
     rounds = []
-    for index in range(2):
+    for index in range(rounds_count):
         if index:
             sleeper(interval)
         try:
@@ -124,8 +126,9 @@ def main():
     parser.add_argument('--game-ids', nargs='+', required=True)
     parser.add_argument('--context', type=Path, default=ROOT/'results/live_context'/f'{CURRENT_SEASON}_day_context_v1.json')
     parser.add_argument('--interval', type=int, default=16)
+    parser.add_argument('--rounds', type=int, choices=(2, 3), default=2)
     args = parser.parse_args()
-    report = check(args.game_ids, args.context, interval=args.interval)
+    report = check(args.game_ids, args.context, interval=args.interval, rounds_count=args.rounds)
     print(json.dumps(report, indent=2))
     return 0 if report['status'] == 'current_feed_passed' else 1
 
@@ -140,7 +143,7 @@ def probe_progress(day, environment, game_ids):
         artifacts.append(value)
         return value
     report = check(game_ids, ROOT/'results/live_context'/f'{CURRENT_SEASON}_day_context_v1.json',
-                   interval=30, artifacts_loader=load_artifacts, verified_pairs=pairs)
+                   interval=30, artifacts_loader=load_artifacts, verified_pairs=pairs, rounds_count=3)
     # Separate controlled failure evidence from real progression observations.
     # Reuse the exact accepted pair: a new HTTP fetch is not the test fixture.
     # No additional HTTP, activation, or viewer fault injection.
