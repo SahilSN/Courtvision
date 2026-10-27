@@ -12,6 +12,7 @@ from live_analysis import predict_live_probabilities
 from live_refresh import current_event
 from offline_live_sample import load_cpu_artifacts
 from probe_live_access import fetch_json, BASE
+from reviewed_live_players import REVIEWED
 
 
 def probe_current(day, environment):
@@ -26,7 +27,7 @@ def probe_current(day, environment):
         stage='scoreboard'
         board,_=fetch_json(BASE+'scoreboard?dates='+day.replace('-',''))
         active={str(e['id']) for e in board['events'] if e['status']['type']['state']=='in'}
-        games=[g for g in bundle['games'] if g['espnEventId'] in active][:2]
+        games=[g for g in bundle['games'] if g['espnEventId'] in active and g['gameId'] in ('0022600119','0022600120')]
         reports=[]
         artifacts=None
         for game in games:
@@ -49,7 +50,12 @@ def probe_current(day, environment):
                 reports.append(dict(gameId=game['gameId'],status='passed',states=len(result)))
             except Exception as error:
                 reports.append(dict(gameId=game['gameId'],status='failed',stage=stage,errorType=type(error).__name__,
-                                    causeType=type(error.__cause__).__name__ if error.__cause__ else None))
-        return dict(status='current_checked',environment=environment,games=reports)
+                                    causeType=type(error.__cause__).__name__ if error.__cause__ else None,
+                                    reason={'An involved player needs a reviewed identity mapping':'identity_unresolved',
+                                            'Play timeline is not reconciled to the header score':'score_header_lag',
+                                            'ESPN box score unavailable or unreconciled':'box_unreconciled'}.get(str(error),'other_validation')))
+        return dict(status='current_checked',environment=environment,games=reports,
+                    currentIdentityCode=any(row[2]=='Christian Anderson' for row in REVIEWED),
+                    currentMinutesCode='minutesAvailable' in _normalize_box.__code__.co_consts)
     except Exception as error:
         return dict(status='failed',stage=stage,errorType=type(error).__name__)
