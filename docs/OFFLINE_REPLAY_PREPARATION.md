@@ -2,7 +2,7 @@
 
 ## Autonomous Mac expansion
 
-`src/run_replay_expansion.py` is a separate low-priority LaunchAgent, defined in
+`src/run_replay_expansion.py` is a separate LaunchAgent, defined in
 `deploy/com.courtvision.replay-expansion.plist`. It does not modify the existing
 nightly intelligence or historical backfill agents. On the configured Mac it
 runs continuously while awake, starting at login and restarting after failure.
@@ -12,7 +12,10 @@ games; wake/login resumes from the saved queue. No ChatGPT execution is needed.
 
 Each batch attempts at most five completed games, one season at a time, with a
 180-second subprocess timeout, single-thread CPU-library settings, background
-priority and no overlap. There is no daily or total processing cap. Successful
+priority and no overlap. The configured priority is now normal (a user-requested
+comparison with the previous low-priority setting); the local page displays
+the effective CPU-priority category. No concurrency/thread count is increased.
+There is no daily or total processing cap. Successful
 work continues after a two-second pause, rather than waiting 30 minutes; idle
 queues poll once per minute and errors back off five minutes. New metadata is
 refreshed every 15 minutes rather than re-copying the archive every batch.
@@ -45,6 +48,18 @@ in Pacific time. It binds only to loopback, serves no arbitrary files, and adds
 no public exposure. The `/status` endpoint returns the same sanitized counts.
 If the Mac is asleep or the worker is stopped, this local page is unavailable.
 The hosted app's Update health remains a nightly snapshot, not realtime progress.
+
+### Measure scheduling priority
+
+`measure_replay_batches.py --root /Users/sahilnayak/Courtvision --label low`
+(or `--label normal`) observes three actual five-game checkpoints without
+starting jobs or changing queue data. Timings include child startup, inference,
+export/validation, and batch bookkeeping; inter-batch idle time is excluded.
+Results persist under `results/.runtime/replay-expansion/priority-comparison/`.
+Compare total successful games divided by total elapsed processing time, plus
+median batch duration. Different games and concurrent laptop use make this an
+observational comparison, not a controlled model benchmark. Old low mode had
+both reduced CPU and disk priority; changes cannot be attributed to CPU alone.
 
 To pause: `launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.courtvision.replay-expansion.plist`.
 To resume: bootstrap that same plist. Do not remove active prepared artifacts or

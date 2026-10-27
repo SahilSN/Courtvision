@@ -146,7 +146,8 @@ def run(source, publish_now=False, prepare=True, now=None, refresh=True):
         if refresh:
             seed_workspace(source, workspace)
         attempted = 0
-        state.update(workerPhase='idle', batchGameIds=[])
+        priority = 'low' if os.getpriority(os.PRIO_PROCESS, 0) > 0 else 'normal'
+        state.update(workerPhase='idle', batchGameIds=[], executionPriority=priority)
         if prepare:
             season, batch = choose_batch(source, workspace, state, 5)
             if batch:
@@ -186,7 +187,7 @@ def run(source, publish_now=False, prepare=True, now=None, refresh=True):
                   'preparedReplayCount': len(read_index(workspace)),
                   'blockedGames': sum(g['status'] == 'blocked' for g in state['games'].values()),
                   'pausedSeasons': ['2024-25'], 'dailyAttempts': state['dailyAttempts'],
-                  'schedule': 'Mac: continuous low-priority batches, no daily cap; publish nightly after 1:30 a.m. Pacific'}
+                  'schedule': f'Mac: continuous {priority}-priority batches, no daily cap; publish nightly after 1:30 a.m. Pacific'}
         state['health'] = health
         write_json(state_path, state)
         if publish_now or publication_due(state, now):
@@ -233,9 +234,11 @@ if __name__ == '__main__':
     parser.add_argument('--publish-now', action='store_true')
     parser.add_argument('--publish-only', action='store_true')
     parser.add_argument('--continuous', action='store_true')
+    parser.add_argument('--priority', choices=['low', 'normal'], default='normal')
     args = parser.parse_args()
     try:
-        os.nice(10)
+        if args.priority == 'low':
+            os.nice(10)
         if args.continuous:
             if args.publish_now or args.publish_only:
                 parser.error('Continuous mode uses the nightly publication policy')

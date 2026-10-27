@@ -6,6 +6,7 @@
     <string>/Users/sahilnayak/Courtvision/.venv/bin/python</string>
     <string>/Users/sahilnayak/Courtvision/src/run_replay_expansion.py</string>
     <string>--continuous</string>
+    <string>--priority</string><string>normal</string>
   </array>
   <key>WorkingDirectory</key><string>/Users/sahilnayak/Courtvision</string>
   <key>EnvironmentVariables</key><dict>
@@ -13,9 +14,9 @@
     <key>PYTHONUNBUFFERED</key><string>1</string>
     <key>MPLCONFIGDIR</key><string>/tmp/courtvision-matplotlib</string>
   </dict>
-  <key>ProcessType</key><string>Background</string>
-  <key>Nice</key><integer>10</integer>
-  <key>LowPriorityIO</key><true/>
+  <key>ProcessType</key><string>Standard</string>
+  <key>Nice</key><integer>0</integer>
+  <key>LowPriorityIO</key><false/>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
   <key>ThrottleInterval</key><integer>60</integer>

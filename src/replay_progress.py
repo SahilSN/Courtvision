@@ -30,6 +30,7 @@ def progress(root):
         'blocked': sum(g['status'] == 'blocked' for g in state['games'].values()),
         'attemptsToday': state.get('dailyAttempts', 0),
         'phase': state.get('workerPhase', 'starting'),
+        'priority': state.get('executionPriority', 'low'),
         'heartbeatAt': state.get('heartbeatAt', state.get('health', {}).get('checkedAt', '')),
         'batchSeason': state.get('batchSeason', ''), 'batchGameIds': state.get('batchGameIds', []),
         'lastPublishAt': state.get('lastPublishAt', ''),
@@ -57,7 +58,7 @@ h1{{letter-spacing:-1px}}p,span{{color:#a7b4c7;line-height:1.7}}.cards{{display:
 section{{border:1px solid #303845;border-radius:14px;padding:20px}}strong{{display:block;font-size:32px;margin-top:8px;color:#83bff5}}
 table{{width:100%;border-collapse:collapse;margin:24px 0}}td,th{{padding:12px;text-align:left;border-bottom:1px solid #303845}}small{{color:#a7b4c7}}
 </style></head><body><small>COURTVISION · THIS MAC ONLY</small><h1>Historical replay progress</h1>
-<p>{escape(phase)} · unlimited catch-up at low priority · refreshes every 10 seconds</p>
+<p>{escape(phase)} · unlimited catch-up at {escape(value['priority'])} priority · refreshes every 10 seconds</p>
 <div class="cards">{cards}</div><p>Batch: {escape(value['batchSeason'])} · {escape(batch)}<br>
 Last worker update: {escape(local_time(value['heartbeatAt']))}<br>Attempts today: {value['attemptsToday']:,} · no daily cap</p>
 <h2>Prepared by season</h2><table><tr><th>Season</th><th>Replays</th></tr>{rows}</table>
