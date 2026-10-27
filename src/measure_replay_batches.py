@@ -16,6 +16,10 @@ def measure(root, label, samples=3, timeout=900):
     started = time.monotonic()
     while len(records) < samples and time.monotonic() - started < timeout:
         state = read_json(runtime / 'state.json')
+        if state.get('executionPriority', label if label == 'low' else None) != label:
+            active = None
+            time.sleep(.5)
+            continue
         if active and state.get('heartbeatAt') != active['start']:
             end = state.get('health', {}).get('checkedAt')
             if end and end > active['start']:

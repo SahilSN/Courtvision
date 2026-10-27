@@ -11,9 +11,10 @@ class MeasureReplayBatchTest(unittest.TestCase):
         start = '2026-10-27T21:00:00+00:00'
         end = '2026-10-27T21:00:30+00:00'
         states = [
-            {'workerPhase': 'processing', 'heartbeatAt': start,
+            {'executionPriority': 'low', 'workerPhase': 'processing', 'heartbeatAt': start},
+            {'workerPhase': 'processing', 'heartbeatAt': start, 'executionPriority': 'normal',
              'batchGameIds': ['a', 'b'], 'batchSeason': '2025-26'},
-            {'workerPhase': 'between_batches', 'heartbeatAt': end,
+            {'workerPhase': 'between_batches', 'heartbeatAt': end, 'executionPriority': 'normal',
              'health': {'checkedAt': end}, 'games': {'a': {'status': 'prepared'}, 'b': {'status': 'blocked'}}},
         ]
         with tempfile.TemporaryDirectory() as directory, \
