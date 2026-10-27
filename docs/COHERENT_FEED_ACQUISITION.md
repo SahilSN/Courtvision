@@ -25,3 +25,26 @@ behavior and coherent stat corrections without mutating prior viewer tables.
 Actual source coherence and hosted behavior must still be verified before a
 four-game rollout. A bounded retry cannot guarantee a delayed/corrected provider
 will publish coherent sections within its window.
+
+## Verification October26
+
+186 full tests passed on Python3.10/3.12; published deployment smoke passed every
+season/view/four replays/frozen V7 with zero HTTP/worker calls. A captured real
+same-game coherent/conflicting pair replay exercises retry recovery, unchanged
+retained tables/predictions, expiry and recovery with controlled time. A separate
+ad-hoc AppTest replay timed out; do not count it as a successful new UI visual
+check. Existing automated view regressions and deployment smoke passed.
+
+The gate blocked stale acquisition code before HTTP. User explicitly approved
+one brief restart if needed; host restarted02:01:55UTC October27. Fresh operator
+request coherent-after-reboot-20261027 then reported runtimeReady=true:
+MIN@CLE548states(post) and IND@MIL418states(in) passed with one attempt. DAL@MIA
+exhausted exactly two attempts and remained unavailable. CHI@BOS stopped after
+one attempt; independent inspection found newly participating Chris Cenac Jr.
+on BOS1610612738 has no reviewed mapping. No identity was guessed or retried.
+
+The four-game hosted rollout therefore remains unapproved and Live stays off.
+Temporary diagnostic removed. Next requirements are independent verification of
+the new participating identity and coherent DAL feed sections, followed by actual
+hosted view/refresh/rollback checks. No claim that bounded retries fix every
+upstream correction, or that completed-game evidence proves four advancing feeds.
