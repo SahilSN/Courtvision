@@ -1,6 +1,6 @@
 import unittest
 import pandas as pd
-from player_table_display import leaderboard_display
+from player_leaderboard_display import leaderboard_display
 
 
 class PlayerTableDisplayTest(unittest.TestCase):

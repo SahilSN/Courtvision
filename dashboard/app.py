@@ -12256,7 +12256,7 @@ def render_player_intelligence(
             )
         )
 
-        from player_table_display import leaderboard_display, leaderboard_columns
+        from player_leaderboard_display import leaderboard_display, leaderboard_columns
         leaderboard=leaderboard_display(leaderboard,coverage['coverageStatus'] in ('Partial','Unknown'))
 
         if leaderboard.empty:

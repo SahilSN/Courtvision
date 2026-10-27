@@ -1,4 +1,4 @@
-"""Numeric leaderboard backing data, with display-only formatting in Streamlit."""
+"""Compact season leaderboard with numeric sorting and display-only formatting."""
 import pandas as pd
 
 
