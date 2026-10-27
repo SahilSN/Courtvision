@@ -12120,8 +12120,9 @@ def render_player_intelligence(
             "toward a fixed historical baseline. A player "
             "enters the leaderboard after three games and "
             "becomes Qualified after at least 10 games with "
-            "60% reliability. Total Season Impact separately tracks "
-            "cumulative impact."
+            "60% sample-size weight. The 100 reference is fixed, not a "
+            "live league average. Find cumulative impact and game-by-game "
+            "detail in Player Explorer."
         )
 
     selected_team = st.selectbox(
@@ -12135,9 +12136,7 @@ def render_player_intelligence(
         else ratings["currentTeam"].eq(selected_team)
     )
     st.caption(
-        "Team filters use the player's latest team in the processed games. "
-        "Ratings and ranks retain their season-wide processed-game context. "
-        "Player Explorer can compare players from any team."
+        "Filter by latest team. Ranks remain season-wide."
     )
 
     if not eligible.any():
@@ -12240,9 +12239,6 @@ def render_player_intelligence(
                     "games",
                     "courtvisionRating",
                     "ratingStatus",
-                    "ratingReliability",
-                    "seasonNetWPA",
-                    "seasonValueRank",
                 ],
             ]
             .sort_values(
@@ -12256,9 +12252,6 @@ def render_player_intelligence(
                     "games": "Games",
                     "courtvisionRating": "Rating",
                     "ratingStatus": "Status",
-                    "ratingReliability": "Reliability",
-                    "seasonNetWPA": "Total Season Impact",
-                    "seasonValueRank": "NBA Value Rank",
                 }
             )
         )
@@ -12268,10 +12261,8 @@ def render_player_intelligence(
 
         if leaderboard.empty:
             st.info("No players on this team have reached three processed games yet.")
-        st.caption('Rating is a sample-adjusted per-36-minute measure on a 100-reference scale. '
-                   'Total Season Impact accumulates attributed impact; it is not added to 100. '
-                   'For example, rating 153 is 53 above the reference—not 100 plus Total Season Impact. '
-                   'NBA Impact Rank sorts by total impact, independently of Rating.')
+        st.caption('Season-only ratings · 100 reference · small samples adjusted. '
+                   'Explore a player for impact totals and season progress.')
         st.dataframe(
             style_player_table(leaderboard),
             hide_index=True,
@@ -12281,9 +12272,8 @@ def render_player_intelligence(
         )
 
         st.caption(
-            "Provisional ratings remain meaningfully "
-            "sample-adjusted. Qualified status requires at "
-            "least 10 games and 60% reliability."
+            "Ranked after 3 games. Provisional = developing sample; "
+            "Qualified = 10+ games and sufficient minutes."
         )
 
     with explorer_tab:
