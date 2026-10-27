@@ -8,10 +8,22 @@ from unittest.mock import Mock, patch
 import pandas as pd
 
 from check_live_deployment import check, progression, summarize
+from check_live_deployment import probe_progress
+from datetime import datetime
+from zoneinfo import ZoneInfo
 from offline_live_sample import sample_inputs
 
 
 class DeploymentReadinessTest(unittest.TestCase):
+    def test_operator_measurement_never_injects_controlled_fixtures(self):
+        day = datetime.now(ZoneInfo('America/New_York')).date().isoformat()
+        with patch('check_live_deployment.check', return_value={'status':'not_ready'}) as checked, \
+             patch('live_release_recovery.verify_recovery') as controlled:
+            report = probe_progress(day, 'community-cloud', ['0022600127'])
+        controlled.assert_not_called()
+        self.assertEqual(checked.call_args.kwargs['rounds_count'], 3)
+        self.assertEqual(report['controlledRecovery']['status'], 'not_run')
+
     def test_only_validated_advancing_in_progress_feed_passes(self):
         first = dict(gameId='0022600120', status='validated', sourceState='in', elapsed=10, action=5)
         self.assertTrue(progression(first, dict(first, elapsed=11)))

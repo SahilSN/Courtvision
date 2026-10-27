@@ -16,6 +16,9 @@ The interval is an OBSERVED span, not exact upstream latency or proof the source
 was continuously wrong. Poll cadence, cache hits, process restarts and evictions
 affect it. Acquisition counts are not time-weighted uptime. Existing
 COURTVISION_LIVE_STATE logs separately report viewer presentation states/ages.
+Owner current-feed probes no longer inject controlled recovery fixtures into
+the live measurement process: those could falsely close a real mismatch episode.
+Controlled retention tests remain separate offline evidence.
 
 Summarize an exported operator log without raw payloads:
 `python src/summarize_live_reliability.py path/to/operator.log`.

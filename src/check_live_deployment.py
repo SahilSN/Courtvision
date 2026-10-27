@@ -137,30 +137,12 @@ def probe_progress(day, environment, game_ids):
     """Once-only owner diagnostic; current day only, no browser activation."""
     if day != datetime.now(ZoneInfo('America/New_York')).date().isoformat():
         return dict(status='wrong_day', canEnableLive=False)
-    pairs, artifacts = {}, []
-    def load_artifacts():
-        value = load_cpu_artifacts()
-        artifacts.append(value)
-        return value
     report = check(game_ids, ROOT/'results/live_context'/f'{CURRENT_SEASON}_day_context_v1.json',
-                   interval=30, artifacts_loader=load_artifacts, verified_pairs=pairs, rounds_count=3)
-    # Separate controlled failure evidence from real progression observations.
-    # Reuse the exact accepted pair: a new HTTP fetch is not the test fixture.
-    # No additional HTTP, activation, or viewer fault injection.
-    try:
-        from live_release_recovery import verify_recovery
-        path = ROOT/'results/live_context'/f'{CURRENT_SEASON}_day_context_v1.json'
-        bundle = json.loads(path.read_text())
-        # Retention safety does not depend on the game clock advancing (e.g.
-        # a timeout). Keep its result independent of the progression gate.
-        selected = next(g for g in report.get('games', []) if g['gameId'] in pairs)
-        game, = [g for g in bundle['games'] if g['gameId'] == selected['gameId']]
-        report['controlledRecovery'] = verify_recovery(game, path,
-            pairs[selected['gameId']], artifacts[0])
-    except StopIteration:
-        report['controlledRecovery'] = dict(status='not_run_no_validated_pair')
-    except Exception as error:
-        report['controlledRecovery'] = dict(status='failed', errorType=type(error).__name__)
+                   interval=30, rounds_count=3)
+    # Never feed archived/controlled fixtures through the process-shared live
+    # telemetry: that could falsely close a real mismatch episode. Controlled
+    # retention tests remain a separate offline suite, not provider measurements.
+    report['controlledRecovery'] = dict(status='not_run', scope='Separate offline verification; no synthetic live measurements')
     return {**report, 'environment': environment}
 
 
