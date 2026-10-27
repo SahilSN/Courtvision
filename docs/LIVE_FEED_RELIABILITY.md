@@ -64,3 +64,27 @@ Keep actual provider failures separate from controlled fault/clock tests. Do not
 claim a full-game pass from a few late-game samples or an archived simulation.
 Use results to set service targets before broadening beyond the private beta;
 public/all-game release is not certified by this instrumentation change.
+
+## Actual validation evidence
+
+207 tests passed on Python3.10 and3.12; deployment smoke passed all published
+views, seasons, careers, four curated replays and frozen CPU artifacts.
+Offline browser preview verified the delayed UTC label/warning and unavailable
+state with no estimates/tables. This was an archived preview, not live-game proof.
+
+Local real-feed sampling observed coherent -> mismatch -> reconciled, with a
+31.108s observation span. One approved host restart loaded the new measurement
+code at03:47:17.676UTC October27 (8:47p.m. Pacific October26). The final isolated
+Community Cloud request measure-isolated-20261027-0352 observed a timeline/header
+mismatch03:53:05, reconciliation03:53:36 (31.248s), then another mismatch03:54:07.
+Its presentation sequence was unavailable -> validated336states -> stale336;
+the source remained blocked from launch. These are short sampled spans, not
+exact latency, uptime, a full-game run, or grounds to extend stale retention.
+Discard the initial pre-isolation host probe when evaluating measurement purity;
+its controlled fixture verification is not real source evidence. Process counters
+carry over across probes and must not be interpreted as a clean full-game sample.
+
+The temporary operator request is removed after verification. Live remains OFF.
+No new recurring jobs, purchases, secrets/sharing changes, retry/TTL changes,
+model changes or backfill/nightly resets were made. Full-game acceptance and
+real paid-provider trials remain pending; the shortlist is not a provider switch.
