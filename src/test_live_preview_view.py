@@ -35,10 +35,14 @@ class PreviewTest(unittest.TestCase):
             self.assertIn('data:image/svg+xml;base64,',html)
             self.assertIn('Houston Rockets',html)
             self.assertIn('Oklahoma City Thunder',html)
-            self.assertIn('SNAPSHOT',html)
+            self.assertIn('FINAL',html)
+            self.assertIn('Game complete',html)
+            self.assertIn('model at last event',html)
             for state,phrase in [('Stale snapshot','last validated'),('Possibly stalled','not changed'),('Unavailable','No estimate')]:
                 app.selectbox[0].set_value(state).run()
                 self.assertFalse(app.exception)
                 text=' '.join(str(element.value) for element in [*app.info,*app.warning])
                 self.assertIn(phrase,text)
+                if state!='Unavailable':
+                    self.assertIn('DELAYED',' '.join(str(x.value) for x in app.markdown))
                 if state=='Unavailable': self.assertFalse(app.dataframe)

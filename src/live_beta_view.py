@@ -38,10 +38,7 @@ def scoreboard_event(canonical,event_id):
     return current_event(canonical,event_id)
 
 
-def render_live_beta(root,allowed_games,rollout_guard=None):
-    st.title('Game Center · Live Beta')
-    st.caption('Private beta · up to four verified matchups · frozen V7 · estimates require a validated feed')
-    root=Path(root)
+def render_readiness(root):
     health=operations_status(root)
     with st.expander('Data readiness'):
         st.caption('Release: owner-beta-daily-v1 · private access · automatic preparation runs on your Mac, not in this page.')
@@ -54,6 +51,12 @@ def render_live_beta(root,allowed_games,rollout_guard=None):
                 st.warning('Some roster identities still need verification. Affected estimates may be unavailable.')
             if health['deferredGames']:
                 st.caption(f"{health['deferredGames']} additional games are outside this four-game beta limit.")
+
+
+def render_live_beta(root,allowed_games,rollout_guard=None):
+    st.title('Game Center')
+    st.caption('Private Live beta · verified matchups · frozen V7')
+    root=Path(root)
     now=datetime.now(ZoneInfo('America/New_York'))
     path=root/'results/live_context'/f'{CURRENT_SEASON}_day_context_v1.json'
     render=runpy.run_path(str(root/'src/live_preview_view.py'))['render_live_analysis']
@@ -69,11 +72,12 @@ def render_live_beta(root,allowed_games,rollout_guard=None):
     except (OSError,ValueError,KeyError,TypeError):
         render(None);return
     registry={team['id']:team['abbreviation'] for team in teams.get_teams()}
-    selected=st.selectbox('Game',list(games),format_func=lambda gid:
+    game_control,refresh_control=st.columns([3,2])
+    selected=game_control.selectbox('Game',list(games),format_func=lambda gid:
         f"{registry[games[gid]['awayTeamId']]} @ {registry[games[gid]['homeTeamId']]}")
     game=games[selected]
     canonical={k:game[k] for k in ('gameId','gameDate','season','homeTeamId','awayTeamId')}
-    auto=st.toggle('Refresh every 15 seconds',value=False)
+    auto=refresh_control.toggle('Refresh every 15 seconds',value=False)
     st.caption('Manual refresh by default. A paused browser is not a background monitor.')
 
     @st.fragment(run_every='15s' if auto else None)
@@ -91,6 +95,7 @@ def render_live_beta(root,allowed_games,rollout_guard=None):
                 if overnight_game(canonical['gameDate'], datetime.now(ZoneInfo('America/New_York'))):
                     raise ValueError('Previous-day game has not started')
                 diagnostics.record(selected,'scheduled',time.perf_counter()-started)
+                st.subheader(f"{registry[canonical['awayTeamId']]} at {registry[canonical['homeTeamId']]}")
                 st.info('Scheduled · this game has not started. No in-game estimate is shown.')
                 st.caption('Verified pregame regular-season records are ready; check back after tip-off.')
                 return
@@ -106,3 +111,4 @@ def render_live_beta(root,allowed_games,rollout_guard=None):
             render(None)
             st.caption('Waiting for a coherent feed and verified context. Try refreshing shortly.')
     panel()
+    render_readiness(root)

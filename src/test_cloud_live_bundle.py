@@ -12,6 +12,18 @@ from cloud_espn_adapter import normalize_snapshot
 
 
 class BundleTest(unittest.TestCase):
+    def test_final_source_metadata_stays_with_the_accepted_cached_pair(self):
+        completed=deepcopy(self.feed)
+        for status in (completed['event']['competitions'][0]['status']['type'],
+                       completed['summary']['header']['competitions'][0]['status']['type']):
+            status.update(state='post',completed=True)
+        first=self.get(lambda:completed)
+        self.assertEqual(first.source_state,'post')
+        self.clock.return_value=5
+        stale=self.get(Mock(side_effect=TimeoutError('source')))
+        self.assertEqual(stale.source_state,'post')
+        self.assertTrue(stale.is_stale)
+
     def test_only_real_acquisitions_report_score_episode_and_recovery(self):
         loader = Mock(side_effect=[self.lagging(), self.feed])
         with patch('cloud_live_bundle.coherence_diagnostics') as log, patch('cloud_live_bundle.time.sleep'):

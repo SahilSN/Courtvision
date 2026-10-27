@@ -8,6 +8,7 @@ from cloud_espn_adapter import normalize_snapshot, validate_canonical, ScoreSect
 from cloud_espn_box import _normalize_box
 from live_snapshot_cache import SnapshotKey
 from live_diagnostics import coherence_diagnostics
+from live_game_state import verified_source_state
 
 SCORE_RETRY_ATTEMPTS = 2
 SCORE_RETRY_DELAY = 0.5
@@ -25,6 +26,7 @@ class LiveBundle:
     unchanged_seconds: float = None
     verified_at: str = None
     max_age_seconds: float = 60
+    source_state: str = 'unknown'
 
 
 def get_live_bundle(cache, canonical, loader, progress=None):
@@ -73,4 +75,5 @@ def get_live_bundle(cache, canonical, loader, progress=None):
     progress_key = (key, canonical['homeTeamId'], canonical['awayTeamId'], snapshot.data['event']['id'])
     state, age = progress.observe(progress_key, snapshot.data) if progress is not None else ('unknown', None)
     return LiveBundle(timeline, box, snapshot.age_seconds, snapshot.is_stale,
-                      snapshot.refresh_error_type, state, age, snapshot.verified_at, cache.max_age)
+                      snapshot.refresh_error_type, state, age, snapshot.verified_at, cache.max_age,
+                      verified_source_state(snapshot.data))

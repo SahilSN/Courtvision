@@ -106,6 +106,18 @@ explicit private activation separately.
 
 ## Remaining launch work
 
+### Game-state presentation
+
+The compact Game Center puts the scoreboard and solid probability lines ahead
+of readiness/debug information. States are Scheduled, Live, Delayed, Unavailable
+and Final; ambiguous source metadata remains labeled Snapshot. Final requires
+BOTH the accepted scoreboard and summary to explicitly say post/completed=true.
+A zero clock, a lead or one source's final flag is never enough. State metadata
+travels with the accepted cached pair, so a failed refresh cannot label retained
+old scores as a newly confirmed final. Delayed/uncertain refresh state takes
+precedence over a retained final marker. Final probabilities remain unchanged
+model history and are labeled as such, not forced to100percent.
+
 The existing October27 hourly checks are SPOT CHECKS, not a full-game monitor.
 Use actual game windows over the next few days to verify first nightly
 publication, roster-source access, late participants, corrections, retention,
