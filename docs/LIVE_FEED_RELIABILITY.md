@@ -17,6 +17,12 @@ was continuously wrong. Poll cadence, cache hits, process restarts and evictions
 affect it. Acquisition counts are not time-weighted uptime. Existing
 COURTVISION_LIVE_STATE logs separately report viewer presentation states/ages.
 
+Summarize an exported operator log without raw payloads:
+`python src/summarize_live_reliability.py path/to/operator.log`.
+It reports observed episode count/median/p95 and presentation sample counts,
+not time-weighted uptime or a release decision. Remove duplicated log-export
+lines before comparing runs; incomplete exports and process resets limit inference.
+
 ## Viewer states
 
 Successful acquisition stores an explicit UTC verification time. Cache hits,
