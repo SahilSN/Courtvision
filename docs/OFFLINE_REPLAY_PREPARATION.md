@@ -59,7 +59,8 @@ requires published, paired completed-game identities. Local processed/raw PBP,
 season training context, frozen model/scaler and cached box scores are required.
 Existing impact summaries are reused; missing ones are built by the original
 offline attribution pipeline into temporary output. Remote PBP/record fallback
-is explicitly prohibited. No scheduler or background worker is installed.
+is explicitly prohibited. The manual rebuilder itself does not install a job;
+the autonomous Mac agent described above invokes it in bounded subprocesses.
 
 The exporter and rebuilder share an exclusive lock. Already published artifacts
 are validated and skipped; differing published history is never overwritten.
