@@ -73,6 +73,34 @@ Do not add every cached game blindly or run preparation inside Streamlit.
 
 ## Next stages (not implemented here)
 
+### Resumable export of caches already on the Mac
+
+```sh
+PYTHONPATH=src .venv/bin/python src/batch_export_replays.py \
+  --root /absolute/path/to/clean-release-checkout \
+  --cache-root /absolute/path/to/trusted-local-Courtvision \
+  --limit 20 --max-seconds 60
+```
+
+This discovers only named existing `v1_v7/*_top3.pkl` caches; it does not acquire
+or analyze missing games. It uses an exclusive lock and atomic per-game ledger
+at `results/.runtime/replay-export/status.json`. Already indexed artifacts are
+validated and skipped. Missing input files are reported separately. Failed caches
+are retried only if an input fingerprint changes or `--retry-blocked` is supplied.
+Each game is independently staged and fully validated before exposure; one bad
+game does not stop other exports. The time budget is checked between games, not
+hard cancellation of in-flight file decoding. Rerun the same command to resume;
+no background scheduler is installed. Publish only scoped new JSONs and index
+from a clean checkout, preserving active data and the user index.
+
+The first actual run found27 saved analyses:6 already prepared,16 newly exported,
+4 rejected for invalid probabilities and1 missing a WPA summary. All22 published
+artifacts pass the catalog validator. No2026–27 final analysis caches were present.
+Local on-demand analysis capability does not imply every game is already cached.
+The four invalid probability histories must be investigated, not clamped,
+silently dropped or relabeled as verified. A missing impact file must come from
+the validated attribution pipeline, not zeros or an older incompatible summary.
+
 Produce missing current-season final analysis caches through a separately
 validated offline acquisition workflow, then export batches. Add independent
 resume/coverage accounting and storage/publication appropriate to a large replay

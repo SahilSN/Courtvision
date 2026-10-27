@@ -2,10 +2,12 @@
 
 import argparse
 from pathlib import Path
+import json
+from hashlib import sha256
 import tempfile
 
 from export_replay_pilot import export_game
-from replay_catalog import ROOT, build_index
+from replay_catalog import ROOT, build_index, load_catalog_replay
 
 
 def prepare(root, cache_root, season, game_ids):
@@ -18,7 +20,14 @@ def prepare(root, cache_root, season, game_ids):
     with tempfile.TemporaryDirectory(prefix='replay-export-') as directory:
         staged=[]
         for gid in game_ids:
-            path=export_game(gid,season,cache_root,Path(directory)/f'{gid}.json')
+            staging=Path(directory)/'results/replay_catalog/games'/f'{gid}.json'
+            staging.parent.mkdir(parents=True,exist_ok=True)
+            path=export_game(gid,season,cache_root,staging)
+            raw=path.read_bytes()
+            data=json.loads(raw)
+            entry=dict(gameId=gid,season=season,date=data['date'],home=data['home']['tricode'],
+                       away=data['away']['tricode'],collection='catalog',sha256=sha256(raw).hexdigest())
+            load_catalog_replay(entry,Path(directory))
             destination=target/path.name
             if destination.exists() and destination.read_bytes()!=path.read_bytes():
                 raise ValueError('Existing replay differs; refusing to replace published history')
