@@ -30,6 +30,8 @@ REVIEWED = (
     ('2026-27',1610612743,'Trevon Brazile',1642350,'https://www.nba.com/player/1642350/trevon-brazile'),
     ('2026-27',1610612737,'Zuby Ejiofor',1643544,'https://www.nba.com/player/1643544'),
     ('2026-27',1610612745,'Bruce Thornton',1643570,'https://www.nba.com/player/1643570/bruce-thornton'),
+    ('2026-27',1610612744,'Graham Ike',1643633,'https://www.nba.com/player/1643633/graham-ike'),
+    ('2026-27',1610612744,'LJ Cryer',1643018,'https://www.nba.com/player/1643018/lj-cryer/bio'),
 )
 
 

@@ -1,8 +1,18 @@
 import unittest
+import reviewed_live_players
 from reviewed_live_players import candidates
 
 
 class ReviewedPlayersTest(unittest.TestCase):
+    def test_late_warriors_participants_are_exact_and_scoped(self):
+        for name, person in [('Graham Ike',1643633), ('LJ Cryer',1643018)]:
+            self.assertEqual(candidates(name,'2026-27',1610612744),{person})
+            for season, team in [('2025-26',1610612744), ('2026-27',1610612743)]:
+                self.assertEqual(candidates(name,season,team),
+                                 reviewed_live_players._static_index().get(
+                                     reviewed_live_players.normalize_name(name),set()))
+        self.assertFalse(candidates('G Ike','2026-27',1610612744))
+
     def test_late_bench_participants_exact_scope(self):
         for name, person, team in [('Zuby Ejiofor',1643544,1610612737),
                                    ('Bruce Thornton',1643570,1610612745)]:
