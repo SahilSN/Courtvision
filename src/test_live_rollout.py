@@ -20,10 +20,14 @@ class RolloutTest(unittest.TestCase):
             self.assertEqual(allowed_games(path,env,now),())
             path.write_text(json.dumps(config))
             self.assertEqual(allowed_games(path,env,now),('0022600125',))
+            four={**config,'gameIds':['0022600120','0022600121','0022600122','0022600123']}
+            path.write_text(json.dumps(four))
+            self.assertEqual(allowed_games(path,env,now),tuple(four['gameIds']))
+            path.write_text(json.dumps(config))
             self.assertEqual(allowed_games(path,{},now),())
             self.assertEqual(allowed_games(path,{**env,'COURTVISION_DISABLE_LIVE_BETA':'1'},now),())
             self.assertEqual(allowed_games(path,env,now+timedelta(hours=3)),())
-            for key,value in [('enabled',False),('gameIds',['0022600125']*2),('gameIds',['0022600125','0022600126','0022600127']),
+            for key,value in [('enabled',False),('gameIds',['0022600125']*2),('gameIds',['0022600120','0022600121','0022600122','0022600123','0022600124']),
                               ('gameIds',[None]),('gameDate','2026-10-25'),('seasonType','Pre Season'),
                               ('expiresAt',(now+timedelta(days=2)).isoformat()),('issuedAt','2026-10-26T20:00:00')]:
                 broken=deepcopy(config);broken[key]=value;path.write_text(json.dumps(broken))

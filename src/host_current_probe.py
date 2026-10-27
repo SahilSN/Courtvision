@@ -28,7 +28,7 @@ def probe_current(day, environment):
         stage='scoreboard'
         board,_=fetch_json(BASE+'scoreboard?dates='+day.replace('-',''))
         active={str(e['id']) for e in board['events'] if e['status']['type']['state']=='in'}
-        games=[g for g in bundle['games'] if g['espnEventId'] in active and g['gameId'] in ('0022600119','0022600120')]
+        games=[g for g in bundle['games'] if g['espnEventId'] in active and g['gameId'] in ('0022600120','0022600121','0022600122','0022600123')]
         reports=[]
         artifacts=None
         for game in games:

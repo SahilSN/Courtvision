@@ -8,7 +8,7 @@ Two independent deployment gates must both pass before navigation is offered:
 1. COURTVISION_ENABLE_LIVE_BETA=1 in the host environment.
 2. A reviewed cloud/live_rollout.json containing schemaVersion1, enabled=true,
    current season/Regular Season, Eastern gameDate=today, explicit timezone-aware
-   issuedAt/expiresAt (maximum24h lifetime), and1–2 unique canonical regular-season
+   issuedAt/expiresAt (maximum24h lifetime), and1–4 unique canonical regular-season
    gameIds. The exact IDs must match published dated context when selected.
 
 Missing/corrupt settings, wrong dates, expired windows and oversized/duplicate
@@ -18,7 +18,7 @@ rerun. These gates are rollout controls, NOT authentication. Community Cloud
 private-sharing authentication must remain enabled; setup readiness is not auth.
 
 When allowed, Workspace defaults to Season Intelligence. Live Beta selection
-loads only the guarded two-game view. On kill/expiry, a retained Live selection
+loads only the guarded four-game-capacity view. On kill/expiry, a retained Live selection
 is reset to Season Intelligence; legacy full discovery stays disabled. A view
 exception shows a sanitized unavailable warning and return path, not traceback
 or a guessed estimate. No activation file is shipped with this change.
