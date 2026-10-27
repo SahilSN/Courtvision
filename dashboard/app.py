@@ -12004,7 +12004,7 @@ def style_player_table(frame):
     for column in ["Status", "Sample Status", "Season Coverage", "Coverage", "Result"]:
         if column in frame.columns:
             styled = styled.map(status_color, subset=[column])
-    for column in ["Season Value", "Total Season Impact", "Game WPA"]:
+    for column in ["Season Value", "Total Season Impact", "Game WPA", "Season Δ"]:
         if column in frame.columns:
             styled = styled.map(
                 lambda value: "color:#6ac8a1" if float(value) > 0 else "color:#ef8793" if float(value) < 0 else "",
@@ -12258,6 +12258,11 @@ def render_player_intelligence(
 
         from player_leaderboard_display import leaderboard_display, leaderboard_columns
         leaderboard=leaderboard_display(leaderboard,coverage['coverageStatus'] in ('Partial','Unknown'))
+        leaderboard.insert(
+            leaderboard.columns.get_loc("Rating") + 1,
+            "Season Δ",
+            (leaderboard["Rating"] - 100.0).round(1),
+        )
 
         if leaderboard.empty:
             st.info("No players on this team have reached three processed games yet.")
@@ -12268,7 +12273,13 @@ def render_player_intelligence(
             hide_index=True,
             width="stretch",
             height=560,
-            column_config=leaderboard_columns(),
+            column_config={
+                **leaderboard_columns(),
+                "Season Δ": st.column_config.NumberColumn(
+                    format="%+.1f",
+                    help="Rating change from the season's starting reference of 100, not the last game.",
+                ),
+            },
         )
 
         st.caption(

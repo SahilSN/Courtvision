@@ -4,6 +4,23 @@ from player_leaderboard_display import leaderboard_display
 
 
 class PlayerTableDisplayTest(unittest.TestCase):
+    def test_dashboard_season_change_is_numeric_from_100(self):
+        import ast
+        from pathlib import Path
+        tree = ast.parse((Path(__file__).resolve().parents[1] / 'dashboard/app.py').read_text())
+        insertion = next(node for node in ast.walk(tree)
+                         if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
+                         and isinstance(node.value.func, ast.Attribute)
+                         and node.value.func.attr == 'insert'
+                         and any(isinstance(arg, ast.Constant) and arg.value == 'Season Δ'
+                                 for arg in node.value.args))
+        frame = pd.DataFrame({'Rating': [134.2, 100.0, 89.7], 'Status': ['Provisional'] * 3})
+        exec(compile(ast.Module(body=[insertion], type_ignores=[]), '<season-change>', 'exec'),
+             {'leaderboard': frame})
+        self.assertEqual(frame['Season Δ'].tolist(), [34.2, 0.0, -10.3])
+        self.assertTrue(pd.api.types.is_numeric_dtype(frame['Season Δ']))
+        self.assertEqual(list(frame), ['Rating', 'Season Δ', 'Status'])
+
     def test_ranks_and_metrics_remain_numeric_for_frontend_sorting(self):
         original=pd.DataFrame({'NBA Rank':[100,10,2,1],'NBA Value Rank':[100,10,2,1],
                                'Player':['A','B','C','D'],'Team':['DEN']*4,'Games':[3,4,10,65],'Status':['Qualified']*4,
