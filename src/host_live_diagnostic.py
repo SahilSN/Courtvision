@@ -18,7 +18,7 @@ def run_requested_probe(request_path, runtime, now=None, runner=None):
         expires = datetime.fromisoformat(request["expiresAt"].replace("Z", "+00:00"))
         day = date.fromisoformat(request["date"]).isoformat()
         kind=request.get('kind','access')
-        if kind not in ('access','pipeline'):
+        if kind not in ('access','pipeline','current'):
             return None
         if (not re.fullmatch(r"[a-z0-9-]{1,64}", request_id) or issued.tzinfo is None or expires.tzinfo is None
                 or not 0 < (expires - issued).total_seconds() <= 900 or not issued <= now < expires):
@@ -36,7 +36,9 @@ def run_requested_probe(request_path, runtime, now=None, runner=None):
         return None
     try:
         if runner is None:
-            if kind == 'pipeline':
+            if kind == 'current':
+                runner=runpy.run_path(str(Path(__file__).with_name('host_current_probe.py')))['probe_current']
+            elif kind == 'pipeline':
                 runner=runpy.run_path(str(Path(__file__).with_name('host_pipeline_probe.py')))['probe_pipeline']
             else:
                 runner=probe

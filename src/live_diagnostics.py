@@ -7,8 +7,12 @@ from threading import RLock
 import time
 
 
+def _emit(message):
+    print(message,flush=True)
+
+
 class RefreshDiagnostics:
-    def __init__(self,clock=time.monotonic,emit=print,max_entries=16,interval=60):
+    def __init__(self,clock=time.monotonic,emit=_emit,max_entries=16,interval=60):
         self.clock,self.emit,self.max_entries,self.interval=clock,emit,max_entries,interval
         self.states=OrderedDict();self.lock=RLock()
 
