@@ -23,9 +23,21 @@ class DailyPreparationTest(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory(); self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         self.directory = self.root/'results/live_context'
-        original = Path(__file__).resolve().parents[1]/'results/live_context/2026-27_day_context_v1.json'
-        self.context = read_json(original)
-        self.context['games'] = self.context['games'][:5]
+        # Fixed test-only slate: nightly publication must not change test cases.
+        # Five distinct games deliberately exercise the four-game capacity limit.
+        self.context = dict(schemaVersion=1,season='2026-27',seasonType='Regular Season',
+                            gameDate='2026-10-26',completeThrough='2026-10-25',
+                            checkedAt='2026-10-26T08:00:00+00:00',
+                            coverageCheckedAt='2026-10-26T08:00:00+00:00',games=[])
+        for index in range(5):
+            home,away=1610612737+2*index,1610612738+2*index
+            self.context['games'].append(dict(
+                season='2026-27',gameDate='2026-10-26',gameId=f'002260{index+1:04d}',
+                homeTeamId=home,awayTeamId=away,espnEventId=str(401900001+index),
+                scheduledAt=f'2026-10-26T23:{index:02d}:00+00:00',
+                pregameContext=dict(homeTeamId=home,awayTeamId=away,
+                    homePreGameWins=0,homePreGameLosses=0,homePreGameWinPct=0.5,
+                    awayPreGameWins=0,awayPreGameLosses=0,awayPreGameWinPct=0.5,strengthDifference=0.0)))
         self.now = datetime.fromisoformat(self.context['gameDate']+'T12:00:00+00:00')
         self.day = self.context['gameDate']
         self.registry = {t['id']:t['full_name'] for t in teams.get_teams()}
