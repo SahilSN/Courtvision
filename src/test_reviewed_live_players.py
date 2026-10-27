@@ -3,6 +3,14 @@ from reviewed_live_players import candidates
 
 
 class ReviewedPlayersTest(unittest.TestCase):
+    def test_late_bench_participants_exact_scope(self):
+        for name, person, team in [('Zuby Ejiofor',1643544,1610612737),
+                                   ('Bruce Thornton',1643570,1610612745)]:
+            self.assertEqual(candidates(name,'2026-27',team),{person})
+            self.assertNotIn(person,candidates(name,'2025-26',team))
+            self.assertNotIn(person,candidates(name,'2026-27',1610612738))
+        self.assertFalse(candidates('B Thornton','2026-27',1610612745))
+
     def test_western_games_exact_official_identities(self):
         for name, person, team in [('Kingston Flemings',1643412,1610612737),
                 ('Cameron Boozer',1643409,1610612763),('Yaxel Lendeborg',1642865,1610612744),

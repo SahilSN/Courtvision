@@ -16,6 +16,12 @@ from live_snapshot_cache import LiveSnapshotCache
 
 
 class AnalysisJoinTest(unittest.TestCase):
+    def test_release_interruption_retains_expires_and_recovers_without_data_changes(self):
+        from live_release_recovery import verify_recovery
+        report = verify_recovery(self.feed['canonical'], self.path, self.feed, self.artifacts)
+        self.assertEqual(report['status'], 'passed')
+        self.assertTrue(report['expiredUnavailable'])
+
     @classmethod
     def setUpClass(cls):
         root=Path(__file__).resolve().parents[1]

@@ -28,6 +28,8 @@ REVIEWED = (
     ('2026-27',1610612744,'Brandon Williams',1630314,'https://www.nba.com/player/1630314/brandon-williams'),
     ('2026-27',1610612743,'Bryce Hopkins',1643624,'https://www.nba.com/player/1643624/bryce-hopkins/bio'),
     ('2026-27',1610612743,'Trevon Brazile',1642350,'https://www.nba.com/player/1642350/trevon-brazile'),
+    ('2026-27',1610612737,'Zuby Ejiofor',1643544,'https://www.nba.com/player/1643544'),
+    ('2026-27',1610612745,'Bruce Thornton',1643570,'https://www.nba.com/player/1643570/bruce-thornton'),
 )
 
 

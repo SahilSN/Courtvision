@@ -128,6 +128,21 @@ def probe_progress(day, environment, game_ids):
     if day != datetime.now(ZoneInfo('America/New_York')).date().isoformat():
         return dict(status='wrong_day', canEnableLive=False)
     report = check(game_ids, ROOT/'results/live_context'/f'{CURRENT_SEASON}_day_context_v1.json', interval=30)
+    # Separate controlled failure evidence from real progression observations.
+    # One bounded extra acquisition, no activation, and no viewer fault injection.
+    try:
+        from live_release_recovery import verify_recovery
+        from live_refresh import fetch_pair
+        path = ROOT/'results/live_context'/f'{CURRENT_SEASON}_day_context_v1.json'
+        bundle = json.loads(path.read_text())
+        selected = next(g for g in report.get('games', []) if g['advanced'])
+        game, = [g for g in bundle['games'] if g['gameId'] == selected['gameId']]
+        report['controlledRecovery'] = verify_recovery(game, path,
+            fetch_pair(game, game['espnEventId']), load_cpu_artifacts())
+    except StopIteration:
+        report['controlledRecovery'] = dict(status='not_run_no_progressing_game')
+    except Exception as error:
+        report['controlledRecovery'] = dict(status='failed', errorType=type(error).__name__)
     return {**report, 'environment': environment}
 
 
