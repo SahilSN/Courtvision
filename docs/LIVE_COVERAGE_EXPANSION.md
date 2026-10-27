@@ -40,3 +40,12 @@ is detected, request approval before a service-interrupting restart. Only after
 runtime/current-feed verification may a short-lived four-game allowlist be used;
 verify actual hosted selection/refresh/stale handling and rollback. Remove every
 temporary diagnostic/rollout activation after the test.
+
+Final pre-activation host check four-capacity-runtime-20261027 reported
+runtimeReady=false and unresolved expansion identities. The existing long-running
+process had not loaded the new reviewed policy. This is an expected fail-closed
+block, not approval to activate or reload modules concurrently. Obtain approval
+for another brief viewer-disrupting restart, verify runtimeReady=true and current
+feeds afterward, then perform the guarded four-game hosted trial.181tests passed
+on Python3.10/3.12; deployment smoke, compilation and diff checks passed. Live
+remains off; temporary diagnostic request removed.
