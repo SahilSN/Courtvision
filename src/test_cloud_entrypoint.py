@@ -23,7 +23,7 @@ class CloudEntrypointTest(unittest.TestCase):
             return real_run(path,*args,**kwargs)
         with patch.dict(os.environ,{'COURTVISION_CLOUD_READY':'1','COURTVISION_DISABLE_OPERATOR_PROBES':'1',
                                    'COURTVISION_ENABLE_LIVE_BETA':'1','COURTVISION_DISABLE_LIVE_BETA':'0'}), \
-             patch('live_rollout.allowed_games',return_value=('0022600125',)) as gate, \
+             patch('daily_live_policy.active_games',return_value=('0022600125',)) as gate, \
              patch('runpy.run_path',side_effect=dispatch), \
              patch('requests.sessions.Session.request',side_effect=AssertionError('Unexpected network')):
             app=AppTest.from_file(str(entrypoint),default_timeout=90).run()
