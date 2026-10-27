@@ -22,6 +22,12 @@ REVIEWED = (
     ('2026-27',1610612749,'Nate Ament',1643417,'https://www.nba.com/player/1643417/nate-ament'),
     ('2026-27',1610612749,'Brayden Burries',1643415,'https://www.nba.com/player/1643415'),
     ('2026-27',1610612738,'Chris Cenac Jr.',1643416,'https://www.nba.com/player/1643416/chris-cenac-jr'),
+    ('2026-27',1610612737,'Kingston Flemings',1643412,'https://www.nba.com/player/1643412/kingston-flemings'),
+    ('2026-27',1610612763,'Cameron Boozer',1643409,'https://www.nba.com/player/1643409/cameron-boozer'),
+    ('2026-27',1610612744,'Yaxel Lendeborg',1642865,'https://www.nba.com/player/1642865/yaxel-lendeborg'),
+    ('2026-27',1610612744,'Brandon Williams',1630314,'https://www.nba.com/player/1630314/brandon-williams'),
+    ('2026-27',1610612743,'Bryce Hopkins',1643624,'https://www.nba.com/player/1643624/bryce-hopkins/bio'),
+    ('2026-27',1610612743,'Trevon Brazile',1642350,'https://www.nba.com/player/1642350/trevon-brazile'),
 )
 
 
@@ -35,6 +41,7 @@ def _static_index():
 
 def candidates(name,season,team_id):
     name=normalize_name(name)
-    result=set(_static_index().get(name,()))
-    result.update(person for s,t,n,person,_ in REVIEWED if s==season and t==team_id and normalize_name(n)==name)
-    return result
+    reviewed={person for s,t,n,person,_ in REVIEWED if s==season and t==team_id and normalize_name(n)==name}
+    # An exact reviewed season/team identity disambiguates names shared with
+    # retired players (Brandon Williams). Conflicting reviewed IDs stay ambiguous.
+    return reviewed or set(_static_index().get(name,()))

@@ -38,6 +38,13 @@ class HostDiagnosticTest(unittest.TestCase):
                 result=run_requested_probe(path,root/'runtime',now)
             self.assertEqual(result['concurrentViewers'],4)
             four.assert_called_once()
+            request.update(kind='progress', requestId='test-progress', gameIds=['0022600127'])
+            path.write_text(json.dumps(request))
+            progress=Mock(return_value={'status':'not_ready','canEnableLive':False})
+            with patch('host_live_diagnostic.runpy.run_path',return_value={'probe_progress':progress}):
+                result=run_requested_probe(path,root/'runtime',now)
+            self.assertFalse(result['canEnableLive'])
+            progress.assert_called_once_with('2026-10-23','community-cloud',['0022600127'])
 
     def request(self, root, now):
         path = root / "request.json"

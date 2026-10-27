@@ -3,6 +3,24 @@ from reviewed_live_players import candidates
 
 
 class ReviewedPlayersTest(unittest.TestCase):
+    def test_western_games_exact_official_identities(self):
+        for name, person, team in [('Kingston Flemings',1643412,1610612737),
+                ('Cameron Boozer',1643409,1610612763),('Yaxel Lendeborg',1642865,1610612744),
+                ('Bryce Hopkins',1643624,1610612743),('Trevon Brazile',1642350,1610612743)]:
+            self.assertEqual(candidates(name,'2026-27',team),{person})
+            self.assertNotIn(person,candidates(name,'2025-26',team))
+            self.assertNotIn(person,candidates(name,'2026-27',1610612745))
+
+    def test_reviewed_team_disambiguates_retired_namesake_only_in_scope(self):
+        from unittest.mock import patch
+        import reviewed_live_players
+        self.assertEqual(candidates('Brandon Williams','2026-27',1610612744),{1630314})
+        self.assertEqual(candidates('Brandon Williams','2025-26',1610612744),{1585,1630314})
+        self.assertEqual(candidates('Brandon Williams','2026-27',1610612745),{1585,1630314})
+        with patch.object(reviewed_live_players,'REVIEWED',reviewed_live_players.REVIEWED +
+                (('2026-27',1610612744,'Brandon Williams',1585,'conflicting-test-source'),)):
+            self.assertEqual(candidates('Brandon Williams','2026-27',1610612744),{1585,1630314})
+
     def test_late_participating_boston_rookie(self):
         self.assertEqual(candidates('Chris Cenac Jr.','2026-27',1610612738),{1643416})
         self.assertNotIn(1643416,candidates('Chris Cenac Jr.','2025-26',1610612738))
