@@ -82,7 +82,7 @@ def _normalize_snapshot(event, summary, canonical):
         for stats in group["statistics"]:
             for record in stats["athletes"]:
                 athlete = record["athlete"]
-                ids = candidates(athlete['displayName'], canonical['season'], team_map[espn_team]['team_id'])
+                ids = candidates(athlete['displayName'], canonical['season'], team_map[espn_team]['team_id'], canonical['gameDate'])
                 metadata = {"player_name": athlete["displayName"], "nba_person_id": next(iter(ids)) if len(ids) == 1 else None,
                             "nba_team_id": team_map[espn_team]["team_id"], "team_tricode": team_map[espn_team]["team_tricode"]}
                 key = str(athlete["id"])

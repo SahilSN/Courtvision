@@ -20,6 +20,7 @@ from season_config import CURRENT_SEASON
 from live_diagnostics import diagnostics
 from live_rollout import MAX_LIVE_GAMES
 from live_game_date import eligible_game_date, overnight_game
+from live_operations import operations_status
 
 
 @st.cache_resource
@@ -38,9 +39,21 @@ def scoreboard_event(canonical,event_id):
 
 
 def render_live_beta(root,allowed_games,rollout_guard=None):
-    st.title('Game Center · Live check')
-    st.caption('Private beta · up to four reviewed games · frozen V7 · refreshes paused unless enabled below')
+    st.title('Game Center · Live Beta')
+    st.caption('Private beta · up to four verified matchups · frozen V7 · estimates require a validated feed')
     root=Path(root)
+    health=operations_status(root)
+    with st.expander('Data readiness'):
+        st.caption('Release: owner-beta-daily-v1 · private access · automatic preparation runs on your Mac, not in this page.')
+        if health['preparation']=='unavailable':
+            st.info('Daily preparation is not available yet. A reviewed manual beta window may still be active.')
+        else:
+            st.write(f"{health['gameDate']} · {health['preparedGames']} prepared matchups · {health['preparation']}")
+            st.caption(f"Prepared at {health['preparedAt']} · expires {health['expiresAt']}")
+            if health['rosterTeamsUnavailable'] or health['pendingIdentities']:
+                st.warning('Some roster identities still need verification. Affected estimates may be unavailable.')
+            if health['deferredGames']:
+                st.caption(f"{health['deferredGames']} additional games are outside this four-game beta limit.")
     now=datetime.now(ZoneInfo('America/New_York'))
     path=root/'results/live_context'/f'{CURRENT_SEASON}_day_context_v1.json'
     render=runpy.run_path(str(root/'src/live_preview_view.py'))['render_live_analysis']

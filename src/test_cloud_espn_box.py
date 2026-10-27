@@ -10,6 +10,24 @@ from cloud_espn_adapter import ProviderContextUnavailable
 
 
 class BoxAdapterTest(unittest.TestCase):
+    def test_dated_official_identity_is_shared_by_timeline_and_box(self):
+        import reviewed_live_players
+        from reviewed_live_players import candidates
+        original = self.feed['summary']['boxscore']['players'][0]['statistics'][0]['athletes'][0]['athlete']
+        name = original['displayName']
+        existing = candidates(name,self.feed['canonical']['season'],self.feed['canonical']['awayTeamId'])
+        self.assertEqual(len(existing),1)
+        index = dict(reviewed_live_players._static_index())
+        index.pop(reviewed_live_players.normalize_name(name))
+        with patch('reviewed_live_players._static_index',return_value=index):
+            with self.assertRaises(ProviderContextUnavailable): self.normalize()
+            with patch('reviewed_live_players.roster_candidates',side_effect=lambda value,*args:
+                       existing if value==name else set()), \
+                 patch('requests.sessions.Session.request',side_effect=AssertionError('Viewer network')):
+                result = self.normalize()
+        row = result['players'].loc[result['players'].fullName==name].iloc[0]
+        self.assertEqual(row.personId,next(iter(existing)))
+
     def setUp(self):
         directory = Path(__file__).parent / 'fixtures'
         self.feed = json.loads((directory/'espn_contract_0022500001.json').read_text())

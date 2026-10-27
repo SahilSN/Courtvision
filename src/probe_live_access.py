@@ -17,7 +17,7 @@ class NoRedirects(HTTPRedirectHandler):
         return None
 
 
-def fetch_json(url):
+def fetch_json(url, headers=None):
     started = time.perf_counter()
     try:
         import certifi
@@ -25,7 +25,8 @@ def fetch_json(url):
     except ImportError:
         context = ssl.create_default_context()
     opener = build_opener(NoRedirects(), HTTPSHandler(context=context))
-    with opener.open(Request(url, headers={"User-Agent": "Courtvision-ReadOnly-Diagnostic/1.0"}), timeout=5) as response:
+    request_headers = {"User-Agent": "Courtvision-ReadOnly-Diagnostic/1.0"} if headers is None else headers
+    with opener.open(Request(url, headers=request_headers), timeout=5) as response:
         raw = response.read(MAX_BYTES + 1)
         if len(raw) > MAX_BYTES:
             raise ValueError("Response exceeds diagnostic size limit")

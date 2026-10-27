@@ -48,7 +48,7 @@ def _normalize_box(event, summary, canonical, timeline=None):
                 seen.add(key)
                 if type(athlete['didNotPlay']) is not bool:
                     raise ValueError('Unknown participation')
-                matches = candidates(person['displayName'],canonical['season'],team_id)
+                matches = candidates(person['displayName'],canonical['season'],team_id,canonical['gameDate'])
                 played = not athlete['didNotPlay']
                 if played and len(matches) != 1:
                     raise ValueError('Unresolved participating player')

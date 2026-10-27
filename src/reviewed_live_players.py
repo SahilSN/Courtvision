@@ -6,6 +6,7 @@ source game IDs/profile URLs retained for audit. No fuzzy names or guessed IDs.
 from functools import lru_cache
 from nba_api.stats.static import players
 from espn_live import normalize_name
+from official_live_rosters import roster_candidates
 
 REVIEWED = (
     ('2026-27',1610612762,'Darryn Peterson',1643408,'0022600112'),
@@ -43,9 +44,15 @@ def _static_index():
     return index
 
 
-def candidates(name,season,team_id):
+def merge_candidates(name,season,team_id,official):
     name=normalize_name(name)
     reviewed={person for s,t,n,person,_ in REVIEWED if s==season and t==team_id and normalize_name(n)==name}
     # An exact reviewed season/team identity disambiguates names shared with
     # retired players (Brandon Williams). Conflicting reviewed IDs stay ambiguous.
-    return reviewed or set(_static_index().get(name,()))
+    # Conflicting official and reviewed identities block, never silently pick one.
+    return (reviewed | official) if reviewed or official else set(_static_index().get(name,()))
+
+
+def candidates(name,season,team_id,game_date=None):
+    official = roster_candidates(name, season, team_id, game_date) if game_date is not None else set()
+    return merge_candidates(name,season,team_id,official)

@@ -42,8 +42,8 @@ if os.environ.get('COURTVISION_ENABLE_LIVE_BETA')=='1' and os.environ.get('COURT
     try:
         import importlib
         importlib.invalidate_caches()
-        from live_rollout import allowed_games
-        games=allowed_games(root/'cloud/live_rollout.json',os.environ)
+        from daily_live_policy import active_games
+        games=active_games(root,os.environ)
         if games:
             runtime_gate=runpy.run_path(str(root/'src/live_runtime_gate.py'))['runtime_ready']
             if not runtime_gate(root):
@@ -59,7 +59,7 @@ if games:
         try:
             view=runpy.run_path(str(root/'src/live_beta_view.py'))
             view['render_live_beta'](root,games,rollout_guard=lambda:
-                allowed_games(root/'cloud/live_rollout.json',os.environ) if runtime_gate(root) else ())
+                active_games(root,os.environ) if runtime_gate(root) else ())
         except Exception as error:
             print('COURTVISION_LIVE_VIEW unavailable '+type(error).__name__,flush=True)
             st.warning('Live is temporarily unavailable. Return to Season Intelligence in the sidebar.')

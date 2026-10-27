@@ -16,6 +16,7 @@ from datetime import datetime, timedelta, timezone
 from season_config import CURRENT_SEASON
 from update_intelligence import ROOT_DIR, game_ids, read_published, refresh_intelligence
 from daily_live_context import refresh_nightly_context as refresh_coverage
+from live_artifacts import read_json
 
 
 def published_paths(season=CURRENT_SEASON):
@@ -27,6 +28,9 @@ def published_paths(season=CURRENT_SEASON):
         f"results/player_intelligence/{season}_player_ratings_v1.csv",
         f"results/live_context/{season}_coverage_v1.json",
         f"results/live_context/{season}_day_context_v1.json",
+        f"results/live_context/{season}_roster_identities_v1.json",
+        f"results/live_context/{season}_identity_review_v1.json",
+        f"results/live_context/{season}_daily_live_v1.json",
     ]
 
 
@@ -52,6 +56,21 @@ def publish_current_data(root=ROOT_DIR, season=CURRENT_SEASON):
             destination = checkout / relative
             if not source.exists():
                 continue
+            if relative.endswith(('_roster_identities_v1.json','_identity_review_v1.json','_daily_live_v1.json')):
+                try:
+                    incoming = read_json(source)
+                    context = read_json(root/f'results/live_context/{season}_day_context_v1.json')
+                    if incoming['schemaVersion'] != 1 or incoming['season'] != season or incoming['gameDate'] != context['gameDate']:
+                        raise ValueError('Wrong Live preparation date')
+                    if relative.endswith('_roster_identities_v1.json'):
+                        from official_live_rosters import validate_roster_artifact
+                        validate_roster_artifact(incoming,season,context['gameDate'])
+                    if relative.endswith('_daily_live_v1.json'):
+                        from daily_live_policy import validate_daily_manifest
+                        validate_daily_manifest(incoming,context)
+                except (OSError,KeyError,TypeError,ValueError,IndexError):
+                    logging.getLogger('courtvision.nightly').warning('Skipping invalid optional Live preparation artifact')
+                    continue
             if relative.endswith('_coverage_v1.json'):
                 incoming = json.loads(source.read_text())
                 if (incoming['season'] != season or incoming['scope'] != 'prior-results-cross-check'
@@ -142,6 +161,12 @@ def run_nightly(root=ROOT_DIR, publish=True, scheduled=False, refresher=refresh_
             incomplete = any(item["status"] != "success" for item in health["pipelines"].values())
             try:
                 result['recordCoverage'] = (coverage_checker or refresh_coverage)(root=root)
+                preparation = result['recordCoverage'].get('livePreparation')
+                if preparation is not None:
+                    result['livePreparationStatus'] = preparation['status']
+                    if preparation['status'] != 'prepared':
+                        logger.warning('Live preparation %s; intelligence publication continues with strict Live validation',
+                                       preparation['status'])
             except Exception as error:
                 result['recordCoverage'] = {'status': 'failed', 'error': type(error).__name__}
                 logger.warning('Record coverage check failed (%s); retaining last artifact', type(error).__name__)

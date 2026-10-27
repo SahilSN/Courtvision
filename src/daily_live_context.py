@@ -34,7 +34,7 @@ def build_day_context(nba_games, espn, coverage, season, game_date):
     league = espn['leagues'][0]
     if league['id'] != '46' or league['season']['year'] != int(season[:4]) + 1:
         raise ProviderContextUnavailable('Wrong scoreboard season')
-    by_matchup, event_ids = {}, set()
+    by_matchup, event_ids, starts = {}, set(), {}
     for event in espn['events']:
         if event['season']['year'] != int(season[:4]) + 1:
             raise ProviderContextUnavailable('Wrong event season')
@@ -54,6 +54,7 @@ def build_day_context(nba_games, espn, coverage, season, game_date):
         if len(sides) != 2 or key in by_matchup or event['id'] in event_ids:
             raise ProviderContextUnavailable('Ambiguous ESPN identity')
         by_matchup[key] = str(event['id'])
+        starts[key] = timestamp.isoformat()
         event_ids.add(event['id'])
     schedule, history, seen_ids = [], [], set()
     for prior in coverage['games']:
@@ -80,7 +81,7 @@ def build_day_context(nba_games, espn, coverage, season, game_date):
             raise ProviderContextUnavailable('Ambiguous NBA day identity')
         expected.add(key)
         seen_ids.add(canonical['gameId'])
-        mapped.append({**canonical, 'espnEventId': by_matchup[key]})
+        mapped.append({**canonical, 'espnEventId': by_matchup[key], 'scheduledAt': starts[key]})
         schedule.append({**canonical, 'seasonType': 'Regular Season'})
     if expected != set(by_matchup):
         raise ProviderContextUnavailable('NBA/ESPN daily game sets disagree')
@@ -147,4 +148,11 @@ def refresh_day_context(root, season=CURRENT_SEASON, game_date=None, nba_loader=
 def refresh_nightly_context(root):
     coverage = refresh_coverage(root)
     coverage['dayContext'] = refresh_day_context(root)
+    # Optional Live preparation must not suppress valid intelligence/coverage
+    # publication when an official roster endpoint is temporarily unavailable.
+    from prepare_daily_live import prepare_daily_live
+    try:
+        coverage['livePreparation'] = prepare_daily_live(root)
+    except Exception as error:
+        coverage['livePreparation'] = dict(status='unavailable',errorType=type(error).__name__)
     return coverage
