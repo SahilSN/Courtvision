@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 from pathlib import Path
 import unittest
@@ -9,6 +9,24 @@ from streamlit.testing.v1 import AppTest
 
 
 class InactiveBetaViewTest(unittest.TestCase):
+    def test_previous_day_unstarted_game_never_loads_model(self):
+        root=Path(__file__).resolve().parents[1]
+        day=json.loads((root/'results/live_context/2026-27_day_context_v1.json').read_text())
+        instant=(datetime.fromisoformat(day['gameDate'])+timedelta(days=1)).replace(
+            hour=1,tzinfo=ZoneInfo('America/New_York'))
+        game=day['games'][0]['gameId']
+        script=f"from live_beta_view import render_live_beta\nrender_live_beta({str(root)!r},[{game!r}])"
+        with patch('live_beta_view.datetime') as clock, \
+             patch('live_beta_view.scoreboard_event',return_value={'competitions':[{'status':{'type':{'state':'pre'}}}]}), \
+             patch('live_beta_view.cpu_artifacts') as model:
+            clock.now.return_value=instant
+            app=AppTest.from_string(script,default_timeout=60).run()
+            self.assertFalse(app.exception)
+            self.assertFalse(app.dataframe)
+            self.assertNotIn('Scheduled', ' '.join(x.value for x in app.info))
+            self.assertIn('Waiting for a coherent feed', ' '.join(x.value for x in app.caption))
+            model.assert_not_called()
+
     def test_fragment_gate_blocks_requests_and_model(self):
         root=Path(__file__).resolve().parents[1]
         day=json.loads((root/'results/live_context/2026-27_day_context_v1.json').read_text())

@@ -3,9 +3,9 @@
 from datetime import datetime, timezone
 import json
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from season_config import CURRENT_SEASON
+from live_game_date import eligible_game_date
 
 MAX_LIVE_GAMES = 4
 
@@ -24,7 +24,7 @@ def allowed_games(path, environ, now=None):
                 or config['season']!=CURRENT_SEASON or config['seasonType']!='Regular Season'
                 or issued.tzinfo is None or expires.tzinfo is None or not issued<=now<expires
                 or not 0<(expires-issued).total_seconds()<=86400
-                or config['gameDate']!=now.astimezone(ZoneInfo('America/New_York')).date().isoformat()
+                or not eligible_game_date(config['gameDate'], now)
                 or not isinstance(games,list) or not 1<=len(games)<=MAX_LIVE_GAMES
                 or any(not isinstance(g,str) or len(g)!=10 or not g.isdigit() or not g.startswith('002'+CURRENT_SEASON[2:4]) for g in games)
                 or len(set(games))!=len(games)):

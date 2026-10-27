@@ -15,9 +15,37 @@ from offline_live_sample import sample_inputs
 
 
 class DeploymentReadinessTest(unittest.TestCase):
+    def test_real_overnight_check_uses_schedule_date_without_replay_override(self):
+        instant = datetime.fromisoformat('2026-10-27T00:15:00-04:00')
+        _, bundle = sample_inputs()
+        game = dict(bundle['games'][0], gameId='0022600127', gameDate='2026-10-26')
+        bundle.update(season='2026-27', gameDate='2026-10-26', games=[game])
+        timeline = pd.DataFrame([dict(elapsedGameTime=2400, actionNumber=400, scoreHome=90, scoreAway=100)])
+        result = SimpleNamespace(snapshot=SimpleNamespace(timeline=timeline, is_stale=False), predictions=timeline)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)/'day.json'; path.write_text(json.dumps(bundle))
+            fetcher = Mock(return_value=({}, {}))
+            with patch('check_live_deployment.datetime') as clock, \
+                 patch('check_live_deployment.read_day_context'), \
+                 patch('check_live_deployment.current_event', return_value={
+                     'competitions':[{'status':{'type':{'state':'in'}}}]}), \
+                 patch('check_live_deployment.analyze_live_snapshot', return_value=result) as analyze:
+                clock.now.return_value = instant
+                report = check([game['gameId']], path, fetcher=fetcher, sleeper=Mock(),
+                               artifacts_loader=Mock(), runtime_check=lambda root:True)
+                self.assertEqual(report['gameDate'], '2026-10-26')
+                self.assertTrue(all('dates=20261026' in call.args[0] for call in fetcher.call_args_list))
+                self.assertIsNone(analyze.call_args.kwargs['as_of_date'])
+                fetcher.reset_mock()
+                clock.now.return_value = instant.replace(hour=6)
+                with self.assertRaises(ValueError):
+                    check([game['gameId']], path, fetcher=fetcher, artifacts_loader=Mock())
+                fetcher.assert_not_called()
+
     def test_operator_measurement_never_injects_controlled_fixtures(self):
-        day = datetime.now(ZoneInfo('America/New_York')).date().isoformat()
+        day = json.loads((Path(__file__).resolve().parents[1]/'results/live_context/2026-27_day_context_v1.json').read_text())['gameDate']
         with patch('check_live_deployment.check', return_value={'status':'not_ready'}) as checked, \
+             patch('check_live_deployment.eligible_game_date', return_value=True), \
              patch('live_release_recovery.verify_recovery') as controlled:
             report = probe_progress(day, 'community-cloud', ['0022600127'])
         controlled.assert_not_called()

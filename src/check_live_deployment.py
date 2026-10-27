@@ -18,6 +18,7 @@ from live_snapshot_cache import LiveSnapshotCache
 from offline_live_sample import load_cpu_artifacts
 from probe_live_access import BASE, fetch_json
 from season_config import CURRENT_SEASON
+from live_game_date import eligible_game_date, overnight_game
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -56,12 +57,14 @@ def check(game_ids, context_path, *, interval=16, fetcher=fetch_json,
                    or not g.startswith('002' + CURRENT_SEASON[2:4]) for g in game_ids)
             or not 16 <= interval <= 30 or type(rounds_count) is not int or rounds_count not in (2, 3)):
         raise ValueError('Choose 1–4 unique current-season IDs, 2–3 rounds and a 16–30 second interval')
-    today = today or datetime.now(ZoneInfo('America/New_York')).date().isoformat()
     bundle = json.loads(Path(context_path).read_text())
-    if (bundle['gameDate'] != today or bundle.get('season') != CURRENT_SEASON
+    now = datetime.now(ZoneInfo('America/New_York'))
+    if ((bundle['gameDate'] != today if today is not None else
+         not eligible_game_date(bundle['gameDate'], now)) or bundle.get('season') != CURRENT_SEASON
             or bundle.get('seasonType') != 'Regular Season'):
         raise ValueError('Current-day context required')
     games = []
+    game_day = bundle['gameDate']
     # Verify the complete selection before any network/model work.
     for game_id in game_ids:
         game, = [g for g in bundle['games'] if g['gameId'] == game_id]
@@ -78,7 +81,7 @@ def check(game_ids, context_path, *, interval=16, fetcher=fetch_json,
         if index:
             sleeper(interval)
         try:
-            board, _ = fetcher(BASE + 'scoreboard?dates=' + today.replace('-', ''))
+            board, _ = fetcher(BASE + 'scoreboard?dates=' + game_day.replace('-', ''))
         except Exception as error:
             rounds.append([dict(gameId=g['gameId'], status='failed',
                                 errorType=type(error).__name__) for g in games])
@@ -92,6 +95,8 @@ def check(game_ids, context_path, *, interval=16, fetcher=fetch_json,
                 event = current_event(game, game['espnEventId'], fetcher=lambda url: (board, {}))
                 state = event['competitions'][0]['status']['type']['state']
                 if state == 'pre':
+                    if today is None and overnight_game(game_day, now):
+                        raise ValueError('Previous-day game has not started')
                     return dict(gameId=game['gameId'], status='pregame', attempts=0)
                 def loader():
                     nonlocal attempts, loaded_pair
@@ -117,7 +122,7 @@ def check(game_ids, context_path, *, interval=16, fetcher=fetch_json,
 
         with ThreadPoolExecutor(max_workers=len(games)) as pool:
             rounds.append(list(pool.map(observe, games)))
-    return dict(checkedAt=datetime.now(timezone.utc).isoformat(), gameDate=today,
+    return dict(checkedAt=datetime.now(timezone.utc).isoformat(), gameDate=game_day,
                 environment='local', **summarize(rounds, game_ids))
 
 
@@ -135,9 +140,12 @@ def main():
 
 def probe_progress(day, environment, game_ids):
     """Once-only owner diagnostic; current day only, no browser activation."""
-    if day != datetime.now(ZoneInfo('America/New_York')).date().isoformat():
+    if not eligible_game_date(day):
         return dict(status='wrong_day', canEnableLive=False)
-    report = check(game_ids, ROOT/'results/live_context'/f'{CURRENT_SEASON}_day_context_v1.json',
+    context = ROOT/'results/live_context'/f'{CURRENT_SEASON}_day_context_v1.json'
+    if json.loads(context.read_text()).get('gameDate') != day:
+        return dict(status='wrong_day', canEnableLive=False)
+    report = check(game_ids, context,
                    interval=30, rounds_count=3)
     # Never feed archived/controlled fixtures through the process-shared live
     # telemetry: that could falsely close a real mismatch episode. Controlled

@@ -19,6 +19,7 @@ from offline_live_sample import load_cpu_artifacts
 from season_config import CURRENT_SEASON
 from live_diagnostics import diagnostics
 from live_rollout import MAX_LIVE_GAMES
+from live_game_date import eligible_game_date, overnight_game
 
 
 @st.cache_resource
@@ -40,14 +41,14 @@ def render_live_beta(root,allowed_games,rollout_guard=None):
     st.title('Game Center · Live check')
     st.caption('Private beta · up to four reviewed games · frozen V7 · refreshes paused unless enabled below')
     root=Path(root)
-    today=datetime.now(ZoneInfo('America/New_York')).date().isoformat()
+    now=datetime.now(ZoneInfo('America/New_York'))
     path=root/'results/live_context'/f'{CURRENT_SEASON}_day_context_v1.json'
     render=runpy.run_path(str(root/'src/live_preview_view.py'))['render_live_analysis']
     if not allowed_games or len(allowed_games)>MAX_LIVE_GAMES or len(set(allowed_games))!=len(allowed_games):
         render(None);return
     try:
         day=json.loads(path.read_text())
-        if day['gameDate']!=today:
+        if not eligible_game_date(day['gameDate'], now):
             raise ValueError('Wrong day')
         games={g['gameId']:g for g in day['games'] if g['gameId'] in allowed_games}
         if not games:
@@ -74,6 +75,8 @@ def render_live_beta(root,allowed_games,rollout_guard=None):
             mapped=read_day_context(path,canonical)  # Gate before all HTTP/model work.
             event=scoreboard_event(canonical,mapped['espnEventId'])
             if event['competitions'][0]['status']['type']['state']=='pre':
+                if overnight_game(canonical['gameDate'], datetime.now(ZoneInfo('America/New_York'))):
+                    raise ValueError('Previous-day game has not started')
                 diagnostics.record(selected,'scheduled',time.perf_counter()-started)
                 st.info('Scheduled · this game has not started. No in-game estimate is shown.')
                 st.caption('Verified pregame regular-season records are ready; check back after tip-off.')

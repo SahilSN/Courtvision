@@ -16,6 +16,32 @@ from live_snapshot_cache import LiveSnapshotCache
 
 
 class AnalysisJoinTest(unittest.TestCase):
+    def test_overnight_original_context_and_cutoff(self):
+        from datetime import datetime
+        with patch('cloud_live_analysis.datetime') as clock:
+            clock.now.return_value = datetime.fromisoformat('2025-10-22T00:15:00-04:00')
+            result = analyze_live_snapshot(self.cache, self.feed['canonical'], self.path,
+                                           self.loader, self.artifacts)
+            self.assertTrue(len(result.predictions))
+            self.assertEqual(self.day['completeThrough'], '2025-10-20')
+            clock.now.return_value = datetime.fromisoformat('2025-10-22T06:00:00-04:00')
+            self.loader.reset_mock()
+            with self.assertRaises(ProviderContextUnavailable):
+                analyze_live_snapshot(self.cache, self.feed['canonical'], self.path,
+                                      self.loader, self.artifacts)
+            self.loader.assert_not_called()
+
+    def test_overnight_unstarted_game_is_rejected(self):
+        from datetime import datetime
+        feed = deepcopy(self.feed)
+        feed['event']['competitions'][0]['status']['type']['state'] = 'pre'
+        self.loader.return_value = feed
+        with patch('cloud_live_analysis.datetime') as clock:
+            clock.now.return_value = datetime.fromisoformat('2025-10-22T00:15:00-04:00')
+            with self.assertRaises(RuntimeError):
+                analyze_live_snapshot(self.cache, self.feed['canonical'], self.path,
+                                      self.loader, self.artifacts)
+
     def test_release_interruption_retains_expires_and_recovers_without_data_changes(self):
         from live_release_recovery import verify_recovery
         report = verify_recovery(self.feed['canonical'], self.path, self.feed, self.artifacts)
