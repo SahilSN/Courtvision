@@ -1,6 +1,7 @@
 """Bounded operator-only current-feed diagnostic; no activation or raw logs."""
 from datetime import datetime
 import json
+import runpy
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -55,6 +56,7 @@ def probe_current(day, environment):
                                             'Play timeline is not reconciled to the header score':'score_header_lag',
                                             'ESPN box score unavailable or unreconciled':'box_unreconciled'}.get(str(error),'other_validation')))
         return dict(status='current_checked',environment=environment,games=reports,
+                    runtimeReady=runpy.run_path(str(root/'src/live_runtime_gate.py'))['runtime_ready'](root),
                     currentIdentityCode=any(row[2]=='Christian Anderson' for row in REVIEWED),
                     currentMinutesCode='minutesAvailable' in _normalize_box.__code__.co_consts)
     except Exception as error:

@@ -3,7 +3,7 @@ from pathlib import Path
 import unittest
 import runpy
 import streamlit as st
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 from streamlit.testing.v1 import AppTest
 
@@ -13,10 +13,12 @@ class CloudEntrypointTest(unittest.TestCase):
         entrypoint=Path(__file__).resolve().parents[1]/'cloud/app.py'
         real_run=runpy.run_path
         calls=[]
+        healthy=Mock(return_value=True)
         def fake_view(root,games,rollout_guard=None):
             self.assertIsNotNone(rollout_guard)
             calls.append(tuple(games));st.info('TEST LIVE ROUTE')
         def dispatch(path,*args,**kwargs):
+            if Path(path).name=='live_runtime_gate.py':return {'runtime_ready':healthy}
             if Path(path).name=='live_beta_view.py': return {'render_live_beta':fake_view}
             return real_run(path,*args,**kwargs)
         with patch.dict(os.environ,{'COURTVISION_CLOUD_READY':'1','COURTVISION_DISABLE_OPERATOR_PROBES':'1',
@@ -31,6 +33,12 @@ class CloudEntrypointTest(unittest.TestCase):
             app.sidebar.radio(key='cloud_workspace').set_value('Live Beta').run()
             self.assertFalse(app.exception)
             self.assertEqual(calls,[('0022600125',)])
+            healthy.return_value=False
+            app.run()
+            self.assertFalse(app.exception)
+            self.assertEqual(app.session_state['cloud_workspace'],'Season Intelligence')
+            self.assertEqual(len(calls),1)
+            healthy.return_value=True
             gate.return_value=()
             app.run()
             self.assertFalse(app.exception)

@@ -44,6 +44,11 @@ if os.environ.get('COURTVISION_ENABLE_LIVE_BETA')=='1' and os.environ.get('COURT
         importlib.invalidate_caches()
         from live_rollout import allowed_games
         games=allowed_games(root/'cloud/live_rollout.json',os.environ)
+        if games:
+            runtime_gate=runpy.run_path(str(root/'src/live_runtime_gate.py'))['runtime_ready']
+            if not runtime_gate(root):
+                print('COURTVISION_LIVE_RUNTIME blocked stale_or_unavailable_validators',flush=True)
+                games=()
     except Exception as error:
         # Optional rollout policy must not break the default dashboard during a hot deployment.
         print('COURTVISION_LIVE_POLICY unavailable '+type(error).__name__,flush=True)
@@ -53,7 +58,8 @@ if games:
         st.set_page_config(page_title='Courtvision · Live beta',page_icon='🏀',layout='wide')
         try:
             view=runpy.run_path(str(root/'src/live_beta_view.py'))
-            view['render_live_beta'](root,games,rollout_guard=lambda:allowed_games(root/'cloud/live_rollout.json',os.environ))
+            view['render_live_beta'](root,games,rollout_guard=lambda:
+                allowed_games(root/'cloud/live_rollout.json',os.environ) if runtime_gate(root) else ())
         except Exception as error:
             print('COURTVISION_LIVE_VIEW unavailable '+type(error).__name__,flush=True)
             st.warning('Live is temporarily unavailable. Return to Season Intelligence in the sidebar.')
