@@ -66,15 +66,25 @@ class DeploymentReadinessTest(unittest.TestCase):
             path = Path(directory)/'day.json'; path.write_text(json.dumps(bundle))
             for stale in (False, True):
                 fetcher, sleeper = Mock(return_value=({}, {})), Mock()
+                pairs = {}
+                accepted = iter([result(10), result(11, stale)])
+                feeds = [{'marker': 'first'}, {'marker': 'second'}]
+                def analyze(*args, **kwargs):
+                    args[3]()
+                    return next(accepted)
                 with patch('check_live_deployment.read_day_context'), \
                      patch('check_live_deployment.current_event', return_value={
                          'competitions':[{'status':{'type':{'state':'in'}}}]}), \
-                     patch('check_live_deployment.analyze_live_snapshot',
-                           side_effect=[result(10), result(11, stale)]):
+                     patch('check_live_deployment.summary_pair', side_effect=feeds), \
+                     patch('check_live_deployment.analyze_live_snapshot', side_effect=analyze):
                     report = check([game['gameId']], path, today=bundle['gameDate'],
                         fetcher=fetcher, sleeper=sleeper, artifacts_loader=Mock(),
-                        runtime_check=lambda root:True)
+                        runtime_check=lambda root:True, verified_pairs=pairs)
                 self.assertEqual(report['status'], 'not_ready' if stale else 'current_feed_passed')
                 self.assertFalse(report['canEnableLive'])
                 self.assertEqual(fetcher.call_count, 2)
                 sleeper.assert_called_once_with(16)
+                self.assertEqual(pairs[game['gameId']]['marker'], 'first' if stale else 'second')
+                pairs[game['gameId']]['marker'] = 'changed'
+                self.assertEqual(feeds[0]['marker'], 'first')
+                self.assertEqual(feeds[1]['marker'], 'second')

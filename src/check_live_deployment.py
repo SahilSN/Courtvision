@@ -47,7 +47,7 @@ def summarize(rounds, game_ids):
 
 def check(game_ids, context_path, *, interval=16, fetcher=fetch_json,
           sleeper=time.sleep, artifacts_loader=load_cpu_artifacts, today=None,
-          runtime_check=None):
+          runtime_check=None, verified_pairs=None):
     if (not isinstance(game_ids, (list, tuple)) or not 1 <= len(game_ids) <= MAX_LIVE_GAMES
             or len(set(game_ids)) != len(game_ids)
             or any(not isinstance(g, str) or len(g) != 10 or not g.isdigit()
@@ -85,17 +85,24 @@ def check(game_ids, context_path, *, interval=16, fetcher=fetch_json,
         def observe(game):
             started = time.monotonic()
             attempts = 0
+            loaded_pair = None
             try:
                 event = current_event(game, game['espnEventId'], fetcher=lambda url: (board, {}))
                 state = event['competitions'][0]['status']['type']['state']
                 if state == 'pre':
                     return dict(gameId=game['gameId'], status='pregame', attempts=0)
                 def loader():
-                    nonlocal attempts
+                    nonlocal attempts, loaded_pair
                     attempts += 1
-                    return summary_pair(event, game['espnEventId'], fetcher=fetcher)
+                    loaded_pair = summary_pair(event, game['espnEventId'], fetcher=fetcher)
+                    return loaded_pair
                 result = analyze_live_snapshot(cache, game, context_path, loader, artifacts,
                                                tracker, as_of_date=today)
+                if verified_pairs is not None and not result.snapshot.is_stale and loaded_pair is not None:
+                    # Retain only the pair actually accepted by the full join,
+                    # never a failed refresh or a separate asynchronous fetch.
+                    from copy import deepcopy
+                    verified_pairs[game['gameId']] = deepcopy(loaded_pair)
                 last = result.snapshot.timeline.iloc[-1]
                 return dict(gameId=game['gameId'], status='stale' if result.snapshot.is_stale else 'validated',
                             sourceState=state, attempts=attempts, states=len(result.predictions),
@@ -127,18 +134,24 @@ def probe_progress(day, environment, game_ids):
     """Once-only owner diagnostic; current day only, no browser activation."""
     if day != datetime.now(ZoneInfo('America/New_York')).date().isoformat():
         return dict(status='wrong_day', canEnableLive=False)
-    report = check(game_ids, ROOT/'results/live_context'/f'{CURRENT_SEASON}_day_context_v1.json', interval=30)
+    pairs, artifacts = {}, []
+    def load_artifacts():
+        value = load_cpu_artifacts()
+        artifacts.append(value)
+        return value
+    report = check(game_ids, ROOT/'results/live_context'/f'{CURRENT_SEASON}_day_context_v1.json',
+                   interval=30, artifacts_loader=load_artifacts, verified_pairs=pairs)
     # Separate controlled failure evidence from real progression observations.
-    # One bounded extra acquisition, no activation, and no viewer fault injection.
+    # Reuse the exact accepted pair: a new HTTP fetch is not the test fixture.
+    # No additional HTTP, activation, or viewer fault injection.
     try:
         from live_release_recovery import verify_recovery
-        from live_refresh import fetch_pair
         path = ROOT/'results/live_context'/f'{CURRENT_SEASON}_day_context_v1.json'
         bundle = json.loads(path.read_text())
         selected = next(g for g in report.get('games', []) if g['advanced'])
         game, = [g for g in bundle['games'] if g['gameId'] == selected['gameId']]
         report['controlledRecovery'] = verify_recovery(game, path,
-            fetch_pair(game, game['espnEventId']), load_cpu_artifacts())
+            pairs[selected['gameId']], artifacts[0])
     except StopIteration:
         report['controlledRecovery'] = dict(status='not_run_no_progressing_game')
     except Exception as error:
