@@ -35,3 +35,16 @@ or automatically create new scheduled monitoring jobs.
 Passing an archived CPU workload is not proof of actual current-feed correctness;
 passing several current snapshots is not a production-load certificate. Record
 which evidence passed and which checks remain before increasing the limit.
+
+## Verification on October26
+
+180 tests passed on Python3.10 and3.12; deployment smoke and syntax/diff checks
+passed. Owner-only Community Cloud request runtime-gate-settled-20261027 reported
+runtimeReady=true, currentIdentityCode=true, currentMinutesCode=true and a passing
+489-state current-game pipeline. An earlier report omitted runtimeReady during
+source deployment and was not accepted as evidence. Temporary requests removed.
+
+Read-only four-game assessment: MIN@CLE passed; CHI@BOS, DAL@MIA and IND@MIL each
+failed involved-player identity validation. These games are not yet approved for
+expanded coverage. Verify exact official player identities before retrying; do
+not interpret unavailable games as a completed four-game rollout.
