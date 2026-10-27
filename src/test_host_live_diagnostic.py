@@ -32,6 +32,12 @@ class HostDiagnosticTest(unittest.TestCase):
                 result=run_requested_probe(path,root/'runtime',now)
             self.assertEqual(result['status'],'current_checked')
             current.assert_called_once()
+            request['kind']='pipeline4';request['requestId']='test-four';path.write_text(json.dumps(request))
+            four=Mock(return_value={'status':'pipeline_baseline_passed','concurrentViewers':4})
+            with patch('host_live_diagnostic.runpy.run_path',return_value={'probe_four':four}):
+                result=run_requested_probe(path,root/'runtime',now)
+            self.assertEqual(result['concurrentViewers'],4)
+            four.assert_called_once()
 
     def request(self, root, now):
         path = root / "request.json"

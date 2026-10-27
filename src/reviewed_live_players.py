@@ -13,6 +13,14 @@ REVIEWED = (
     ('2026-27',1610612751,'Joshua Jefferson',1643538,'0022600113'),
     ('2026-27',1610612766,'Christian Anderson',1643515,'https://www.nba.com/player/1643515/christian-anderson'),
     ('2026-27',1610612739,'Meleek Thomas',1643509,'https://www.nba.com/player/1643509/meleek-thomas/profile'),
+    ('2026-27',1610612741,'Caleb Wilson',1643410,'https://www.nba.com/player/1643410/caleb-wilson'),
+    ('2026-27',1610612741,'Tobe Awaka',1643591,'https://www.nba.com/player/1643591/tobe-awaka'),
+    ('2026-27',1610612741,'Dailyn Swain',1643517,'https://www.nba.com/player/1643517/dailyn-swain/profile'),
+    ('2026-27',1610612741,'Jaylin Sellers',1643637,'https://stats.nba.com/stats/commonteamroster?TeamID=1610612741&Season=2026-27'),
+    ('2026-27',1610612742,'Morez Johnson Jr.',1643516,'https://www.nba.com/player/1643516/morez-johnson'),
+    ('2026-27',1610612742,'Sergio de Larrea',1643547,'https://www.nba.com/player/1643547'),
+    ('2026-27',1610612749,'Nate Ament',1643417,'https://www.nba.com/player/1643417/nate-ament'),
+    ('2026-27',1610612749,'Brayden Burries',1643415,'https://www.nba.com/player/1643415'),
 )
 
 
