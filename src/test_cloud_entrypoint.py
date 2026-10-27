@@ -10,6 +10,9 @@ from streamlit.testing.v1 import AppTest
 
 class CloudEntrypointTest(unittest.TestCase):
     def test_prepared_route_defaults_to_intelligence_and_kill_recovers_session(self):
+        # Load the health consumer before mocking its provider, so it cannot
+        # retain a temporary mock in its module namespace after this test.
+        import live_operations  # noqa: F401
         entrypoint=Path(__file__).resolve().parents[1]/'cloud/app.py'
         real_run=runpy.run_path
         calls=[]
