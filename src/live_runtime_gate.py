@@ -11,6 +11,7 @@ MODULES = ('season_config','live_rollout','reviewed_live_players','cloud_espn_ad
            'cloud_live_analysis','live_refresh','live_analysis','feature_engineering')
 LITERALS = {'season_config':('CURRENT_SEASON','CURRENT_SEASON_TYPE'),
             'live_rollout':('MAX_LIVE_GAMES',),
+            'cloud_live_bundle':('SCORE_RETRY_ATTEMPTS','SCORE_RETRY_DELAY','SCORE_RETRY_BUDGET'),
             'reviewed_live_players':('REVIEWED',),'cloud_espn_box':('COUNTS','SHOTS')}
 
 

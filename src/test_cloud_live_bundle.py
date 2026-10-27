@@ -12,6 +12,56 @@ from cloud_espn_adapter import normalize_snapshot
 
 
 class BundleTest(unittest.TestCase):
+    def test_concurrent_score_retries_share_one_acquisition(self):
+        loader=Mock(side_effect=[self.lagging(),self.feed])
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            results=list(pool.map(lambda _:self.get(loader),range(4)))
+        self.assertEqual(loader.call_count,2)
+        self.assertTrue(all(not r.is_stale for r in results))
+        self.assertTrue(all(r.timeline.equals(results[0].timeline) for r in results))
+
+    def lagging(self):
+        broken=deepcopy(self.feed)
+        broken['summary']['header']['competitions'][0]['competitors'][0]['score']=str(
+            int(broken['summary']['header']['competitions'][0]['competitors'][0]['score'])+2)
+        return broken
+
+    def test_score_retry_recovers_whole_pair_without_mutating_previous(self):
+        first=self.get(lambda:self.feed)
+        self.clock.return_value=5
+        loader=Mock(side_effect=[self.lagging(),self.feed])
+        with patch('cloud_live_bundle.time.sleep') as pause:
+            result=self.get(loader)
+        self.assertEqual(loader.call_count,2);pause.assert_called_once_with(.5)
+        self.assertFalse(result.is_stale)
+        self.assertTrue(first.timeline.equals(result.timeline))
+        self.assertTrue(first.box['players'].equals(result.box['players']))
+
+    def test_exhausted_score_retry_keeps_pair_and_expiry_still_blocks(self):
+        self.get(lambda:self.feed);self.clock.return_value=5
+        loader=Mock(return_value=self.lagging())
+        with patch('cloud_live_bundle.time.sleep'):
+            result=self.get(loader)
+        self.assertTrue(result.is_stale);self.assertEqual(loader.call_count,2)
+        self.assertEqual(result.refresh_error_type,'ScoreSectionsUnreconciled')
+        self.clock.return_value=21
+        with patch('cloud_live_bundle.time.sleep'),self.assertRaises(SnapshotUnavailable):self.get(loader)
+        self.assertEqual(loader.call_count,4)
+
+    def test_identity_and_transport_failure_never_retried(self):
+        broken=deepcopy(self.feed)
+        broken['summary']['boxscore']['players'][0]['statistics'][0]['athletes'][0]['athlete']['displayName']='Unresolved Player'
+        for loader in (Mock(return_value=broken),Mock(side_effect=TimeoutError('private'))):
+            self.cache=LiveSnapshotCache(ttl=5,max_age=20,retry_delay=5,clock=self.clock)
+            with patch('cloud_live_bundle.time.sleep') as pause,self.assertRaises(SnapshotUnavailable):self.get(loader)
+            self.assertEqual(loader.call_count,1);pause.assert_not_called()
+
+    def test_retry_budget_stops_before_second_request(self):
+        loader=Mock(return_value=self.lagging())
+        with patch('cloud_live_bundle.time.monotonic',side_effect=[0,8]),patch('cloud_live_bundle.time.sleep') as pause:
+            with self.assertRaises(SnapshotUnavailable):self.get(loader)
+        self.assertEqual(loader.call_count,1);pause.assert_not_called()
+
     def test_coherent_stat_correction_replaces_pair_without_mutating_previous_result(self):
         first=self.get(lambda:self.feed)
         corrected=deepcopy(self.feed)
@@ -58,7 +108,7 @@ class BundleTest(unittest.TestCase):
         self.clock.return_value=5
         stale=self.get(lambda:broken)
         self.assertTrue(stale.is_stale)
-        self.assertEqual(stale.refresh_error_type,'ProviderContextUnavailable')
+        self.assertEqual(stale.refresh_error_type,'ScoreSectionsUnreconciled')
         self.assertEqual(sorted(stale.box['teams'].points),[124,125])
         self.clock.return_value=10
         fresh=self.get(lambda:self.feed)

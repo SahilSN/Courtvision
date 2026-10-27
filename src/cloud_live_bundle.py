@@ -2,10 +2,15 @@
 
 from dataclasses import dataclass
 from copy import deepcopy
+import time
 
-from cloud_espn_adapter import normalize_snapshot, validate_canonical
+from cloud_espn_adapter import normalize_snapshot, validate_canonical, ScoreSectionsUnreconciled
 from cloud_espn_box import _normalize_box
 from live_snapshot_cache import SnapshotKey
+
+SCORE_RETRY_ATTEMPTS = 2
+SCORE_RETRY_DELAY = 0.5
+SCORE_RETRY_BUDGET = 8.0
 
 
 @dataclass
@@ -39,9 +44,20 @@ def get_live_bundle(cache, canonical, loader, progress=None):
         return timeline, box
 
     def validated_loader():
-        data = deepcopy(loader())
-        validate_pair(data)
-        return data
+        started=time.monotonic()
+        for attempt in range(SCORE_RETRY_ATTEMPTS):
+            data = deepcopy(loader())
+            try:
+                validate_pair(data)
+                return data
+            except ScoreSectionsUnreconciled:
+                # Only the single-flight cache owner retries. Identity, malformed
+                # data and transport failures never create a retry loop. The
+                # budget is checked between bounded calls, not hard cancellation.
+                if attempt+1>=SCORE_RETRY_ATTEMPTS or time.monotonic()-started+SCORE_RETRY_DELAY>=SCORE_RETRY_BUDGET:
+                    raise
+                time.sleep(SCORE_RETRY_DELAY)
+                if time.monotonic()-started>=SCORE_RETRY_BUDGET:raise
 
     snapshot = cache.get(key, validated_loader)
     # Defensive reconstruction per caller; raw cache never holds DataFrames.

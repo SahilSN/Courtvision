@@ -16,6 +16,10 @@ class ProviderContextUnavailable(ValueError):
     pass
 
 
+class ScoreSectionsUnreconciled(ProviderContextUnavailable):
+    """Well-identified score sections disagree; acquisition may retry, not guess."""
+
+
 def validate_canonical(game):
     season = game["season"]
     year = int(season[:4])
@@ -121,7 +125,7 @@ def _normalize_snapshot(event, summary, canonical):
     for competitor in header["competitions"][0]["competitors"]:
         column = "scoreHome" if competitor["homeAway"] == "home" else "scoreAway"
         if int(timeline[column].iloc[-1]) != int(competitor["score"]):
-            raise ProviderContextUnavailable("Play timeline is not reconciled to the header score")
+            raise ScoreSectionsUnreconciled("Play timeline is not reconciled to the header score")
     return timeline
 
 

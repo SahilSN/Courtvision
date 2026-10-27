@@ -3,7 +3,7 @@
 import re
 import pandas as pd
 
-from cloud_espn_adapter import normalize_snapshot, ProviderContextUnavailable
+from cloud_espn_adapter import normalize_snapshot, ProviderContextUnavailable, ScoreSectionsUnreconciled
 from reviewed_live_players import candidates
 
 
@@ -94,12 +94,16 @@ def _normalize_box(event, summary, canonical, timeline=None):
             if len(stats['totals']) != len(labels):
                 raise ValueError('Missing team totals')
             reported = dict(zip(labels, stats['totals']))['PTS']
-            if not re.fullmatch(r'\d+', reported) or int(reported) != team_points or team_points != int(timeline['scoreHome' if side == 'home' else 'scoreAway'].iloc[-1]):
-                raise ValueError('Player/team/header points disagree')
+            if not re.fullmatch(r'\d+', reported):
+                raise ValueError('Invalid team points')
+            if int(reported) != team_points or team_points != int(timeline['scoreHome' if side == 'home' else 'scoreAway'].iloc[-1]):
+                raise ScoreSectionsUnreconciled('Player/team/header points disagree')
             totals.append(dict(teamId=team_id, points=team_points))
         if seen_teams != set(sides):
             raise ValueError('Missing box-score team')
         return {'players': pd.DataFrame(rows), 'teams': pd.DataFrame(totals),
                 'source': 'ESPN', 'advancedStatsAvailable': False}
+    except ScoreSectionsUnreconciled:
+        raise
     except (KeyError, ValueError, TypeError, IndexError) as error:
         raise ProviderContextUnavailable('ESPN box score unavailable or unreconciled') from error
