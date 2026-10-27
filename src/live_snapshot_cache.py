@@ -8,7 +8,7 @@ from collections import OrderedDict
 from concurrent.futures import Future, TimeoutError
 from copy import deepcopy
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timezone
 import json
 from threading import RLock
 import time
@@ -41,6 +41,7 @@ class Snapshot:
     age_seconds: float
     is_stale: bool
     refresh_error_type: str = None
+    verified_at: str = None
 
 
 @dataclass
@@ -50,6 +51,7 @@ class _Slot:
     retry_at: float = 0
     error: str = None
     flight: Future = None
+    verified_at: str = None
 
 
 class LiveSnapshotCache:
@@ -66,7 +68,7 @@ class LiveSnapshotCache:
         age = max(0, self.clock() - slot.fetched)
         if slot.data is None or age > self.max_age:
             raise SnapshotUnavailable("No sufficiently recent feed snapshot")
-        return Snapshot(deepcopy(slot.data), age, age >= self.ttl, slot.error)
+        return Snapshot(deepcopy(slot.data), age, age >= self.ttl, slot.error, slot.verified_at)
 
     def get(self, key, loader):
         if not isinstance(key, SnapshotKey):
@@ -95,7 +97,7 @@ class LiveSnapshotCache:
             except TimeoutError:
                 with self._lock:
                     stale = self._snapshot(slot)
-                    return Snapshot(stale.data, stale.age_seconds, True, "RefreshInProgress")
+                    return Snapshot(stale.data, stale.age_seconds, True, "RefreshInProgress", stale.verified_at)
             with self._lock:
                 return self._snapshot(slot)
         try:
@@ -120,6 +122,7 @@ class LiveSnapshotCache:
             raise
         with self._lock:
             slot.data, slot.fetched, slot.error, slot.retry_at = data, self.clock(), None, 0
+            slot.verified_at = datetime.now(timezone.utc).isoformat()
             slot.flight = None
             flight.set_result(None)
             return self._snapshot(slot)

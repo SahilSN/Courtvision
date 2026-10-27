@@ -2,11 +2,23 @@ import os
 from pathlib import Path
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
+from live_preview_view import verification_label
 
 from streamlit.testing.v1 import AppTest
 
 
 class PreviewTest(unittest.TestCase):
+    def test_verified_time_is_explicit_utc_and_never_invented(self):
+        text = verification_label(SimpleNamespace(age_seconds=17, verified_at='2026-10-26T15:30:00+02:00'))
+        self.assertIn('13:30:00 UTC', text)
+        self.assertIn('17s old at the last refresh', text)
+        self.assertIn('Not the age of the last play', text)
+        for value in (None, 'invalid', '2026-10-26T12:00:00'):
+            text = verification_label(SimpleNamespace(age_seconds=17, verified_at=value))
+            self.assertNotIn('Last verified at', text)
+            self.assertIn('acquired 17s', text)
+
     def test_gate_and_all_states_offline(self):
         path=Path(__file__).resolve().parents[1]/'cloud/live_preview.py'
         with patch.dict(os.environ,{'COURTVISION_LOCAL_LIVE_PREVIEW':'0'}):

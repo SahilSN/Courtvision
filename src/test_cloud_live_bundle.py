@@ -12,6 +12,21 @@ from cloud_espn_adapter import normalize_snapshot
 
 
 class BundleTest(unittest.TestCase):
+    def test_only_real_acquisitions_report_score_episode_and_recovery(self):
+        loader = Mock(side_effect=[self.lagging(), self.feed])
+        with patch('cloud_live_bundle.coherence_diagnostics') as log, patch('cloud_live_bundle.time.sleep'):
+            first = self.get(loader)
+            self.assertEqual(log.observe.call_args_list[0].args[1], 'timeline_header')
+            self.assertIsNone(log.observe.call_args_list[1].args[1])
+            self.assertEqual(log.observe.call_count, 2)
+            self.get(loader)
+            self.assertEqual(log.observe.call_count, 2)  # Cache hits aren't acquisitions.
+        self.assertIsNotNone(first.verified_at)
+        self.clock.return_value = 5
+        stale = self.get(Mock(side_effect=TimeoutError('source')))
+        self.assertEqual(stale.verified_at, first.verified_at)
+        self.assertEqual(stale.max_age_seconds, 20)
+
     def test_concurrent_score_retries_share_one_acquisition(self):
         loader=Mock(side_effect=[self.lagging(),self.feed])
         with ThreadPoolExecutor(max_workers=4) as pool:

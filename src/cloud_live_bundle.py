@@ -7,6 +7,7 @@ import time
 from cloud_espn_adapter import normalize_snapshot, validate_canonical, ScoreSectionsUnreconciled
 from cloud_espn_box import _normalize_box
 from live_snapshot_cache import SnapshotKey
+from live_diagnostics import coherence_diagnostics
 
 SCORE_RETRY_ATTEMPTS = 2
 SCORE_RETRY_DELAY = 0.5
@@ -22,6 +23,8 @@ class LiveBundle:
     refresh_error_type: str = None
     progress_state: str = 'unknown'
     unchanged_seconds: float = None
+    verified_at: str = None
+    max_age_seconds: float = 60
 
 
 def get_live_bundle(cache, canonical, loader, progress=None):
@@ -49,8 +52,10 @@ def get_live_bundle(cache, canonical, loader, progress=None):
             data = deepcopy(loader())
             try:
                 validate_pair(data)
-                return data
-            except ScoreSectionsUnreconciled:
+            except ScoreSectionsUnreconciled as error:
+                reason = ('timeline_header' if str(error) == 'Play timeline is not reconciled to the header score'
+                          else 'box_points')
+                coherence_diagnostics.observe(canonical['gameId'], reason)
                 # Only the single-flight cache owner retries. Identity, malformed
                 # data and transport failures never create a retry loop. The
                 # budget is checked between bounded calls, not hard cancellation.
@@ -58,6 +63,9 @@ def get_live_bundle(cache, canonical, loader, progress=None):
                     raise
                 time.sleep(SCORE_RETRY_DELAY)
                 if time.monotonic()-started>=SCORE_RETRY_BUDGET:raise
+            else:
+                coherence_diagnostics.observe(canonical['gameId'], None)
+                return data
 
     snapshot = cache.get(key, validated_loader)
     # Defensive reconstruction per caller; raw cache never holds DataFrames.
@@ -65,4 +73,4 @@ def get_live_bundle(cache, canonical, loader, progress=None):
     progress_key = (key, canonical['homeTeamId'], canonical['awayTeamId'], snapshot.data['event']['id'])
     state, age = progress.observe(progress_key, snapshot.data) if progress is not None else ('unknown', None)
     return LiveBundle(timeline, box, snapshot.age_seconds, snapshot.is_stale,
-                      snapshot.refresh_error_type, state, age)
+                      snapshot.refresh_error_type, state, age, snapshot.verified_at, cache.max_age)

@@ -5,6 +5,7 @@ import streamlit as st
 import base64
 from html import escape
 from pathlib import Path
+from datetime import datetime, timezone
 from nba_api.stats.static import teams
 from replay_collection import clock_label
 
@@ -39,16 +40,32 @@ def scoreboard_html(result, home_label, away_label):
             f'<span class="cv-clock">{phase}</span>{escape(clock_label(row.clock))}</div>{cards[1]}</section>')
 
 
+def verification_label(snapshot):
+    """Acquisition time, explicitly not the source's last-play timestamp."""
+    age = max(0, float(snapshot.age_seconds))
+    try:
+        verified = datetime.fromisoformat(snapshot.verified_at)
+        if verified.tzinfo is None:
+            raise ValueError('Timezone required')
+        stamp = verified.astimezone(timezone.utc).strftime('%H:%M:%S UTC')
+        return f'Last verified at {stamp} · {age:.0f}s old at the last refresh. Not the age of the last play.'
+    except (AttributeError, TypeError, ValueError):
+        return f'Verified snapshot acquired {age:.0f}s before the last refresh. Not the age of the last play.'
+
+
 def render_live_analysis(result, home_label='Home', away_label='Away'):
     if result is None:
         st.subheader('Game Center')
-        st.info('Live analysis unavailable. A verified feed and dated pregame context are required. No estimate is shown.')
+        st.info('Live analysis temporarily unavailable. Waiting for a verified feed and dated pregame context. No estimate is shown.')
         return
     snapshot = result.snapshot
+    st.caption(verification_label(snapshot))
     if snapshot.timeline.attrs.get('scoreSource')=='reconciled_scoring_events':
         st.caption('Score source: explicit scoring events reconciled with every scorer, team totals and header. Reported cumulative scores are retained for audit.')
     if result.display_state == 'stale_snapshot':
-        st.warning('Feed refresh failed or is delayed. Showing the last validated snapshot—not the current game state.')
+        st.warning('Update delayed — showing the last validated snapshot, not the current game state.')
+        limit = float(getattr(snapshot, 'max_age_seconds', 60))
+        st.caption(f'On refresh, estimates older than {limit:.0f}s are hidden. Refresh to retry; automatic refresh is optional.')
     elif result.display_state == 'possibly_stalled':
         st.warning('The active feed has not changed recently. Play may be stopped or updates may be delayed.')
     elif result.display_state == 'progress_unknown':
