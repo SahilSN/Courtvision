@@ -10,6 +10,32 @@ from player_rating_dataset import (
 
 
 class PlayerRatingDatasetTest(unittest.TestCase):
+    def test_corroborated_zero_minute_appearance_keeps_wpa_without_inventing_time(self):
+        context = pd.DataFrame([dict(gameId="0022400942", teamTricode="IND",
+            opponentTricode="MIL", gameDate="2025-03-11", isHome=1, teamWin=1)])
+        box = pd.DataFrame([dict(personId=1628396, fullName="Tony Bradley",
+            teamTricode="IND", minutes="0:00", starter=False,
+            possessions=1.0, reboundsTotal=1)])
+        impact = pd.DataFrame([dict(personId=1628396, teamTricode="IND", events=1,
+            netWPA=.021469, positiveWPA=.021469, negativeWPA=0,
+            absoluteWPA=.021469, maxPositiveEvent=.021469, maxNegativeEvent=.021469)])
+        rows = build_player_game_rows("2024-25", "0022400942", context, box, impact)
+        self.assertTrue(validate_player_game_dataset(rows))
+        self.assertEqual(rows.minutes.iloc[0], 0)
+        self.assertEqual(rows.attributedEvents.iloc[0], 1)
+        self.assertAlmostEqual(rows.netWPA.sum(), impact.netWPA.sum())
+        # A source zero alone, DNP/missing minutes, wrong team, or missing
+        # independent activity/possessions must never whitelist an impact row.
+        for changes in (dict(minutes=""), dict(minutes=None), dict(minutes="-1:00"),
+                        dict(possessions=0), dict(reboundsTotal=0), dict(teamTricode="MIL"),
+                        dict(comment="DNP - Coach's Decision")):
+            bad = box.assign(**changes)
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                build_player_game_rows("2024-25", "0022400942", context, bad, impact)
+        for column, value in (("possessions", 0), ("attributedEvents", 0), ("minutes", -1)):
+            with self.subTest(column=column), self.assertRaises(ValueError):
+                validate_player_game_dataset(rows.assign(**{column: value}))
+
     def test_parse_minutes(self):
         self.assertAlmostEqual(parse_minutes("12:30"), 12.5)
         self.assertAlmostEqual(parse_minutes("PT7M15.00S"), 7.25)

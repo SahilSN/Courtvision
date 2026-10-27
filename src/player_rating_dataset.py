@@ -278,9 +278,27 @@ def build_player_game_rows(
     players["minutes"] = players["minutes"].map(
         parse_minutes
     )
-    players = players.loc[
-        players["minutes"] > 0.0
-    ].copy()
+    # Subsecond appearances can be reported as 0:00 (Bradley, 0022400942).
+    # Admit only explicit zero-duration box rows corroborated by possessions,
+    # a recorded box action, and same-player/same-team attributed events.
+    # Keep the source's zero minutes; do not invent a duration or admit DNPs.
+    impact_keys = set(zip(
+        pd.to_numeric(wpa_summary.loc[wpa_summary["events"] > 0, "personId"], errors="raise").astype(int),
+        wpa_summary.loc[wpa_summary["events"] > 0, "teamTricode"],
+    ))
+    box_activity = pd.Series(False, index=players.index)
+    for column in ("fieldGoalsAttempted", "freeThrowsAttempted", "reboundsTotal",
+                   "assists", "steals", "blocks", "turnovers", "foulsPersonal"):
+        if column in players:
+            box_activity |= pd.to_numeric(players[column], errors="raise").gt(0)
+    zero_participant = (
+        box_players["minutes"].astype(str).str.strip().isin(("0:00", "00:00", "PT0M0.00S", "PT00M00.00S"))
+        & pd.to_numeric(players.get("possessions", pd.Series(0, index=players.index)), errors="raise").gt(0)
+        & box_activity
+        & players.get("comment", pd.Series("", index=players.index)).fillna("").astype(str).str.strip().eq("")
+        & pd.Series([(int(p), t) in impact_keys for p, t in zip(players.personId, players.teamTricode)], index=players.index)
+    )
+    players = players.loc[(players["minutes"] > 0.0) | zero_participant].copy()
     players["personId"] = pd.to_numeric(
         players["personId"],
         errors="raise",
@@ -350,7 +368,7 @@ def build_player_game_rows(
 
     if not unmatched_impact.empty:
         raise ValueError(
-            "WPA attribution rows are missing from positive-minute "
+            "WPA attribution rows are missing from verified "
             f"box-score participants for game {game_id}: "
             f"{unmatched_impact['personId'].tolist()}"
         )
@@ -431,7 +449,13 @@ def validate_player_game_dataset(dataset):
             "Duplicate player-game rows found."
         )
 
-    if (dataset["minutes"] <= 0.0).any():
+    minutes = pd.to_numeric(dataset["minutes"], errors="raise")
+    verified_zero = (
+        minutes.eq(0)
+        & pd.to_numeric(dataset["possessions"], errors="raise").gt(0)
+        & pd.to_numeric(dataset["attributedEvents"], errors="raise").gt(0)
+    )
+    if (minutes.isna() | minutes.lt(0) | (minutes.eq(0) & ~verified_zero)).any():
         raise ValueError(
             "Player-game dataset contains non-participants."
         )
