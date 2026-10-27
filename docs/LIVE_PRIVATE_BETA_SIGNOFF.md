@@ -48,7 +48,9 @@ CPU evidence remains separately documented.
 ## Operational boundary
 
 Temporary diagnostic and Live activation files are removed after validation.
-Verify existing sessions pause and default navigation recovers on reload.
+Both existing automatically refreshing sessions were verified paused after
+removal, with no estimate retained; both toggles were stopped, the temporary
+second browser tab was closed, and the original default dashboard recovered.
 Private sharing, independent host opt-in, runtime coherence, dated context,
 expiry/kill, strict joint validation and bounded stale retention remain required.
 No new schedules, model changes, backfill resets or nightly-job changes.
@@ -57,3 +59,11 @@ A release operator must select only reviewed games with fresh context and source
 verification and use a short dated window. Unknown players/incoherent feeds
 remain unavailable, not zeros or guessed estimates. Automatic daily activation,
 unrestricted coverage and public-scale deployment are not approved by this signoff.
+
+## Final deployment CI
+
+Actual main64b88db passed Deployment checks run40443709179:
+https://github.com/SahilSN/Courtvision/actions/runs/40443709179
+Both ubuntu-latest (1m49s) and macos-14 (2m13s) passed clean dependency install,
+unit regressions, frozen model/published UI smoke, compilation and clean-diff
+checks. This documentation-only follow-up does not change the tested runtime.
