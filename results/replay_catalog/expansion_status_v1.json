@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-10-27T21:35:10.983520+00:00",
+  "preparedReplayCount": 58,
+  "blockedGames": 0,
+  "pausedSeasons": [
+    "2024-25"
+  ],
+  "dailyAttempts": 5,
+  "schedule": "Mac: bounded batch every 30 minutes; publish nightly after 1:30 a.m. Pacific",
+  "publishedReplayCount": 58
+}

@@ -435,6 +435,51 @@
       "sha256": "94bb97351cbcacbe6ad91b06d2d115d5d36ff8953faace6a101ab99edbd2f57a"
     },
     {
+      "gameId": "0022501191",
+      "season": "2025-26",
+      "date": "2026-04-12",
+      "home": "PHI",
+      "away": "MIL",
+      "collection": "catalog",
+      "sha256": "79665e6642e3a75582d0bebda7359aaf9a08f5049224c50fd80839ce8ed7009c"
+    },
+    {
+      "gameId": "0022501192",
+      "season": "2025-26",
+      "date": "2026-04-12",
+      "home": "TOR",
+      "away": "BKN",
+      "collection": "catalog",
+      "sha256": "7f8dbb62a1375713e9dd7a68da69ef0057028acfab8fb2cbe0c2cdfeea1e9601"
+    },
+    {
+      "gameId": "0022501193",
+      "season": "2025-26",
+      "date": "2026-04-12",
+      "home": "DAL",
+      "away": "CHI",
+      "collection": "catalog",
+      "sha256": "f9c10ada132e44421ac41d81320d5913eac81b0841e443add961a98806371fc6"
+    },
+    {
+      "gameId": "0022501194",
+      "season": "2025-26",
+      "date": "2026-04-12",
+      "home": "HOU",
+      "away": "MEM",
+      "collection": "catalog",
+      "sha256": "ca30d5092f22b4237c0848f857d39347113fee0bc68a0fa6bbd0c5ce72be0f14"
+    },
+    {
+      "gameId": "0022501195",
+      "season": "2025-26",
+      "date": "2026-04-12",
+      "home": "MIN",
+      "away": "NOP",
+      "collection": "catalog",
+      "sha256": "db3737efca452d6f807b436e0f7af3ba93dfea64b29aed642a8a98bd0189f126"
+    },
+    {
       "gameId": "0022501196",
       "season": "2025-26",
       "date": "2026-04-12",
