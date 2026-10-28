@@ -18,7 +18,7 @@ def run_requested_probe(request_path, runtime, now=None, runner=None):
         expires = datetime.fromisoformat(request["expiresAt"].replace("Z", "+00:00"))
         day = date.fromisoformat(request["date"]).isoformat()
         kind=request.get('kind','access')
-        if kind not in ('access','pipeline','pipeline4','current','progress'):
+        if kind not in ('access','pipeline','pipeline4','current','progress','nba-cdn'):
             return None
         if (not re.fullmatch(r"[a-z0-9-]{1,64}", request_id) or issued.tzinfo is None or expires.tzinfo is None
                 or not 0 < (expires - issued).total_seconds() <= 900 or not issued <= now < expires):
@@ -36,7 +36,10 @@ def run_requested_probe(request_path, runtime, now=None, runner=None):
         return None
     try:
         if runner is None:
-            if kind == 'progress':
+            if kind == 'nba-cdn':
+                cdn=runpy.run_path(str(Path(__file__).with_name('probe_nba_cdn.py')))['probe_cdn']
+                runner=lambda day, environment: cdn(day, environment, request.get('gameIds'))
+            elif kind == 'progress':
                 progress=runpy.run_path(str(Path(__file__).with_name('check_live_deployment.py')))['probe_progress']
                 runner=lambda day, environment: progress(day, environment, request.get('gameIds'))
             elif kind == 'current':
