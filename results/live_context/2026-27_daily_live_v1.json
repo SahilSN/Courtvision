@@ -24,7 +24,8 @@
     },
     {
       "gameId": "0022600129",
-      "status": "inspected"
+      "status": "unavailable",
+      "errorType": "JSONDecodeError"
     },
     {
       "gameId": "0022600130",

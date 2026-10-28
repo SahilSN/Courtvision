@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "season": "2026-27",
   "gameDate": "2026-10-27",
-  "checkedAt": "2026-10-28T01:00:30.765946+00:00",
+  "checkedAt": "2026-10-28T02:05:11.950730+00:00",
   "scope": "nightly-summary-roster-review-not-full-game-coverage",
   "pending": [],
   "games": [
@@ -12,7 +12,8 @@
     },
     {
       "gameId": "0022600129",
-      "status": "inspected"
+      "status": "unavailable",
+      "errorType": "JSONDecodeError"
     },
     {
       "gameId": "0022600130",
