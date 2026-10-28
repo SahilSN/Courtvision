@@ -56,6 +56,15 @@ def publish_preflight(source, stage, context, original):
                 raise ValueError('Refusing to discard a concurrently published verified roster')
             if fresh and datetime.fromisoformat(fresh.get('checkedAt',new_roster['checkedAt'])) < datetime.fromisoformat(old_team.get('checkedAt',old_roster['checkedAt'])):
                 raise ValueError('Refusing to publish older roster evidence')
+        for old_profile in old_roster.get('profiles', []):
+            stamp = datetime.fromisoformat(old_profile['checkedAt'])
+            if not 0 <= (datetime.now(timezone.utc)-stamp).total_seconds() <= 36*3600:
+                continue
+            fresh = next((p for p in new_roster.get('profiles', [])
+                          if (p['teamId'],p['fullName']) == (old_profile['teamId'],old_profile['fullName'])), None)
+            if (fresh is None or fresh['personId'] != old_profile['personId']
+                    or datetime.fromisoformat(fresh['checkedAt']) < stamp):
+                raise ValueError('Refusing to replace concurrent verified profile evidence')
         candidate = read_json(stage / paths()[2])
         invariant(remote_manifest, candidate, context)
         validate_roster_artifact(read_json(stage / paths()[0]), CURRENT_SEASON, context['gameDate'])

@@ -9,6 +9,7 @@ from espn_live import normalize_name
 from live_artifacts import read_json
 from live_game_date import eligible_game_date
 from season_config import CURRENT_SEASON
+from official_profile_lookup import validate_evidence
 
 
 def roster_url(team_id, season):
@@ -80,6 +81,16 @@ def validate_roster_artifact(bundle, season, game_date):
         normalize_roster(dict(parameters=dict(TeamID=team_id, Season=season), resultSets=[dict(
             name='CommonTeamRoster', headers=['TeamID','SEASON','PLAYER','PLAYER_ID'],
             rowSet=[[p['teamId'],season,p['fullName'],p['personId']] for p in rows])]), team_id, season)
+    profiles = bundle.get('profiles', [])
+    if not isinstance(profiles, list) or len(profiles) > 240:
+        raise ValueError('Oversized official profile evidence')
+    identities = set()
+    for item in profiles:
+        validate_evidence(item, checked)
+        key = (item['teamId'], normalize_name(item['fullName']))
+        if item['teamId'] not in seen or key in identities:
+            raise ValueError('Duplicate or out-of-slate profile identity')
+        identities.add(key)
     return bundle
 
 
@@ -106,7 +117,11 @@ def roster_candidates(name, season, team_id, game_date, *, path=None, now=None):
         matches = [t for t in bundle['teams'] if t['teamId'] == team_id and t['status'] == 'verified']
         matches = [t for t in matches if 0 <= (instant - datetime.fromisoformat(
             t.get('checkedAt', bundle['checkedAt']))).total_seconds() <= 36*3600]
-        return {p['personId'] for t in matches for p in t['players']
-                if normalize_name(p['fullName']) == normalize_name(name)}
+        ids = {p['personId'] for t in matches for p in t['players']
+               if normalize_name(p['fullName']) == normalize_name(name)}
+        ids.update(p['personId'] for p in bundle.get('profiles', [])
+                   if p['teamId'] == team_id and normalize_name(p['fullName']) == normalize_name(name)
+                   and 0 <= (instant-datetime.fromisoformat(p['checkedAt'])).total_seconds() <= 36*3600)
+        return ids
     except (OSError, ValueError, KeyError, TypeError, IndexError):
         return set()

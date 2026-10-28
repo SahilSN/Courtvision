@@ -9,6 +9,7 @@ from espn_live import normalize_name
 from official_live_rosters import roster_candidates
 
 REVIEWED = (
+    ('2026-27',1610612747,'Arthur Kaluma',1641751,'https://www.nba.com/lakers/player/1641751/arthur-kaluma'),
     ('2026-27',1610612762,'Darryn Peterson',1643408,'0022600112'),
     ('2026-27',1610612751,'Chaney Johnson',1643052,'0022600113'),
     ('2026-27',1610612751,'Joshua Jefferson',1643538,'0022600113'),

@@ -17,6 +17,7 @@ from official_live_rosters import normalize_roster, roster_url, validate_roster_
 from probe_live_access import BASE, fetch_json
 from reviewed_live_players import merge_candidates
 from season_config import CURRENT_SEASON
+from official_profile_lookup import ProfileLookup
 
 
 def preparation_fetch(url):
@@ -60,7 +61,8 @@ def summary_sides(payload, game):
     return sides
 
 
-def prepare_daily_live(root, season=CURRENT_SEASON, *, fetcher=preparation_fetch, now=None, budget=65):
+def prepare_daily_live(root, season=CURRENT_SEASON, *, fetcher=preparation_fetch, now=None, budget=65,
+                       profile_fetcher=None):
     root = Path(root)
     now = now or datetime.now(timezone.utc)
     directory = root/'results/live_context'
@@ -87,6 +89,13 @@ def prepare_daily_live(root, season=CURRENT_SEASON, *, fetcher=preparation_fetch
         previous = {'teams': []}
     roster = dict(schemaVersion=1, season=season, seasonType='Regular Season',
                   gameDate=context['gameDate'], checkedAt=now.isoformat(), source='NBA CommonTeamRoster', teams=[])
+    selected_teams = {g[side+'TeamId'] for g in selected for side in ('home','away')}
+    roster['profiles'] = [p for p in previous.get('profiles', []) if p['teamId'] in selected_teams
+        and 0 <= (now-datetime.fromisoformat(p['checkedAt'])).total_seconds() <= 36*3600]
+    # Custom/test fetchers never implicitly make external HTTP calls.
+    lookup = ProfileLookup(**({'fetcher': profile_fetcher} if profile_fetcher is not None else {}),
+                           allowed=lambda: time.monotonic()-started < budget-5)
+    use_profiles = fetcher is preparation_fetch or profile_fetcher is not None
     for team_id in sorted({g[side+'TeamId'] for g in selected for side in ('home','away')}):
         team = dict(teamId=team_id, source=roster_url(team_id,season), status='unavailable', players=[])
         try:
@@ -106,7 +115,6 @@ def prepare_daily_live(root, season=CURRENT_SEASON, *, fetcher=preparation_fetch
         roster['teams'].append(team)
     validate_roster_artifact(roster, season, context['gameDate'])
     roster_path = directory/f'{season}_roster_identities_v1.json'
-    write_json(roster_path, roster)
     pending, observations = {}, []
     for game in selected:
         observation = dict(gameId=game['gameId'], status='unavailable')
@@ -136,15 +144,29 @@ def prepare_daily_live(root, season=CURRENT_SEASON, *, fetcher=preparation_fetch
                         # Merge exact official roster evidence with existing
                         # scoped/static identities; disagreement needs review.
                         official_ids = {person for full,person in official.items() if normalize_name(full)==normalize_name(name)}
+                        official_ids.update(p['personId'] for p in roster['profiles']
+                            if p['teamId']==team_id and normalize_name(p['fullName'])==normalize_name(name))
                         ids = merge_candidates(name,season,team_id,official_ids)
+                        profile_error = None
+                        if not ids and use_profiles:
+                            try:
+                                evidence = lookup.resolve(name, team_id, str(row['athlete']['id']), now)
+                                roster['profiles'].append(evidence)
+                                ids = merge_candidates(name,season,team_id,{evidence['personId']})
+                            except Exception as error:
+                                profile_error = type(error).__name__
                         if len(ids) != 1:
                             key = (team_id,name)
                             pending[key] = dict(teamId=team_id, fullName=name,
                                                 reason='unresolved' if not ids else 'conflicting_identity')
+                            if profile_error:
+                                pending[key]['profileErrorType'] = profile_error
             observation['status'] = 'inspected'
         except Exception as error:
             observation['errorType'] = type(error).__name__
         observations.append(observation)
+    validate_roster_artifact(roster, season, context['gameDate'])
+    write_json(roster_path, roster)
     review = dict(schemaVersion=1, season=season, gameDate=context['gameDate'],
                   checkedAt=now.isoformat(), scope='nightly-summary-roster-review-not-full-game-coverage',
                   pending=list(pending.values()), games=observations)

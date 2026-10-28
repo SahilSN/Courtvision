@@ -4,6 +4,13 @@ from reviewed_live_players import candidates
 
 
 class ReviewedPlayersTest(unittest.TestCase):
+    def test_kaluma_official_lakers_profile_exact_scope(self):
+        self.assertEqual(candidates('Arthur Kaluma','2026-27',1610612747),{1641751})
+        for season,team in [('2025-26',1610612747),('2026-27',1610612738)]:
+            self.assertEqual(candidates('Arthur Kaluma',season,team),
+                             reviewed_live_players._static_index().get('arthur kaluma',set()))
+        self.assertFalse(candidates('A Kaluma','2026-27',1610612747))
+
     def test_late_warriors_participants_are_exact_and_scoped(self):
         for name, person in [('Graham Ike',1643633), ('LJ Cryer',1643018)]:
             self.assertEqual(candidates(name,'2026-27',1610612744),{person})

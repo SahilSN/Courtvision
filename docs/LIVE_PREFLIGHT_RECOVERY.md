@@ -42,6 +42,37 @@ unavailable for a genuinely new identity, human review of an official profile
 is still required. This implementation does not promise all future games will
 always be available, purchase a provider, or extend the private beta policy.
 
+## Official profile fallback
+
+The background preparer now discovers exact-name profile links on the selected
+team's official `www.nba.com/<team>/roster` page when no existing candidate is
+available. Discovery is not verification: a profile must contain structured
+`__NEXT_DATA__` player evidence with the exact full name, official team ID, and
+NBA player ID matching its official URL, together in one record. Unknown page
+layouts, missing team data, multiple candidate IDs, redirects, HTTP403 and
+conflicts fail closed. No web-search snippets, fuzzy names or inferred IDs are
+accepted. ESPN IDs are retained for audit but never interpreted as NBA IDs.
+
+The existing same-day roster artifact carries optional `profiles` evidence with
+source URL, discovery URL, verification method and original timestamp. The
+existing guarded three-artifact publisher publishes it; the viewer only reads
+it, without HTTP. Evidence remains team/season/day scoped, expires after 36h,
+and cannot silently overwrite concurrently published verified profile evidence.
+Full-roster health remains unavailable if the roster API failed; one verified
+profile does not certify an entire team roster.
+
+At most four additional HTTP requests per preparation, five seconds each,
+bounded by the original preparation budget, and shared team/page success/failure
+cache within the run. Known verified profiles are reused without refetching;
+failures retry only through the existing 15-minute worker. Profiles supplement
+missing identities, never override ambiguous existing candidates. Custom/test
+fetchers do not enable real profile HTTP unless explicitly requested.
+
+Validation uses synthetic official-format HTML for success and adversarial
+cases. The real NBA profile endpoint returned HTTP403 on this Mac during
+implementation, so successful end-to-end automatic discovery is NOT certified.
+This fallback does not defeat access controls or guarantee site availability.
+
 ## Viewer recovery and useful errors
 
 Absent/expired cache now preserves only a sanitized error CLASS for display:
