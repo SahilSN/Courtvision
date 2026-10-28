@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>Label</key><string>com.courtvision.live-preflight</string>
+<key>ProgramArguments</key><array>
+<string>/Users/sahilnayak/Courtvision/.venv/bin/python</string>
+<string>/Users/sahilnayak/Courtvision/src/run_live_preflight.py</string>
+</array>
+<key>WorkingDirectory</key><string>/Users/sahilnayak/Courtvision</string>
+<key>EnvironmentVariables</key><dict>
+<key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+<key>PYTHONUNBUFFERED</key><string>1</string>
+</dict>
+<key>ProcessType</key><string>Background</string>
+<key>RunAtLoad</key><true/>
+<key>StartInterval</key><integer>900</integer>
+<key>StandardOutPath</key><string>/Users/sahilnayak/Courtvision/results/.runtime/live-preflight/launchd.log</string>
+<key>StandardErrorPath</key><string>/Users/sahilnayak/Courtvision/results/.runtime/live-preflight/launchd-error.log</string>
+</dict></plist>

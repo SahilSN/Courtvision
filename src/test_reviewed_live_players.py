@@ -51,6 +51,15 @@ class ReviewedPlayersTest(unittest.TestCase):
         self.assertNotIn(1643414,candidates('Mikel Brown Jr.','2026-27',1610612738))
         self.assertFalse(candidates('M Brown','2026-27',1610612751))
 
+    def test_october27_full_roster_additions_exact_scope(self):
+        for name, team, person in [('Jaden Akins',1610612752,1643022),
+                ('Ebuka Okorie',1610612765,1643536),('Darius Acuff Jr.',1610612758,1643411),
+                ('Alex Karaban',1610612758,1642284),('Emanuel Sharp',1610612758,1643567),
+                ('Tarris Reed Jr.',1610612759,1643542)]:
+            self.assertEqual(candidates(name,'2026-27',team),{person})
+            self.assertNotIn(person,candidates(name,'2025-26',team))
+            self.assertNotIn(person,candidates(name,'2026-27',1610612738))
+
     def test_expansion_rookies_exact_scope(self):
         for name,person,team in [('Caleb Wilson',1643410,1610612741),('Tobe Awaka',1643591,1610612741),
                 ('Dailyn Swain',1643517,1610612741),('Jaylin Sellers',1643637,1610612741),

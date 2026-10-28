@@ -14,7 +14,7 @@ from cloud_live_analysis import analyze_live_snapshot
 from daily_live_context import read_day_context
 from feed_progress import FeedProgress
 from live_refresh import current_event, summary_pair
-from live_snapshot_cache import LiveSnapshotCache
+from live_snapshot_cache import LiveSnapshotCache, unavailable_reason
 from offline_live_sample import load_cpu_artifacts
 from season_config import CURRENT_SEASON
 from live_diagnostics import diagnostics
@@ -38,7 +38,7 @@ def scoreboard_event(canonical,event_id):
     return current_event(canonical,event_id)
 
 
-def render_readiness(root):
+def render_readiness(root, canonical=None):
     health=operations_status(root)
     with st.expander('Data readiness'):
         st.caption('Release: owner-beta-daily-v1 · private access · automatic preparation runs on your Mac, not in this page.')
@@ -47,8 +47,19 @@ def render_readiness(root):
         else:
             st.write(f"{health['gameDate']} · {health['preparedGames']} prepared matchups · {health['preparation']}")
             st.caption(f"Prepared at {health['preparedAt']} · expires {health['expiresAt']}")
-            if health['rosterTeamsUnavailable'] or health['pendingIdentities']:
-                st.warning('Some roster identities still need verification. Affected estimates may be unavailable.')
+            if health['pendingIdentities']:
+                st.warning(f"{health['pendingIdentities']} roster identities need review. Affected estimates remain unavailable.")
+                try:
+                    review=json.loads((Path(root)/'results/live_context'/f'{CURRENT_SEASON}_identity_review_v1.json').read_text())
+                    if review['gameDate']==health['gameDate']:
+                        selected={canonical['homeTeamId'],canonical['awayTeamId']} if canonical else set()
+                        names=[p['fullName'] for p in review['pending'] if not selected or p['teamId'] in selected]
+                        if names:st.text('Unresolved: '+', '.join(names[:12]))
+                except (OSError,ValueError,KeyError,TypeError):
+                    pass
+            if health['rosterTeamsUnavailable']:
+                st.caption(f"NBA roster refresh unavailable for {health['rosterTeamsUnavailable']} teams. "
+                           'Independently reviewed identities may still allow analysis. The Mac preflight retries during the game window.')
             if health['deferredGames']:
                 st.caption(f"{health['deferredGames']} additional games are outside this four-game beta limit.")
 
@@ -110,6 +121,6 @@ def render_live_beta(root,allowed_games,rollout_guard=None):
             diagnostics.record(selected,'unavailable',time.perf_counter()-started,error_type=type(error).__name__)
             # No provider exception details, guessed probabilities or neutral records.
             render(None)
-            st.caption('Waiting for a coherent feed and verified context. Try refreshing shortly.')
+            st.caption(unavailable_reason(error))
     panel()
-    render_readiness(root)
+    render_readiness(root,canonical)

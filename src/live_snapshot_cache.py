@@ -15,7 +15,20 @@ import time
 
 
 class SnapshotUnavailable(RuntimeError):
-    pass
+    def __init__(self, message, error_type=None):
+        super().__init__(message)
+        self.error_type = error_type
+
+
+def unavailable_reason(error):
+    kind = getattr(error, 'error_type', None) or type(error).__name__
+    if kind == 'PlayerIdentityUnavailable':
+        return 'Waiting for an exact NBA player identity. Automatic roster preparation will retry; unresolved or conflicting names require review.'
+    if kind == 'ScoreSectionsUnreconciled':
+        return 'The provider’s play-by-play, headline score or box score disagree. Refresh will retry; no mismatched estimate is shown.'
+    if kind in ('TimeoutError', 'URLError', 'HTTPError', 'ConnectionError'):
+        return 'The feed provider did not respond successfully. Refresh will retry after the bounded backoff.'
+    return 'Waiting for a verified feed and original dated pregame context. Check Data readiness for preparation status.'
 
 
 @dataclass(frozen=True)
@@ -67,7 +80,7 @@ class LiveSnapshotCache:
     def _snapshot(self, slot):
         age = max(0, self.clock() - slot.fetched)
         if slot.data is None or age > self.max_age:
-            raise SnapshotUnavailable("No sufficiently recent feed snapshot")
+            raise SnapshotUnavailable("No sufficiently recent feed snapshot", slot.error)
         return Snapshot(deepcopy(slot.data), age, age >= self.ttl, slot.error, slot.verified_at)
 
     def get(self, key, loader):

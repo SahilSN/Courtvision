@@ -21,6 +21,10 @@ class ScoreSectionsUnreconciled(ProviderContextUnavailable):
     """Well-identified score sections disagree; acquisition may retry, not guess."""
 
 
+class PlayerIdentityUnavailable(ProviderContextUnavailable):
+    """Exact participating NBA identity is missing or ambiguous."""
+
+
 def validate_canonical(game):
     season = game["season"]
     year = int(season[:4])
@@ -108,7 +112,7 @@ def _normalize_snapshot(event, summary, canonical):
         for participant in play.get("participants", []):
             metadata = athlete_map.get(str(participant["athlete"]["id"]))
             if metadata is None or metadata["nba_person_id"] is None:
-                raise ProviderContextUnavailable("An involved player needs a reviewed identity mapping")
+                raise PlayerIdentityUnavailable("An involved player needs a reviewed identity mapping")
         row = normalize_espn_play(play, number, team_map, athlete_map, name_map)
         period_length = 720 if row["period"] <= 4 else 300
         if row["period"] < 1 or not 0 <= parse_clock(row["clock"], period_length) <= period_length:

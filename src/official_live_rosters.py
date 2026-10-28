@@ -66,6 +66,9 @@ def validate_roster_artifact(bundle, season, game_date):
         if team_id in seen or team['source'] != roster_url(team_id, season):
             raise ValueError('Duplicate or unofficial roster team')
         seen.add(team_id)
+        observed = datetime.fromisoformat(team.get('checkedAt', bundle['checkedAt']))
+        if observed.tzinfo is None or observed > checked:
+            raise ValueError('Invalid per-team roster timestamp')
         if team['status'] not in ('verified', 'unavailable'):
             raise ValueError('Invalid roster status')
         rows = team['players']
@@ -101,6 +104,8 @@ def roster_candidates(name, season, team_id, game_date, *, path=None, now=None):
         if not 0 <= (instant - checked).total_seconds() <= 36*3600:
             return set()
         matches = [t for t in bundle['teams'] if t['teamId'] == team_id and t['status'] == 'verified']
+        matches = [t for t in matches if 0 <= (instant - datetime.fromisoformat(
+            t.get('checkedAt', bundle['checkedAt']))).total_seconds() <= 36*3600]
         return {p['personId'] for t in matches for p in t['players']
                 if normalize_name(p['fullName']) == normalize_name(name)}
     except (OSError, ValueError, KeyError, TypeError, IndexError):

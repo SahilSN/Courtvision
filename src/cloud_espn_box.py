@@ -3,7 +3,7 @@
 import re
 import pandas as pd
 
-from cloud_espn_adapter import normalize_snapshot, ProviderContextUnavailable, ScoreSectionsUnreconciled
+from cloud_espn_adapter import normalize_snapshot, ProviderContextUnavailable, ScoreSectionsUnreconciled, PlayerIdentityUnavailable
 from reviewed_live_players import candidates
 
 
@@ -51,7 +51,7 @@ def _normalize_box(event, summary, canonical, timeline=None):
                 matches = candidates(person['displayName'],canonical['season'],team_id,canonical['gameDate'])
                 played = not athlete['didNotPlay']
                 if played and len(matches) != 1:
-                    raise ValueError('Unresolved participating player')
+                    raise PlayerIdentityUnavailable('Unresolved participating player')
                 if len(matches) == 1:
                     person_id = next(iter(matches))
                     if person_id in seen_people:
@@ -103,7 +103,7 @@ def _normalize_box(event, summary, canonical, timeline=None):
             raise ValueError('Missing box-score team')
         return {'players': pd.DataFrame(rows), 'teams': pd.DataFrame(totals),
                 'source': 'ESPN', 'advancedStatsAvailable': False}
-    except ScoreSectionsUnreconciled:
+    except (ScoreSectionsUnreconciled, PlayerIdentityUnavailable):
         raise
     except (KeyError, ValueError, TypeError, IndexError) as error:
         raise ProviderContextUnavailable('ESPN box score unavailable or unreconciled') from error

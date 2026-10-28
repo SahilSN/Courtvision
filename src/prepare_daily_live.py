@@ -80,6 +80,11 @@ def prepare_daily_live(root, season=CURRENT_SEASON, *, fetcher=preparation_fetch
         read_day_context(context_path, game)
     selected = games[:4]
     started = time.monotonic()
+    try:
+        previous = validate_roster_artifact(read_json(directory/f'{season}_roster_identities_v1.json'),
+                                            season, context['gameDate'])
+    except (OSError, ValueError, KeyError, TypeError, IndexError):
+        previous = {'teams': []}
     roster = dict(schemaVersion=1, season=season, seasonType='Regular Season',
                   gameDate=context['gameDate'], checkedAt=now.isoformat(), source='NBA CommonTeamRoster', teams=[])
     for team_id in sorted({g[side+'TeamId'] for g in selected for side in ('home','away')}):
@@ -88,10 +93,16 @@ def prepare_daily_live(root, season=CURRENT_SEASON, *, fetcher=preparation_fetch
             if time.monotonic()-started >= budget:
                 raise TimeoutError('Live preparation budget reached')
             payload, _ = fetcher(team['source'])
-            team.update(status='verified', players=normalize_roster(payload,team_id,season))
+            team.update(status='verified', players=normalize_roster(payload,team_id,season), checkedAt=now.isoformat())
         except Exception as error:
             # Public IDs and exception classes only; no raw upstream text/payload.
             team['errorType'] = type(error).__name__
+            old = next((t for t in previous['teams'] if t['teamId']==team_id and t['status']=='verified'), None)
+            if old:
+                observed = old.get('checkedAt', previous['checkedAt'])
+                age = (now - datetime.fromisoformat(observed)).total_seconds()
+                if 0 <= age <= 36*3600:
+                    team = {**old, 'checkedAt': observed, 'lastFetchErrorType': type(error).__name__}
         roster['teams'].append(team)
     validate_roster_artifact(roster, season, context['gameDate'])
     roster_path = directory/f'{season}_roster_identities_v1.json'
@@ -107,8 +118,8 @@ def prepare_daily_live(root, season=CURRENT_SEASON, *, fetcher=preparation_fetch
             # feed or creates player IDs from ESPN. Match both exact team sides.
             sides = summary_sides(payload,game)
             groups = payload.get('boxscore',{}).get('players',[])
-            if not isinstance(groups,list) or len(groups)>2:
-                raise ValueError('Oversized summary roster')
+            if not isinstance(groups,list) or len(groups)!=2:
+                raise ValueError('Complete summary rosters are not published yet')
             for group in groups:
                 team_id = game[sides[str(group['team']['id'])]+'TeamId']
                 official = {p['fullName']:p['personId'] for t in roster['teams']
@@ -116,7 +127,7 @@ def prepare_daily_live(root, season=CURRENT_SEASON, *, fetcher=preparation_fetch
                 if len(group['statistics']) != 1:
                     raise ValueError('Ambiguous summary statistics')
                 for stats in group['statistics']:
-                    if len(stats['athletes'])>30:
+                    if not 1 <= len(stats['athletes']) <= 30:
                         raise ValueError('Oversized team roster')
                     for row in stats['athletes']:
                         name = row['athlete']['displayName']
