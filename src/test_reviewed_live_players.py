@@ -45,6 +45,12 @@ class ReviewedPlayersTest(unittest.TestCase):
         self.assertNotIn(1643416,candidates('Chris Cenac Jr.','2026-27',1610612741))
         self.assertFalse(candidates('C Cenac','2026-27',1610612738))
 
+    def test_brooklyn_mikel_brown_exact_official_identity(self):
+        self.assertEqual(candidates('Mikel Brown Jr.','2026-27',1610612751),{1643414})
+        self.assertNotIn(1643414,candidates('Mikel Brown Jr.','2025-26',1610612751))
+        self.assertNotIn(1643414,candidates('Mikel Brown Jr.','2026-27',1610612738))
+        self.assertFalse(candidates('M Brown','2026-27',1610612751))
+
     def test_expansion_rookies_exact_scope(self):
         for name,person,team in [('Caleb Wilson',1643410,1610612741),('Tobe Awaka',1643591,1610612741),
                 ('Dailyn Swain',1643517,1610612741),('Jaylin Sellers',1643637,1610612741),

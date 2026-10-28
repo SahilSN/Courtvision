@@ -12,6 +12,7 @@ REVIEWED = (
     ('2026-27',1610612762,'Darryn Peterson',1643408,'0022600112'),
     ('2026-27',1610612751,'Chaney Johnson',1643052,'0022600113'),
     ('2026-27',1610612751,'Joshua Jefferson',1643538,'0022600113'),
+    ('2026-27',1610612751,'Mikel Brown Jr.',1643414,'https://www.nba.com/player/1643414'),
     ('2026-27',1610612766,'Christian Anderson',1643515,'https://www.nba.com/player/1643515/christian-anderson'),
     ('2026-27',1610612739,'Meleek Thomas',1643509,'https://www.nba.com/player/1643509/meleek-thomas/profile'),
     ('2026-27',1610612741,'Caleb Wilson',1643410,'https://www.nba.com/player/1643410/caleb-wilson'),
