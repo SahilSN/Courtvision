@@ -32,7 +32,8 @@
     },
     {
       "gameId": "0022600131",
-      "status": "inspected"
+      "status": "unavailable",
+      "errorType": "ValueError"
     }
   ],
   "scope": "prepared-matchups-not-feed-readiness-or-release-certification"
