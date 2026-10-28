@@ -2,15 +2,9 @@
   "schemaVersion": 1,
   "season": "2026-27",
   "gameDate": "2026-10-27",
-  "checkedAt": "2026-10-28T03:25:27.670092+00:00",
+  "checkedAt": "2026-10-28T05:16:54.289801+00:00",
   "scope": "nightly-summary-roster-review-not-full-game-coverage",
-  "pending": [
-    {
-      "teamId": 1610612747,
-      "fullName": "Arthur Kaluma",
-      "reason": "unresolved"
-    }
-  ],
+  "pending": [],
   "games": [
     {
       "gameId": "0022600128",
