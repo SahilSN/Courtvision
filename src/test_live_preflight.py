@@ -72,6 +72,16 @@ class PreflightTest(unittest.TestCase):
             self.assertIn('exact NBA player identity',message)
             self.assertNotIn('private raw',message)
 
+    def test_unreadable_provider_response_is_not_blame_on_context(self):
+        import ast
+        source=Path(__file__).with_name('live_beta_view.py').read_text()
+        node=next(n for n in ast.parse(source).body if isinstance(n,ast.FunctionDef) and n.name=='display_unavailable_reason')
+        namespace={'unavailable_reason':unavailable_reason}
+        exec(compile(ast.Module(body=[node],type_ignores=[]),'<display-reason>','exec'),namespace)
+        message=namespace['display_unavailable_reason'](SnapshotUnavailable('raw', 'JSONDecodeError'))
+        self.assertIn('unreadable response',message)
+        self.assertNotIn('raw',message)
+
     def test_transient_roster_timeout_retains_original_evidence_timestamp(self):
         from prepare_daily_live import prepare_daily_live
         f=self.fixture

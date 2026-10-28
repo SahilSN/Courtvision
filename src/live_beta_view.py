@@ -64,6 +64,13 @@ def render_readiness(root, canonical=None):
                 st.caption(f"{health['deferredGames']} additional games are outside this four-game beta limit.")
 
 
+def display_unavailable_reason(error):
+    kind=getattr(error,'error_type',None) or type(error).__name__
+    if kind in ('JSONDecodeError','UnicodeDecodeError'):
+        return 'The feed provider returned an unreadable response. Refresh will retry; no estimate is shown from invalid data.'
+    return unavailable_reason(error)
+
+
 def render_live_beta(root,allowed_games,rollout_guard=None):
     st.title('Game Center')
     st.caption('Private Live beta · verified matchups · frozen V7')
@@ -121,6 +128,6 @@ def render_live_beta(root,allowed_games,rollout_guard=None):
             diagnostics.record(selected,'unavailable',time.perf_counter()-started,error_type=type(error).__name__)
             # No provider exception details, guessed probabilities or neutral records.
             render(None)
-            st.caption(unavailable_reason(error))
+            st.caption(display_unavailable_reason(error))
     panel()
     render_readiness(root,canonical)
