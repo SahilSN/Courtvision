@@ -1,63 +1,25 @@
 {
   "schemaVersion": 1,
   "season": "2026-27",
-  "gameDate": "2026-10-28",
-  "checkedAt": "2026-10-29T02:46:42.944980+00:00",
+  "gameDate": "2026-10-29",
+  "checkedAt": "2026-10-29T08:01:21.663590+00:00",
   "scope": "nightly-summary-roster-review-not-full-game-coverage",
-  "pending": [
-    {
-      "teamId": 1610612748,
-      "fullName": "Ryan Conwell",
-      "reason": "unresolved",
-      "profileErrorType": "ValueError"
-    },
-    {
-      "teamId": 1610612764,
-      "fullName": "AJ Dybantsa",
-      "reason": "unresolved",
-      "profileErrorType": "ValueError"
-    },
-    {
-      "teamId": 1610612739,
-      "fullName": "Tristan Enaruna",
-      "reason": "unresolved",
-      "profileErrorType": "ValueError"
-    },
-    {
-      "teamId": 1610612766,
-      "fullName": "Hannes Steinbach",
-      "reason": "unresolved",
-      "profileErrorType": "ValueError"
-    },
-    {
-      "teamId": 1610612755,
-      "fullName": "Labaron Philon Jr.",
-      "reason": "unresolved",
-      "profileErrorType": "TimeoutError"
-    },
-    {
-      "teamId": 1610612754,
-      "fullName": "Braden Smith",
-      "reason": "unresolved",
-      "profileErrorType": "TimeoutError"
-    }
-  ],
+  "pending": [],
   "games": [
     {
-      "gameId": "0022600132",
-      "status": "inspected"
+      "gameId": "0022600144",
+      "status": "unavailable",
+      "errorType": "ValueError"
     },
     {
-      "gameId": "0022600133",
-      "status": "inspected"
+      "gameId": "0022600145",
+      "status": "unavailable",
+      "errorType": "ValueError"
     },
     {
-      "gameId": "0022600134",
-      "status": "inspected"
-    },
-    {
-      "gameId": "0022600135",
-      "status": "inspected"
+      "gameId": "0022600146",
+      "status": "unavailable",
+      "errorType": "ValueError"
     }
   ]
 }
