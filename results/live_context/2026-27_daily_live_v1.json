@@ -16,27 +16,23 @@
   "deferredGames": 8,
   "rosterTeamsVerified": 0,
   "rosterTeamsUnavailable": 8,
-  "pendingIdentities": 0,
+  "pendingIdentities": 6,
   "summaryInspections": [
     {
       "gameId": "0022600132",
-      "status": "unavailable",
-      "errorType": "ValueError"
+      "status": "inspected"
     },
     {
       "gameId": "0022600133",
-      "status": "unavailable",
-      "errorType": "ValueError"
+      "status": "inspected"
     },
     {
       "gameId": "0022600134",
-      "status": "unavailable",
-      "errorType": "ValueError"
+      "status": "inspected"
     },
     {
       "gameId": "0022600135",
-      "status": "unavailable",
-      "errorType": "ValueError"
+      "status": "inspected"
     }
   ],
   "scope": "prepared-matchups-not-feed-readiness-or-release-certification"
