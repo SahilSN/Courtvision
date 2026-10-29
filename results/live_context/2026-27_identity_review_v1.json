@@ -2,14 +2,14 @@
   "schemaVersion": 1,
   "season": "2026-27",
   "gameDate": "2026-10-28",
-  "checkedAt": "2026-10-29T00:36:20.129973+00:00",
+  "checkedAt": "2026-10-29T02:30:17.312993+00:00",
   "scope": "nightly-summary-roster-review-not-full-game-coverage",
   "pending": [
     {
       "teamId": 1610612748,
       "fullName": "Ryan Conwell",
       "reason": "unresolved",
-      "profileErrorType": "ValueError"
+      "profileErrorType": "TimeoutError"
     },
     {
       "teamId": 1610612764,
@@ -21,13 +21,13 @@
       "teamId": 1610612739,
       "fullName": "Tristan Enaruna",
       "reason": "unresolved",
-      "profileErrorType": "ValueError"
+      "profileErrorType": "TimeoutError"
     },
     {
       "teamId": 1610612766,
       "fullName": "Hannes Steinbach",
       "reason": "unresolved",
-      "profileErrorType": "ValueError"
+      "profileErrorType": "TimeoutError"
     },
     {
       "teamId": 1610612755,
