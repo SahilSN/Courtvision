@@ -2,19 +2,30 @@
   "schemaVersion": 1,
   "season": "2026-27",
   "gameDate": "2026-10-29",
-  "checkedAt": "2026-10-29T23:05:43.968555+00:00",
+  "checkedAt": "2026-10-30T00:30:15.313273+00:00",
   "scope": "nightly-summary-roster-review-not-full-game-coverage",
-  "pending": [],
+  "pending": [
+    {
+      "teamId": 1610612739,
+      "fullName": "Ernest Udeh Jr.",
+      "reason": "unresolved",
+      "profileErrorType": "ValueError"
+    },
+    {
+      "teamId": 1610612740,
+      "fullName": "Julian Reese",
+      "reason": "unresolved",
+      "profileErrorType": "ValueError"
+    }
+  ],
   "games": [
     {
       "gameId": "0022600144",
-      "status": "unavailable",
-      "errorType": "ValueError"
+      "status": "inspected"
     },
     {
       "gameId": "0022600145",
-      "status": "unavailable",
-      "errorType": "ValueError"
+      "status": "inspected"
     },
     {
       "gameId": "0022600146",

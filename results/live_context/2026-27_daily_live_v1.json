@@ -15,17 +15,15 @@
   "deferredGames": 0,
   "rosterTeamsVerified": 0,
   "rosterTeamsUnavailable": 6,
-  "pendingIdentities": 0,
+  "pendingIdentities": 2,
   "summaryInspections": [
     {
       "gameId": "0022600144",
-      "status": "unavailable",
-      "errorType": "ValueError"
+      "status": "inspected"
     },
     {
       "gameId": "0022600145",
-      "status": "unavailable",
-      "errorType": "ValueError"
+      "status": "inspected"
     },
     {
       "gameId": "0022600146",
