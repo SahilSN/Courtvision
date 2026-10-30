@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "season": "2026-27",
   "gameDate": "2026-10-29",
-  "checkedAt": "2026-10-30T02:20:40.619244+00:00",
+  "checkedAt": "2026-10-30T07:34:10.424797+00:00",
   "scope": "nightly-summary-roster-review-not-full-game-coverage",
   "pending": [
     {
@@ -15,7 +15,7 @@
       "teamId": 1610612740,
       "fullName": "Julian Reese",
       "reason": "unresolved",
-      "profileErrorType": "ValueError"
+      "profileErrorType": "TimeoutError"
     },
     {
       "teamId": 1610612763,
