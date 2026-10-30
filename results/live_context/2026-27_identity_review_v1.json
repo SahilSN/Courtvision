@@ -1,41 +1,30 @@
 {
   "schemaVersion": 1,
   "season": "2026-27",
-  "gameDate": "2026-10-29",
-  "checkedAt": "2026-10-30T07:50:09.898479+00:00",
+  "gameDate": "2026-10-30",
+  "checkedAt": "2026-10-30T08:00:41.756420+00:00",
   "scope": "nightly-summary-roster-review-not-full-game-coverage",
-  "pending": [
-    {
-      "teamId": 1610612739,
-      "fullName": "Ernest Udeh Jr.",
-      "reason": "unresolved",
-      "profileErrorType": "ValueError"
-    },
-    {
-      "teamId": 1610612740,
-      "fullName": "Julian Reese",
-      "reason": "unresolved",
-      "profileErrorType": "ValueError"
-    },
-    {
-      "teamId": 1610612763,
-      "fullName": "Karim Lopez",
-      "reason": "unresolved",
-      "profileErrorType": "ValueError"
-    }
-  ],
+  "pending": [],
   "games": [
     {
-      "gameId": "0022600144",
-      "status": "inspected"
+      "gameId": "0022600015",
+      "status": "unavailable",
+      "errorType": "ValueError"
     },
     {
-      "gameId": "0022600145",
-      "status": "inspected"
+      "gameId": "0022600016",
+      "status": "unavailable",
+      "errorType": "ValueError"
     },
     {
-      "gameId": "0022600146",
-      "status": "inspected"
+      "gameId": "0022600017",
+      "status": "unavailable",
+      "errorType": "ValueError"
+    },
+    {
+      "gameId": "0022600018",
+      "status": "unavailable",
+      "errorType": "ValueError"
     }
   ]
 }
