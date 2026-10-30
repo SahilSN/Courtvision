@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "season": "2026-27",
   "gameDate": "2026-10-29",
-  "checkedAt": "2026-10-30T00:30:15.313273+00:00",
+  "checkedAt": "2026-10-30T02:20:40.619244+00:00",
   "scope": "nightly-summary-roster-review-not-full-game-coverage",
   "pending": [
     {
@@ -14,6 +14,12 @@
     {
       "teamId": 1610612740,
       "fullName": "Julian Reese",
+      "reason": "unresolved",
+      "profileErrorType": "ValueError"
+    },
+    {
+      "teamId": 1610612763,
+      "fullName": "Karim Lopez",
       "reason": "unresolved",
       "profileErrorType": "ValueError"
     }
@@ -29,8 +35,7 @@
     },
     {
       "gameId": "0022600146",
-      "status": "unavailable",
-      "errorType": "ValueError"
+      "status": "inspected"
     }
   ]
 }

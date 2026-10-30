@@ -15,7 +15,7 @@
   "deferredGames": 0,
   "rosterTeamsVerified": 0,
   "rosterTeamsUnavailable": 6,
-  "pendingIdentities": 2,
+  "pendingIdentities": 3,
   "summaryInspections": [
     {
       "gameId": "0022600144",
@@ -27,8 +27,7 @@
     },
     {
       "gameId": "0022600146",
-      "status": "unavailable",
-      "errorType": "ValueError"
+      "status": "inspected"
     }
   ],
   "scope": "prepared-matchups-not-feed-readiness-or-release-certification"
