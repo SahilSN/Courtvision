@@ -3,8 +3,8 @@
   "season": "2026-27",
   "seasonType": "Regular Season",
   "scope": "prior-results-cross-check",
-  "completeThrough": "2026-10-29",
-  "checkedAt": "2026-10-30T08:00:41.334766+00:00",
+  "completeThrough": "2026-11-01",
+  "checkedAt": "2026-11-02T09:00:44.349980+00:00",
   "checkedDays": [
     "2026-09-30",
     "2026-10-01",
@@ -35,7 +35,10 @@
     "2026-10-26",
     "2026-10-27",
     "2026-10-28",
-    "2026-10-29"
+    "2026-10-29",
+    "2026-10-30",
+    "2026-10-31",
+    "2026-11-01"
   ],
   "source": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard",
   "games": [
@@ -128,6 +131,106 @@
       "espnEventId": "401909096",
       "homeScore": 110,
       "awayScore": 114
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600015",
+      "gameDate": "2026-10-30",
+      "homeTeamId": 1610612764,
+      "awayTeamId": 1610612766,
+      "espnEventId": "401909277",
+      "homeScore": 95,
+      "awayScore": 79
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600016",
+      "gameDate": "2026-10-30",
+      "homeTeamId": 1610612738,
+      "awayTeamId": 1610612741,
+      "espnEventId": "401909278",
+      "homeScore": 125,
+      "awayScore": 111
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600017",
+      "gameDate": "2026-10-30",
+      "homeTeamId": 1610612751,
+      "awayTeamId": 1610612765,
+      "espnEventId": "401909279",
+      "homeScore": 94,
+      "awayScore": 110
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600018",
+      "gameDate": "2026-10-30",
+      "homeTeamId": 1610612755,
+      "awayTeamId": 1610612752,
+      "espnEventId": "401909280",
+      "homeScore": 98,
+      "awayScore": 93
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600019",
+      "gameDate": "2026-10-30",
+      "homeTeamId": 1610612761,
+      "awayTeamId": 1610612753,
+      "espnEventId": "401909281",
+      "homeScore": 114,
+      "awayScore": 121
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600020",
+      "gameDate": "2026-10-30",
+      "homeTeamId": 1610612748,
+      "awayTeamId": 1610612754,
+      "espnEventId": "401909282",
+      "homeScore": 145,
+      "awayScore": 125
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600021",
+      "gameDate": "2026-10-30",
+      "homeTeamId": 1610612742,
+      "awayTeamId": 1610612745,
+      "espnEventId": "401909283",
+      "homeScore": 116,
+      "awayScore": 111
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600022",
+      "gameDate": "2026-10-30",
+      "homeTeamId": 1610612750,
+      "awayTeamId": 1610612746,
+      "espnEventId": "401909284",
+      "homeScore": 127,
+      "awayScore": 101
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600023",
+      "gameDate": "2026-10-30",
+      "homeTeamId": 1610612744,
+      "awayTeamId": 1610612747,
+      "espnEventId": "401909285",
+      "homeScore": 112,
+      "awayScore": 95
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600024",
+      "gameDate": "2026-10-30",
+      "homeTeamId": 1610612756,
+      "awayTeamId": 1610612743,
+      "espnEventId": "401909286",
+      "homeScore": 120,
+      "awayScore": 127
     },
     {
       "season": "2026-27",
@@ -748,6 +851,116 @@
       "espnEventId": "401909895",
       "homeScore": 103,
       "awayScore": 124
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600147",
+      "gameDate": "2026-10-31",
+      "homeTeamId": 1610612762,
+      "awayTeamId": 1610612757,
+      "espnEventId": "401909896",
+      "homeScore": 90,
+      "awayScore": 112
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600148",
+      "gameDate": "2026-10-31",
+      "homeTeamId": 1610612766,
+      "awayTeamId": 1610612755,
+      "espnEventId": "401909897",
+      "homeScore": 104,
+      "awayScore": 109
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600149",
+      "gameDate": "2026-10-31",
+      "homeTeamId": 1610612740,
+      "awayTeamId": 1610612737,
+      "espnEventId": "401909898",
+      "homeScore": 121,
+      "awayScore": 99
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600150",
+      "gameDate": "2026-10-31",
+      "homeTeamId": 1610612763,
+      "awayTeamId": 1610612758,
+      "espnEventId": "401909899",
+      "homeScore": 136,
+      "awayScore": 105
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600151",
+      "gameDate": "2026-10-31",
+      "homeTeamId": 1610612749,
+      "awayTeamId": 1610612739,
+      "espnEventId": "401909900",
+      "homeScore": 111,
+      "awayScore": 136
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600152",
+      "gameDate": "2026-10-31",
+      "homeTeamId": 1610612759,
+      "awayTeamId": 1610612750,
+      "espnEventId": "401909901",
+      "homeScore": 121,
+      "awayScore": 111
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600153",
+      "gameDate": "2026-10-31",
+      "homeTeamId": 1610612745,
+      "awayTeamId": 1610612760,
+      "espnEventId": "401909902",
+      "homeScore": 119,
+      "awayScore": 98
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600154",
+      "gameDate": "2026-11-01",
+      "homeTeamId": 1610612753,
+      "awayTeamId": 1610612738,
+      "espnEventId": "401909903",
+      "homeScore": 97,
+      "awayScore": 108
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600155",
+      "gameDate": "2026-11-01",
+      "homeTeamId": 1610612754,
+      "awayTeamId": 1610612751,
+      "espnEventId": "401909904",
+      "homeScore": 90,
+      "awayScore": 98
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600156",
+      "gameDate": "2026-11-01",
+      "homeTeamId": 1610612744,
+      "awayTeamId": 1610612746,
+      "espnEventId": "401909905",
+      "homeScore": 124,
+      "awayScore": 112
+    },
+    {
+      "season": "2026-27",
+      "gameId": "0022600157",
+      "gameDate": "2026-11-01",
+      "homeTeamId": 1610612747,
+      "awayTeamId": 1610612761,
+      "espnEventId": "401909906",
+      "homeScore": 131,
+      "awayScore": 125
     }
   ]
 }
