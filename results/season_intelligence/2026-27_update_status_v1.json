@@ -1,28 +1,40 @@
 {
   "season": "2026-27",
-  "checkedAt": "2026-11-11T09:00:17.067563+00:00",
+  "checkedAt": "2026-11-12T10:42:08.374982+00:00",
   "sourceError": null,
   "pipelines": {
     "teams": {
       "status": "success",
-      "checkedAt": "2026-11-11T09:00:17.067563+00:00",
-      "lastSuccessfulCheckAt": "2026-11-11T09:00:17.067563+00:00",
-      "gamesThrough": "2026-11-10",
-      "processedGames": 160,
-      "completedGames": 160,
+      "checkedAt": "2026-11-12T10:42:08.374982+00:00",
+      "lastSuccessfulCheckAt": "2026-11-12T10:42:08.374982+00:00",
+      "gamesThrough": "2026-11-11",
+      "processedGames": 170,
+      "completedGames": 170,
       "pendingGameIds": [],
       "failures": [],
       "error": null
     },
     "players": {
-      "status": "success",
-      "checkedAt": "2026-11-11T09:00:17.067563+00:00",
+      "status": "partial",
+      "checkedAt": "2026-11-12T10:42:08.374982+00:00",
       "lastSuccessfulCheckAt": "2026-11-11T09:00:17.067563+00:00",
-      "gamesThrough": "2026-11-10",
-      "processedGames": 160,
-      "completedGames": 160,
-      "pendingGameIds": [],
-      "failures": [],
+      "gamesThrough": "2026-11-11",
+      "processedGames": 168,
+      "completedGames": 170,
+      "pendingGameIds": [
+        "0022600217",
+        "0022600222"
+      ],
+      "failures": [
+        {
+          "gameId": "0022600217",
+          "error": "HTTPSConnectionPool(host='stats.nba.com', port=443): Read timed out. (read timeout=60)"
+        },
+        {
+          "gameId": "0022600222",
+          "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+        }
+      ],
       "error": null
     }
   }
