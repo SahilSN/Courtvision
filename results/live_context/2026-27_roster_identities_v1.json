@@ -2,13 +2,13 @@
   "schemaVersion": 1,
   "season": "2026-27",
   "seasonType": "Regular Season",
-  "gameDate": "2026-11-19",
-  "checkedAt": "2026-11-19T09:01:38.351587+00:00",
+  "gameDate": "2026-11-21",
+  "checkedAt": "2026-11-21T09:01:07.336201+00:00",
   "source": "NBA CommonTeamRoster",
   "teams": [
     {
-      "teamId": 1610612744,
-      "source": "https://stats.nba.com/stats/commonteamroster?TeamID=1610612744&Season=2026-27&LeagueID=00",
+      "teamId": 1610612742,
+      "source": "https://stats.nba.com/stats/commonteamroster?TeamID=1610612742&Season=2026-27&LeagueID=00",
       "status": "unavailable",
       "players": [],
       "errorType": "TimeoutError"
@@ -42,15 +42,15 @@
       "errorType": "TimeoutError"
     },
     {
-      "teamId": 1610612757,
-      "source": "https://stats.nba.com/stats/commonteamroster?TeamID=1610612757&Season=2026-27&LeagueID=00",
+      "teamId": 1610612755,
+      "source": "https://stats.nba.com/stats/commonteamroster?TeamID=1610612755&Season=2026-27&LeagueID=00",
       "status": "unavailable",
       "players": [],
       "errorType": "TimeoutError"
     },
     {
-      "teamId": 1610612759,
-      "source": "https://stats.nba.com/stats/commonteamroster?TeamID=1610612759&Season=2026-27&LeagueID=00",
+      "teamId": 1610612757,
+      "source": "https://stats.nba.com/stats/commonteamroster?TeamID=1610612757&Season=2026-27&LeagueID=00",
       "status": "unavailable",
       "players": [],
       "errorType": "TimeoutError"
