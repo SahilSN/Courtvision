@@ -2,39 +2,33 @@
   "schemaVersion": 1,
   "season": "2026-27",
   "seasonType": "Regular Season",
-  "gameDate": "2026-11-23",
-  "issuedAt": "2026-11-23T09:01:41.036867+00:00",
-  "expiresAt": "2026-11-24T09:01:41.036867+00:00",
-  "contextDigest": "abd6c12c13d53d83eeb0e57011f5b5055fe0ee0838d690b9c5b677805e17deeb",
+  "gameDate": "2026-11-24",
+  "issuedAt": "2026-11-24T09:01:17.352561+00:00",
+  "expiresAt": "2026-11-25T09:01:17.352561+00:00",
+  "contextDigest": "2a2cc02cd3f9f78f55d70a67ed092cc1455eb9a604ba96cc47c67562cf2e9942",
   "gameIds": [
-    "0022600287",
-    "0022600288",
-    "0022600289",
-    "0022600290"
+    "0022600052",
+    "0022600053",
+    "0022600054"
   ],
-  "scheduledGames": 10,
-  "deferredGames": 6,
+  "scheduledGames": 3,
+  "deferredGames": 0,
   "rosterTeamsVerified": 0,
-  "rosterTeamsUnavailable": 8,
+  "rosterTeamsUnavailable": 6,
   "pendingIdentities": 0,
   "summaryInspections": [
     {
-      "gameId": "0022600287",
+      "gameId": "0022600052",
       "status": "unavailable",
       "errorType": "ValueError"
     },
     {
-      "gameId": "0022600288",
+      "gameId": "0022600053",
       "status": "unavailable",
       "errorType": "ValueError"
     },
     {
-      "gameId": "0022600289",
-      "status": "unavailable",
-      "errorType": "ValueError"
-    },
-    {
-      "gameId": "0022600290",
+      "gameId": "0022600054",
       "status": "unavailable",
       "errorType": "ValueError"
     }
