@@ -1,23 +1,28 @@
 {
   "schemaVersion": 1,
   "season": "2026-27",
-  "gameDate": "2026-11-24",
-  "checkedAt": "2026-11-24T09:01:17.352561+00:00",
+  "gameDate": "2026-11-25",
+  "checkedAt": "2026-11-25T09:00:42.384436+00:00",
   "scope": "nightly-summary-roster-review-not-full-game-coverage",
   "pending": [],
   "games": [
     {
-      "gameId": "0022600052",
+      "gameId": "0022600055",
       "status": "unavailable",
       "errorType": "ValueError"
     },
     {
-      "gameId": "0022600053",
+      "gameId": "0022600056",
       "status": "unavailable",
       "errorType": "ValueError"
     },
     {
-      "gameId": "0022600054",
+      "gameId": "0022600057",
+      "status": "unavailable",
+      "errorType": "ValueError"
+    },
+    {
+      "gameId": "0022600058",
       "status": "unavailable",
       "errorType": "ValueError"
     }
