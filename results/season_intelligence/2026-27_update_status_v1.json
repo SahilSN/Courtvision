@@ -1,26 +1,26 @@
 {
   "season": "2026-27",
-  "checkedAt": "2026-11-25T09:00:15.687408+00:00",
+  "checkedAt": "2026-11-26T09:00:14.918955+00:00",
   "sourceError": null,
   "pipelines": {
     "teams": {
       "status": "success",
-      "checkedAt": "2026-11-25T09:00:15.687408+00:00",
-      "lastSuccessfulCheckAt": "2026-11-25T09:00:15.687408+00:00",
-      "gamesThrough": "2026-11-24",
-      "processedGames": 261,
-      "completedGames": 261,
+      "checkedAt": "2026-11-26T09:00:14.918955+00:00",
+      "lastSuccessfulCheckAt": "2026-11-26T09:00:14.918955+00:00",
+      "gamesThrough": "2026-11-25",
+      "processedGames": 270,
+      "completedGames": 270,
       "pendingGameIds": [],
       "failures": [],
       "error": null
     },
     "players": {
       "status": "success",
-      "checkedAt": "2026-11-25T09:00:15.687408+00:00",
-      "lastSuccessfulCheckAt": "2026-11-25T09:00:15.687408+00:00",
-      "gamesThrough": "2026-11-24",
-      "processedGames": 261,
-      "completedGames": 261,
+      "checkedAt": "2026-11-26T09:00:14.918955+00:00",
+      "lastSuccessfulCheckAt": "2026-11-26T09:00:14.918955+00:00",
+      "gamesThrough": "2026-11-25",
+      "processedGames": 270,
+      "completedGames": 270,
       "pendingGameIds": [],
       "failures": [],
       "error": null
