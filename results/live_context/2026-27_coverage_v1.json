@@ -3,8 +3,8 @@
   "season": "2026-27",
   "seasonType": "Regular Season",
   "scope": "prior-results-cross-check",
-  "completeThrough": "2026-11-25",
-  "checkedAt": "2026-11-26T09:01:24.046121+00:00",
+  "completeThrough": "2026-11-26",
+  "checkedAt": "2026-11-27T09:00:31.726988+00:00",
   "checkedDays": [
     "2026-09-30",
     "2026-10-01",
@@ -62,7 +62,8 @@
     "2026-11-22",
     "2026-11-23",
     "2026-11-24",
-    "2026-11-25"
+    "2026-11-25",
+    "2026-11-26"
   ],
   "source": "https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard",
   "games": [
